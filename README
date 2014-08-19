@@ -1,0 +1,25 @@
+This is the Kernel source for the Wiko DarkMoon (Mediatek MT6582)
+Android 4.4.2 KitKat, binder.c patch already merged
+
+======
+
+First be sure to use the correct ToolChain (Linaro 4.6 works fine)
+
+======
+
+On terminal:
+
+export PATH=~/Your_Toolchain_PATH/
+for example /alps/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin
+
+Kernel Build Command:
+
+======
+
+1 cd to your kernel directory
+2 execute ./build.sh TARGET_PRODUCT=tinno82_wet_jb5 
+
+
+Have funn :) 
+
+SuperDragonPT
