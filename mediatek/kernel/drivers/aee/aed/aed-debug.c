@@ -291,32 +291,6 @@ static int proc_write_generate_kernel_notify(struct file* file,
 	return count;
 }
 
-static int proc_read_generate_dal(char *page, char **start,
-			     off_t off, int count,
-			     int *eof, void *data)
-{
-	int len;
-	aee_kernel_dal_show("Test for DAL \n");
-	len = sprintf(page, "DAL Generated\n");
-
-	return len;
-}
-
-static int proc_read_generate_mrdump(char *page, char **start,
-				     off_t off, int count,
-				     int *eof, void *data)
-{
-	return sprintf(page, "Usage: write message with format \"dump message\" into this file to generate ram dump\n");
-}
-
-static int proc_write_generate_mrdump(struct file* file,
-				      const char __user *buf, unsigned long count,
-				      void *data)
-{
-	aee_kdump_reboot(AEE_REBOOT_MODE_MANUAL_KDUMP, "Test mrdump API");
-	return 0;
-}
-
 int aed_proc_debug_init(struct proc_dir_entry *aed_proc_dir)
 {
 	struct proc_dir_entry *aed_proc_generate_oops_file;
@@ -324,8 +298,6 @@ int aed_proc_debug_init(struct proc_dir_entry *aed_proc_dir)
 	struct proc_dir_entry *aed_proc_generate_combo_file;
 	struct proc_dir_entry *aed_proc_generate_ke_file;
 	struct proc_dir_entry *aed_proc_generate_wdt_file;
-	struct proc_dir_entry *aed_proc_generate_dal_file;
-	struct proc_dir_entry *aed_proc_generate_mrdump_file;
 
 	spin_lock_init(&fiq_debugger_test_lock0);
 	spin_lock_init(&fiq_debugger_test_lock1);
@@ -374,24 +346,6 @@ int aed_proc_debug_init(struct proc_dir_entry *aed_proc_dir)
 	aed_proc_generate_wdt_file->write_proc = proc_write_generate_wdt;
 	aed_proc_generate_wdt_file->read_proc = proc_read_generate_wdt;
 
-	aed_proc_generate_dal_file = create_proc_read_entry("generate-dal", 
-							   0400, aed_proc_dir, 
-							   proc_read_generate_dal,
-							   NULL);
-	if(aed_proc_generate_dal_file == NULL) {
-	  xlog_printk(ANDROID_LOG_ERROR, AEK_LOG_TAG, "aed create_proc_read_entry failed at generate-dal\n");
-	  return -ENOMEM;
-	}
-
-	aed_proc_generate_mrdump_file = create_proc_entry("generate-mrdump",
-							  S_IFREG | 0600, aed_proc_dir);
-	if (aed_proc_generate_mrdump_file == NULL) {
-		xlog_printk(ANDROID_LOG_ERROR, AEK_LOG_TAG, "aed create_proc_read_entry failed at generate-wdt\n");
-		return -ENOMEM;
-	}
-	aed_proc_generate_mrdump_file->write_proc = proc_write_generate_mrdump;
-	aed_proc_generate_mrdump_file->read_proc = proc_read_generate_mrdump;
-
 	return 0;
 }
 
@@ -402,8 +356,6 @@ int aed_proc_debug_done(struct proc_dir_entry *aed_proc_dir)
 	remove_proc_entry("generate-ee", aed_proc_dir);
 	remove_proc_entry("generate-combo", aed_proc_dir);
 	remove_proc_entry("generate-wdt", aed_proc_dir);
-	remove_proc_entry("generate-dal", aed_proc_dir);
-	remove_proc_entry("generate-mt-ramdump", aed_proc_dir);
 	return 0;
 }
 

@@ -14,10 +14,6 @@
 
 /*
 ** $Log: que_mgt.c $
-**
-** 05 06 2013 yuche.tsai
-** [ALPS00625499] [GN_WIFI]wifi????????
-** Fix p2p device interface & group interface may conflict issue.
  *
  * 03 02 2012 terry.wu
  * NULL
@@ -570,21 +566,6 @@ qmInit(
     prAdapter->rWifiVar.fgSupportULPSMP = FALSE;
 #endif
 
-#if CFG_SUPPORT_RX_SGI
-    prAdapter->rWifiVar.u8SupportRxSgi20 = 0;
-    prAdapter->rWifiVar.u8SupportRxSgi40 = 0;
-#else
-    prAdapter->rWifiVar.u8SupportRxSgi20 = 2;
-    prAdapter->rWifiVar.u8SupportRxSgi40 = 2;
-#endif
-
-#if CFG_SUPPORT_RX_HT_GF
-    prAdapter->rWifiVar.u8SupportRxGf = 0;
-#else
-    prAdapter->rWifiVar.u8SupportRxGf = 2;
-#endif
-
-
     //4 <2> Initialize other TX queues (queues not in STA_RECs)
     for(u4QueArrayIdx = 0; u4QueArrayIdx < NUM_OF_PER_TYPE_TX_QUEUES; u4QueArrayIdx++){
         QUEUE_INITIALIZE(&(prQM->arTxQueue[u4QueArrayIdx]));
@@ -685,6 +666,10 @@ qmInit(
         prQM->au4HeadStaRecIndex[i] = 0;
     }
 }
+#endif
+
+#if QM_TC_RESOURCE_EMPTY_COUNTER
+    kalMemZero(prQM->au4QmTcResourceEmptyCounter, sizeof(prQM->au4QmTcResourceEmptyCounter));
 #endif
 
 }
@@ -1413,7 +1398,22 @@ qmEnqueueTxPackets(
 
         //4 <4> Enqueue the packet
         QUEUE_INSERT_TAIL(prTxQue, (P_QUE_ENTRY_T)prCurrentMsduInfo);
+#if QM_TC_RESOURCE_EMPTY_COUNTER
+        {
+            P_TX_CTRL_T prTxCtrl = &prAdapter->rTxCtrl;
 
+            if(prTxCtrl->rTc.aucFreeBufferCount[ucTC] == 0) {
+                prQM->au4QmTcResourceEmptyCounter[prCurrentMsduInfo->ucNetworkType][ucTC]++;
+				/*
+                DBGLOG(QM, TRACE, ("TC%d Q Empty Count: [%d]%ld\n", 
+                        ucTC, 
+                        prCurrentMsduInfo->ucNetworkType, 
+                        prQM->au4QmTcResourceEmptyCounter[prCurrentMsduInfo->ucNetworkType][ucTC]));
+			    */
+            }
+            
+        }
+#endif
 
 #if QM_TEST_MODE
         if (++prQM->u4PktCount == QM_TEST_TRIGGER_TX_COUNT){
@@ -2617,7 +2617,6 @@ qmHandleRxPackets(
     P_HIF_RX_HEADER_T   prHifRxHdr;
     QUE_T               rReturnedQue;
     PUINT_8             pucEthDestAddr;
-    BOOLEAN             fgIsBMC;
 
     //DbgPrint("QM: Enter qmHandleRxPackets()\n");
 
@@ -2653,7 +2652,6 @@ qmHandleRxPackets(
         }
 #endif
 
-        fgIsBMC = FALSE;
         if (!HIF_RX_HDR_GET_80211_FLAG(prHifRxHdr)){
 
             UINT_8 ucNetTypeIdx;
@@ -2665,10 +2663,6 @@ qmHandleRxPackets(
             prBssInfo = &(prAdapter->rWifiVar.arBssInfo[ucNetTypeIdx]);
             //DBGLOG_MEM8(QM, TRACE,prCurrSwRfb->pvHeader, 16);
             //
-
-            if (IS_BMCAST_MAC_ADDR(pucEthDestAddr) && (OP_MODE_ACCESS_POINT != prBssInfo->eCurrentOPMode)) {
-                fgIsBMC = TRUE;
-            }
 
             if( prAdapter->rRxCtrl.rFreeSwRfbList.u4NumElem
                     > (CFG_RX_MAX_PKT_NUM - CFG_NUM_OF_QM_RX_PKT_NUM)  ) {
@@ -2709,7 +2703,7 @@ qmHandleRxPackets(
             qmProcessBarFrame(prAdapter, prCurrSwRfb, &rReturnedQue);
         }
         /* Reordering is not required for this packet, return it without buffering */
-        else if(!HIF_RX_HDR_GET_REORDER_FLAG(prHifRxHdr) || fgIsBMC){
+        else if(!HIF_RX_HDR_GET_REORDER_FLAG(prHifRxHdr)){
 #if 0
             if (!HIF_RX_HDR_GET_80211_FLAG(prHifRxHdr)){
                 UINT_8 ucNetTypeIdx;
@@ -4444,13 +4438,12 @@ qmGetFrameAction(
                  }
              }
              else if (u2TxFrameCtrl == MAC_FRAME_PROBE_RSP) {
-                 if ((prBssInfo->fgIsNetAbsent) && (!p2pFuncIsChannelGrant(prAdapter))) {
+                 if( prBssInfo->fgIsNetAbsent) {
                      break;
                  }
-                 return FRAME_ACTION_TX_PKT;
             }
             else if (u2TxFrameCtrl == MAC_FRAME_DEAUTH) {
-                if (prBssInfo->fgIsNetAbsent) {
+                if( prBssInfo->fgIsNetAbsent) {
                     break;
                 }
                 DBGLOG(P2P, LOUD, ("Sending DEAUTH Frame\n"));

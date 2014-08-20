@@ -3229,11 +3229,8 @@ p2pRunEventAAAComplete (
         prP2pBssInfo = &(prAdapter->rWifiVar.arBssInfo[NETWORK_TYPE_P2P_INDEX]);
 
         eOriMediaState = prP2pBssInfo->eConnectionState;
-		if (prStaRec != NULL) {
-        	bssRemoveStaRecFromClientList(prAdapter, prP2pBssInfo, prStaRec);
-		} else {
-			break;
-		}
+
+        bssRemoveStaRecFromClientList(prAdapter, prP2pBssInfo, prStaRec);
 
         if (prP2pBssInfo->rStaRecOfClientList.u4NumElem > P2P_MAXIMUM_CLIENT_COUNT ||
             kalP2PMaxClients(prAdapter->prGlueInfo, prP2pBssInfo->rStaRecOfClientList.u4NumElem)) {

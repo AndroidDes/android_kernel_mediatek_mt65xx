@@ -613,10 +613,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_TIMER]);
 
 	switch (ipinr) {
-        case IPI_CPU_START:
-            mt_trace_ISR_start(ipinr);
-            mt_trace_ISR_end(ipinr);
-            break;
 	case IPI_TIMER:
         mt_trace_ISR_start(ipinr);
 		irq_enter();

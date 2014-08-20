@@ -83,10 +83,10 @@
 
 #include "sched.h"
 #include "../workqueue_sched.h"
-#include "linux/aee.h"
-#include "linux/mtk_ram_console.h"
 #ifdef CONFIG_MT65XX_TRACER
 #include "mach/mt_mon.h"
+#include "linux/aee.h"
+#include "linux/mtk_ram_console.h"
 #endif
 #include <linux/mt_sched_mon.h>
 #define CREATE_TRACE_POINTS
@@ -94,9 +94,6 @@
 
 #include <mtlbprof/mtlbprof.h>
 #include <mtlbprof/mtlbprof_stat.h>
-#ifdef CONFIG_MT_PRIO_TRACER
- #include <linux/prio_tracer.h>
-#endif
 
 #ifdef CONFIG_MTK_SCHED_TRACERS
 DEFINE_PER_CPU(struct task_struct *, mtk_next_task);
@@ -1671,7 +1668,7 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 #endif
 		wake_flags |= WF_MIGRATED;
 #ifdef CONFIG_MT_LOAD_BALANCE_PROFILER
-		snprintf(strings, 128, "%d:%d:%s:wakeup:%d:%d:%s", task_cpu(current), current->pid, current->comm, cpu, p->pid, p->comm);
+		sprintf(strings, "%d:%d:%s:wakeup:%d:%d:%s", task_cpu(current), current->pid, current->comm, cpu, p->pid, p->comm);
 		trace_sched_lbprof_log(strings);
 #endif		
 		set_task_cpu(p, cpu);
@@ -2099,9 +2096,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 #ifdef CONFIG_MTK_SCHED_TRACERS
 	unsigned int cpu = smp_processor_id();
 	per_cpu(mtk_next_task, cpu) = next;
-#ifdef CONFIG_MTK_RAM_CONSOLE
 	aee_rr_rec_last_sched_jiffies(cpu, sched_clock(), next->comm);
-#endif
 #endif
 	prepare_task_switch(rq, prev, next);
 
@@ -3963,61 +3958,6 @@ out_unlock:
 	__task_rq_unlock(rq);
 }
 #endif
-
-#ifdef CONFIG_MT_PRIO_TRACER
-void set_user_nice_core(struct task_struct *p, long nice)
-{
-	int old_prio, delta, on_rq;
-	unsigned long flags;
-	struct rq *rq;
-
-	if (TASK_NICE(p) == nice || nice < -20 || nice > 19)
-		return;
-	/*
-	 * We have to be careful, if called from sys_setpriority(),
-	 * the task might be in the middle of scheduling on another CPU.
-	 */
-	rq = task_rq_lock(p, &flags);
-	/*
-	 * The RT priorities are set via sched_setscheduler(), but we still
-	 * allow the 'normal' nice value to be set - but as expected
-	 * it wont have any effect on scheduling until the task is
-	 * SCHED_FIFO/SCHED_RR:
-	 */
-	if (task_has_rt_policy(p)) {
-		p->static_prio = NICE_TO_PRIO(nice);
-		goto out_unlock;
-	}
-	on_rq = p->on_rq;
-	if (on_rq)
-		dequeue_task(rq, p, 0);
-
-	p->static_prio = NICE_TO_PRIO(nice);
-	set_load_weight(p);
-	old_prio = p->prio;
-	p->prio = effective_prio(p);
-	delta = p->prio - old_prio;
-
-	if (on_rq) {
-		enqueue_task(rq, p, 0);
-		/*
-		 * If the task increased its priority or is running and
-		 * lowered its priority, then reschedule its CPU:
-		 */
-		if (delta < 0 || (delta > 0 && task_running(rq, p)))
-			resched_task(rq->curr);
-	}
-out_unlock:
-	task_rq_unlock(rq, p, &flags);
-}
-
-void set_user_nice(struct task_struct *p, long nice)
-{
-	set_user_nice_core(p, nice);
-	/* setting nice implies to set a normal sched policy */
-	update_prio_tracer(task_pid_nr(p), NICE_TO_PRIO(nice), 0, PTS_KRNL);
-}
-#else
 void set_user_nice(struct task_struct *p, long nice)
 {
 	int old_prio, delta, on_rq;
@@ -4063,7 +4003,6 @@ void set_user_nice(struct task_struct *p, long nice)
 out_unlock:
 	task_rq_unlock(rq, p, &flags);
 }
-#endif
 EXPORT_SYMBOL(set_user_nice);
 
 /*
@@ -4116,11 +4055,7 @@ SYSCALL_DEFINE1(nice, int, increment)
 	if (retval)
 		return retval;
 
-#ifdef CONFIG_MT_PRIO_TRACER
-	set_user_nice_syscall(current, nice);
-#else
 	set_user_nice(current, nice);
-#endif
 	return 0;
 }
 
@@ -4409,36 +4344,11 @@ recheck:
  *
  * NOTE that the task may be already dead.
  */
-#ifdef CONFIG_MT_PRIO_TRACER
-int sched_setscheduler_core(struct task_struct *p, int policy,
-			    const struct sched_param *param)
-{
-	return __sched_setscheduler(p, policy, param, true);
-}
-
-int sched_setscheduler(struct task_struct *p, int policy,
-		       const struct sched_param *param)
-{
-	int retval;
-
-	retval = sched_setscheduler_core(p, policy, param);
-	if (!retval) {
-		int prio = param->sched_priority & ~MT_ALLOW_RT_PRIO_BIT;
-		if (!rt_policy(policy))
-			prio = __normal_prio(p);
-		else
-			prio = MAX_RT_PRIO-1 - prio;
-		update_prio_tracer(task_pid_nr(p), prio, policy, PTS_KRNL);
-	}
-	return retval;
-}
-#else
 int sched_setscheduler(struct task_struct *p, int policy,
 		       const struct sched_param *param)
 {
 	return __sched_setscheduler(p, policy, param, true);
 }
-#endif
 EXPORT_SYMBOL_GPL(sched_setscheduler);
 
 /**
@@ -4452,36 +4362,11 @@ EXPORT_SYMBOL_GPL(sched_setscheduler);
  * stop_machine(): we create temporary high priority worker threads,
  * but our caller might not have that capability.
  */
-#ifdef CONFIG_MT_PRIO_TRACER
-int sched_setscheduler_nocheck_core(struct task_struct *p, int policy,
-				    const struct sched_param *param)
-{
-	return __sched_setscheduler(p, policy, param, false);
-}
-
-int sched_setscheduler_nocheck(struct task_struct *p, int policy,
-			       const struct sched_param *param)
-{
-        int retval;
-
-	retval = sched_setscheduler_nocheck_core(p, policy, param);
-	if (!retval) {
-		int prio = param->sched_priority & ~MT_ALLOW_RT_PRIO_BIT;
-		if (!rt_policy(policy))
-			prio = __normal_prio(p);
-		else
-			prio = MAX_RT_PRIO-1 - prio;
-		update_prio_tracer(task_pid_nr(p), prio, policy, PTS_KRNL);
-	}
-	return retval;
-}
-#else
 int sched_setscheduler_nocheck(struct task_struct *p, int policy,
 			       const struct sched_param *param)
 {
 	return __sched_setscheduler(p, policy, param, false);
 }
-#endif
 
 static int
 do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
@@ -4498,13 +4383,8 @@ do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 	rcu_read_lock();
 	retval = -ESRCH;
 	p = find_process_by_pid(pid);
-	if (p != NULL) {
-#ifdef CONFIG_MT_PRIO_TRACER
-		retval = sched_setscheduler_syscall(p, policy, &lparam);
-#else
+	if (p != NULL)
 		retval = sched_setscheduler(p, policy, &lparam);
-#endif
-	}
 	rcu_read_unlock();
 
 	return retval;
@@ -6757,7 +6637,6 @@ static int build_sched_domains(const struct cpumask *cpu_map,
 	struct s_data d;
 	int i, ret = -ENOMEM;
 
-	printk("[Sched] build_sched_domains\n");
 	alloc_state = __visit_domain_allocation_hell(&d, cpu_map);
 	if (alloc_state != sa_rootdomain)
 		goto error;
@@ -7109,7 +6988,6 @@ static int cpuset_cpu_active(struct notifier_block *nfb, unsigned long action,
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_ONLINE:
 	case CPU_DOWN_FAILED:
-		printk("[Sched] cpuset_cpu_active %lu\n", action);
 		cpuset_update_active_cpus();
 		return NOTIFY_OK;
 	default:
@@ -7179,7 +7057,6 @@ int in_sched_functions(unsigned long addr)
 
 #ifdef CONFIG_CGROUP_SCHED
 struct task_group root_task_group;
-LIST_HEAD(task_groups);
 #endif
 
 DECLARE_PER_CPU(cpumask_var_t, load_balance_tmpmask);

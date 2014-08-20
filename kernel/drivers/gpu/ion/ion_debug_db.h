@@ -42,11 +42,14 @@ struct debug_dbcl {
 enum dbis_types
 {
 	/* member */
-	DBIS_CLIENTS = 0,
+	DBIS_HEAPS,
+	DBIS_CLIENTS,
 	DBIS_BUFFERS,
 	DBIS_MMAPS,
 	DBIS_FDS,
 	DBIS_PIDS,
+	DBIS_MODS,
+	DBIS_HISTORY,
 	_TOTAL_DBIS,
 
 	/* attr */
@@ -60,26 +63,22 @@ struct dbis_child {
 	char *name;
 };
 
-struct dbis_child dbis_child_attr[] 
-		= { 
+struct dbis_child dbis_child_attr[_TOTAL_DBIS] 
+		= { {DBIS_FILE, "heaps"},
 		    {DBIS_FILE, "clients"},
 		    {DBIS_FILE, "buffers"},
 		    {DBIS_FILE, "mmaps"},
 		    {DBIS_FILE, "fds"},
 		    {DBIS_FILE, "pids"},
-		    {DBIS_DIR,  "history_record"},
-		    {DBIS_FILE, "history_clients"},
-		    {DBIS_FILE, "history_buffers"},
-		    {DBIS_FILE, "history_mmaps"},
-		    {DBIS_FILE, "history_fds"},
-		    {DBIS_FILE, "history_pids"},
+		    {DBIS_FILE, "mods"},
+		    {DBIS_DIR,  "history"},
 		};
 
 /* Ion Statistics DB */
 struct debug_dbis {
-	struct dentry *child[_TOTAL_DBIS+1];
+	struct dentry *child[_TOTAL_DBIS];
 	/* This is for history */
-	struct dentry *history_record[_TOTAL_DBIS];	/* buffers, mmaps, fds */
+	struct dentry *history_record[3];	/* buffers, mmaps, fds */
 };
 
 /* ION Debug DB Root */

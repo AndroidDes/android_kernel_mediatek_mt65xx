@@ -29,7 +29,6 @@
  *  may be accessed from irq
 */
 static spinlock_t aed_device_lock;
-static int aee_mode = AEE_MODE_MTK_ENG;	
 
 static struct proc_dir_entry *aed_proc_dir;
 static struct proc_dir_entry *aed_proc_current_ke_console_file;
@@ -1058,71 +1057,26 @@ DEFINE_SEMAPHORE(aed_dal_sem);
 static long aed_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
-
-	if( cmd == AEEIOCTL_GET_PROCESS_BT)
-	{
-		struct aee_process_bt *bt;
-
-		printk("%s: get process backtrace ioctl\n", __func__);
-
-		bt = kzalloc(sizeof(struct aee_process_bt), GFP_KERNEL);
-		if (bt == NULL) {
-			ret = -ENOMEM;
-			return ret;
-		}
-
-		if (copy_from_user(bt, (struct aee_process_bt __user *)arg, sizeof(struct aee_process_bt))) {
-			kfree(bt);
-			ret = -EFAULT;
-			return ret;
-		}
-
-		ret = aed_get_process_bt(bt);
-		if (ret == 0) {
-			if (copy_to_user((struct aee_process_bt __user *)arg, bt, sizeof(struct aee_process_bt))) {
-				kfree(bt);
-				ret = -EFAULT;
-				return ret;
-			}
-		}
-		kfree(bt);
-
-		return ret;
-	}
-    
 	
 	if(down_interruptible(&aed_dal_sem) < 0 ) {
 		return -ERESTARTSYS;
 	}
 
 	switch (cmd) {
-	case AEEIOCTL_SET_AEE_MODE:
-	{
-		if (copy_from_user(&aee_mode, (void __user *)arg, sizeof(aee_mode))) {
-			ret = -EFAULT;
-			goto EXIT;
-		}
-		xlog_printk(ANDROID_LOG_DEBUG, AEK_LOG_TAG, "set aee mode = %d\n", aee_mode);
-		break;
-	}
 	case AEEIOCTL_DAL_SHOW:
 	{
-		/*It's troublesome to allocate more than 1KB size on stack*/
+
+        /*It's troublesome to allocate more than 1KB size on stack*/
 		struct aee_dal_show *dal_show = kzalloc(sizeof(struct aee_dal_show),  
                                                 GFP_KERNEL);
-		if (dal_show == NULL) {
-			ret = -EFAULT;
+        if(dal_show == NULL) {
+            ret = -EFAULT;
 			goto EXIT;
-		}
+        }
 
 		if (copy_from_user(dal_show, (struct aee_dal_show __user *)arg,
 				   sizeof(struct aee_dal_show))) {
 			ret = -EFAULT;
-			goto OUT;
-		}
-
-		if (aee_mode >= AEE_MODE_CUSTOMER_ENG) {
-			xlog_printk(ANDROID_LOG_DEBUG, AEK_LOG_TAG, "DAL_SHOW not allowed (mode %d)\n", aee_mode);
 			goto OUT;
 		}
 		
@@ -1130,9 +1084,9 @@ static long aed_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		dal_show->msg[sizeof(dal_show->msg) - 1] = 0;
 		DAL_Printf("%s", dal_show->msg);
 
-	OUT: 
-		kfree(dal_show);
-		dal_show = NULL;
+   OUT: 
+        kfree(dal_show);
+        dal_show = NULL;
 		goto EXIT;
 	}
 	
@@ -1150,13 +1104,9 @@ static long aed_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	
 	case AEEIOCTL_SETCOLOR:
 	{
+
 		struct aee_dal_setcolor dal_setcolor;
 		
-		if (aee_mode >= AEE_MODE_CUSTOMER_ENG) {
-			xlog_printk(ANDROID_LOG_DEBUG, AEK_LOG_TAG, "SETCOLOR not allowed (mode %d)\n", aee_mode);
-			goto EXIT;
-		}
-
 		if (copy_from_user(&dal_setcolor, (struct aee_dal_setcolor __user *)arg,
 				   sizeof(struct aee_dal_setcolor))) {
 			ret = -EFAULT;
@@ -1166,11 +1116,56 @@ static long aed_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		DAL_SetColor(dal_setcolor.foreground, dal_setcolor.background);
 		break;
 	}
+	
+	case AEEIOCTL_GET_PROCESS_BT:
+	{
+		struct aee_process_bt *bt;
 
-	default:
+		printk("%s: get process backtrace ioctl\n", __func__);
+
+		bt = kzalloc(sizeof(struct aee_process_bt), GFP_KERNEL);
+		if (bt == NULL) {
+			ret = -ENOMEM;
+            goto EXIT;
+		}
+
+		if (copy_from_user(bt, (struct aee_process_bt __user *)arg, sizeof(struct aee_process_bt))) {
+			kfree(bt);
+			ret = -EFAULT;
+			goto EXIT;
+		}
+
+		ret = aed_get_process_bt(bt);
+		if (ret == 0) {
+			if (copy_to_user((struct aee_process_bt __user *)arg, bt, sizeof(struct aee_process_bt))) {
+				kfree(bt);
+				ret = -EFAULT;
+				goto EXIT;
+			}
+		}
+		kfree(bt);
+
+		break;
+	}
+    case AEEIOCTL_GET_SMP_INFO:
+	{
+        int smp_info;
+        
+#ifdef CONFIG_SMP
+        smp_info =1;
+#else
+        smp_info =0;
+#endif
+        if (copy_to_user((void __user *)arg, &smp_info, sizeof(smp_info))) {
+			ret = -EFAULT;
+			goto EXIT;
+		}     
+		break;
+    }
+        default:
 		ret = -EINVAL;
 	}
-
+	
 EXIT:
 	up(&aed_dal_sem);
 	return ret;
@@ -1191,10 +1186,8 @@ static void kernel_reportAPI(const AE_DEFECT_ATTR attr,const int db_opt, const c
     }
 }
 
-#ifndef PARTIAL_BUILD
 void aee_kernel_dal_api(const char *file, const int line, const char *msg)
 {
-#ifdef CONFIG_MTK_AEE_AED
 	if (down_interruptible(&aed_dal_sem) < 0 ) {
 		xlog_printk(ANDROID_LOG_INFO, AEK_LOG_TAG, "ERROR : aee_kernel_dal_api() get aed_dal_sem fail ");
 		return;
@@ -1208,28 +1201,16 @@ void aee_kernel_dal_api(const char *file, const int line, const char *msg)
 			up(&aed_dal_sem);
 			return;
 		}
-		if (aee_mode < AEE_MODE_CUSTOMER_ENG) {
-			dal_setcolor.foreground = 0xff00ff; // fg: purple
-			dal_setcolor.background = 0x00ff00; // bg: green
-			DAL_SetColor(dal_setcolor.foreground, dal_setcolor.background);
-			strncpy(dal_show->msg, msg, sizeof(struct aee_dal_show));
-			dal_show->msg[sizeof(dal_show->msg) - 1] = 0;
-			DAL_Printf("%s", dal_show->msg);
-			kfree(dal_show);
-		} else {
-			xlog_printk(ANDROID_LOG_DEBUG, AEK_LOG_TAG, "DAL not allowed (mode %d)\n", aee_mode);
-		}
+		dal_setcolor.foreground = 0xff00ff; // fg: purple
+		dal_setcolor.background = 0x00ff00; // bg: green
+		DAL_SetColor(dal_setcolor.foreground, dal_setcolor.background);
+		strncpy(dal_show->msg, msg, sizeof(struct aee_dal_show));
+		dal_show->msg[sizeof(dal_show->msg) - 1] = 0;
+		DAL_Printf("%s", dal_show->msg);
+		kfree(dal_show);
 	}	
 	up(&aed_dal_sem);
-#endif
 }
-#else
-void aee_kernel_dal_api(const char *file, const int line, const char *msg)
-{
-	xlog_printk(ANDROID_LOG_INFO, AEK_LOG_TAG, "aee_kernel_dal_api : <%s:%d> %s ", file, line, msg);
-	return;
-}
-#endif
 EXPORT_SYMBOL(aee_kernel_dal_api);
 
 static void external_exception(const char *assert_type, const int *log, int log_size, const int *phy, int phy_size, const char *detail)

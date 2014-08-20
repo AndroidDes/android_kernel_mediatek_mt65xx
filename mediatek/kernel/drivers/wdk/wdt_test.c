@@ -44,14 +44,16 @@
 #include <linux/kdev_t.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
-#include <mach/wd_api.h>
+//#include "mach/mt6575_fiq.h"
+#include <wd_kicker.h>
+//#include <asm/tcm.h>
 #include <linux/aee.h>
 
 
 #ifdef CONFIG_LOCAL_WDT
 extern int nr_cpu_ids;
 #else
-#define nr_cpu_ids		4
+#define nr_cpu_ids		1
 #endif
 
 
@@ -140,7 +142,7 @@ static int kwdt_thread_test(void *arg)
 
   set_current_state(TASK_INTERRUPTIBLE);
   for(;;){ 
-  	printk("wd_test debug start, cpu:%d\n", cpu);
+  	printk("wulin debug start, cpu:%d\n", cpu);
   	spin_lock(&wdt_test_lock0);
   	cpu = smp_processor_id();
   	spin_unlock(&wdt_test_lock0);
@@ -157,7 +159,7 @@ static int kwdt_thread_test(void *arg)
 	  }	
   	msleep(5*1000);//5s
   	wdt_dump_reg();
-  	printk("wd_test debug end, cpu:%d\n", cpu);
+  	printk("wulin debug end, cpu:%d\n", cpu);
   	}
   	return 0;
 }
@@ -165,11 +167,11 @@ static int start_kicker(void)
 {
 
 	int i;
-	unsigned char name[64] = {0};
+	unsigned char name[10] = {0};
 	
 
 	for(i = 0; i < nr_cpu_ids; i++){
-	sprintf(name, "wdtk-test-%d", i);
+	sprintf(name, "wdtk-%d", i);
 	printk("[WDK]:thread name: %s\n", name);
 	wk_tsk[i] = kthread_create(kwdt_thread_test, &data, name);
 	if (IS_ERR(wk_tsk[i])) {

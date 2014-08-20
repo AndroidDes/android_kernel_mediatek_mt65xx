@@ -38,12 +38,6 @@ static struct fm_lowlevel_ops MT6620fm_low_ops;
 #ifdef MT6628_FM
 static struct fm_lowlevel_ops MT6628fm_low_ops;
 #endif
-#ifdef MT6627_FM
-static struct fm_lowlevel_ops MT6627fm_low_ops;
-#endif
-#ifdef MT6630_FM
-static struct fm_lowlevel_ops MT6630fm_low_ops;
-#endif
 //MTK FM Radio private advanced features
 #if 0//(!defined(MT6620_FM)&&!defined(MT6628_FM))
 static struct fm_priv priv_adv;
@@ -238,16 +232,6 @@ fm_s32 fm_open(struct fm *fmp)
 #endif
 		}
 #endif
-#ifdef MT6627_FM
-		fm_low_ops = MT6627fm_low_ops;
-		fmp->chip_id = 0x6627;
-		WCN_DBG(FM_NTC | MAIN, "get 6627 low ops\n");
-#endif
-#ifdef MT6630_FM
-        fm_low_ops = MT6630fm_low_ops;
-        fmp->chip_id = 0x6630;
-        WCN_DBG(FM_NTC | MAIN, "get 6630 low ops\n");
-#endif
 		if(fm_low_ops.bi.pwron == NULL)
 		{
 			WCN_DBG(FM_NTC | MAIN, "get fm_low_ops fail\n");
@@ -343,16 +327,13 @@ RESTART:
         FM_EVENT_RESET(fmp->rds_event);
         FM_UNLOCK(fm_read_lock);
     } else {
-        /*if (FM_EVENT_WAIT(fmp->rds_event, FM_RDS_DATA_READY) == 0) {
+        if (FM_EVENT_WAIT(fmp->rds_event, FM_RDS_DATA_READY) == 0) {
             WCN_DBG(FM_DBG | MAIN, "fm_read wait ok\n");
             goto RESTART;
         } else {
             WCN_DBG(FM_ALT | MAIN, "fm_read wait err\n");
             return 0;
-        }*/ /*event wait caused AP stop RDS thread and re-read RDS, which caused issue ALPS00595367 */
-
-		WCN_DBG(FM_DBG | MAIN, "fm_read no event now\n");
-		return 0;
+        }
     }
 
     return (copy_len - left);
@@ -361,7 +342,6 @@ RESTART:
 fm_s32 fm_powerup(struct fm *fm, struct fm_tune_parm *parm)
 {
     fm_s32 ret = 0;
-    fm_u8 tmp_vol;
 
     FMR_ASSERT(fm_low_ops.bi.pwron);
     FMR_ASSERT(fm_low_ops.bi.pwrupseq);
@@ -406,10 +386,6 @@ fm_s32 fm_powerup(struct fm *fm, struct fm_tune_parm *parm)
     parm->err = FM_SUCCESS;
     fm_low_ops.bi.low_pwr_wa(1);
 
-    fm_low_ops.bi.volget(&tmp_vol);
-	WCN_DBG(FM_NTC | MAIN, "vol=%d!!!\n",tmp_vol);
-    
-    //fm_low_ops.bi.volset(0);
     fm->vol = 15;
 	if(fm_low_ops.ri.rds_bci_get)
 	{
@@ -1387,57 +1363,6 @@ fm_s32 fm_reg_write(struct fm *fm, fm_u8 addr, fm_u16 val)
     FM_UNLOCK(fm_ops_lock);
     return ret;
 }
-fm_s32 fm_top_read(struct fm *fm, fm_u16 addr, fm_u32 *val)
-{
-    fm_s32 ret = 0;
-
-    FMR_ASSERT(fm_low_ops.bi.top_read);
-    if (FM_LOCK(fm_ops_lock)) return (-FM_ELOCK);
-
-    ret = fm_low_ops.bi.top_read(addr, val);
-
-    FM_UNLOCK(fm_ops_lock);
-    return ret;
-}
-
-fm_s32 fm_top_write(struct fm *fm, fm_u16 addr, fm_u32 val)
-{
-    fm_s32 ret = 0;
-
-    FMR_ASSERT(fm_low_ops.bi.top_write);
-    if (FM_LOCK(fm_ops_lock)) return (-FM_ELOCK);
-
-    ret = fm_low_ops.bi.top_write(addr, val);
-
-    FM_UNLOCK(fm_ops_lock);
-    return ret;
-}
-
-fm_s32 fm_host_read(struct fm *fm, fm_u32 addr, fm_u32 *val)
-{
-    fm_s32 ret = 0;
-
-    FMR_ASSERT(fm_low_ops.bi.host_read);
-    if (FM_LOCK(fm_ops_lock)) return (-FM_ELOCK);
-
-    ret = fm_low_ops.bi.host_read(addr, val);
-
-    FM_UNLOCK(fm_ops_lock);
-    return ret;
-}
-
-fm_s32 fm_host_write(struct fm *fm, fm_u32 addr, fm_u32 val)
-{
-    fm_s32 ret = 0;
-
-    FMR_ASSERT(fm_low_ops.bi.host_write);
-    if (FM_LOCK(fm_ops_lock)) return (-FM_ELOCK);
-
-    ret = fm_low_ops.bi.host_write(addr, val);
-
-    FM_UNLOCK(fm_ops_lock);
-    return ret;
-}
 
 fm_s32 fm_chipid_get(struct fm *fm, fm_u16 *chipid)
 {
@@ -1573,11 +1498,6 @@ fm_s32 fm_rds_onoff(struct fm *fm, fm_u16 rdson_off)
 {
     fm_s32 ret = 0;
 
-    if (fm_pwr_state_get(fm) != FM_PWR_RX_ON) 
-    {
-        ret = -EPERM;
-        goto out;
-    }
     FMR_ASSERT(fm_low_ops.ri.rds_onoff);
     if (FM_LOCK(fm_ops_lock)) return (-FM_ELOCK);
 
@@ -1823,7 +1743,7 @@ fm_s32 fm_tune(struct fm *fm, struct fm_tune_parm *parm)
         ret = -EPERM;
     }
 
-	//fm_low_ops.bi.mute(fm_false);//open for dbg
+//    fm_low_ops.bi.mute(fm_false);
     fm_op_state_set(fm, FM_STA_PLAY);
 out:
     FM_UNLOCK(fm_ops_lock);
@@ -1849,39 +1769,6 @@ fm_s32 fm_cqi_log(void)
     FM_UNLOCK(fm_ops_lock);
 	return ret;
 }
-fm_s32 fm_pre_search(struct fm *fm)
-{
-    fm_s32 ret = 0;
-	FMR_ASSERT(fm_low_ops.bi.pre_search);
-	if (fm_pwr_state_get(fm) != FM_PWR_RX_ON) 
-	{
-	    return -FM_EPARA;
-	}
-	if (FM_LOCK(fm_ops_lock)) 
-	{
-		return (-FM_ELOCK);
-	}
-	ret = fm_low_ops.bi.pre_search();	
-	FM_UNLOCK(fm_ops_lock);
-	return ret;
-}
-fm_s32 fm_restore_search(struct fm *fm)
-{
-    fm_s32 ret = 0;
-	FMR_ASSERT(fm_low_ops.bi.restore_search);
-	if (fm_pwr_state_get(fm) != FM_PWR_RX_ON) 
-	{
-	    return -FM_EPARA;
-	}
-	if (FM_LOCK(fm_ops_lock)) 
-	{
-		return (-FM_ELOCK);
-	}
-	ret = fm_low_ops.bi.restore_search();	
-	FM_UNLOCK(fm_ops_lock);
-	return ret;
-}
-
 /*fm soft mute tune function*/
 fm_s32 fm_soft_mute_tune(struct fm *fm, struct fm_softmute_tune_t *parm)
 {
@@ -2298,44 +2185,31 @@ void fm_subsys_reset_work_func(unsigned long data)
     fm_sys_state_set(g_fm_struct, FM_SUBSYS_RST_START);
     
     if (g_fm_struct->chipon == fm_false)
-    {
-        WCN_DBG(FM_ALT | MAIN, "chip off no need do recover\n");
+	{
+        WCN_DBG(FM_ALT | MAIN, "no need do recover\n");
         goto out;
     }
-    fm_low_ops.bi.pwrdownseq();
     // subsystem power off
-    if (fm_low_ops.bi.pwroff(0))
-    {
-        WCN_DBG(FM_ALT | MAIN, "chip off fail\n");
-        goto out;
-    }
+    fm_low_ops.bi.pwroff(0);
     
     // prepare to reset
     
     // wait 3s
-    //fm_low_ops.bi.msdelay(2000);
+    fm_low_ops.bi.msdelay(2000);
     
     // subsystem power on
-    if (fm_low_ops.bi.pwron(0))
-    {
-        WCN_DBG(FM_ALT | MAIN, "chip on fail\n");
-        goto out;
-    }
+    fm_low_ops.bi.pwron(0);
     
     // recover context
-    if (g_fm_struct->chipon == fm_false) 
-    {
+    if (g_fm_struct->chipon == fm_false) {
         fm_low_ops.bi.pwroff(0);
         WCN_DBG(FM_ALT | MAIN, "no need do recover\n");
         goto out;
     }
 
-    if (FM_PWR_RX_ON == fm_pwr_state_get(g_fm_struct)) 
-    {
+    if (FM_PWR_RX_ON == fm_pwr_state_get(g_fm_struct)) {
         fm_low_ops.bi.pwrupseq(&g_fm_struct->chip_id, &g_fm_struct->device_id);
-    } 
-    else 
-    {
+    } else {
         WCN_DBG(FM_ALT | MAIN, "no need do re-powerup\n");
         goto out;
     }
@@ -2346,10 +2220,8 @@ void fm_subsys_reset_work_func(unsigned long data)
 
     fm_low_ops.bi.volset((fm_u8)g_fm_struct->vol);
 
-    g_fm_struct->mute=0;
     fm_low_ops.bi.mute(g_fm_struct->mute);
-    
-    g_fm_struct->rds_on=1;
+
     fm_low_ops.ri.rds_onoff(g_fm_struct->pstRDSData, g_fm_struct->rds_on);
 
     WCN_DBG(FM_ALT | MAIN, "recover done\n");
@@ -2430,7 +2302,7 @@ static fm_s32 fm_para_init(struct fm *fmp)
 fm_s32 fm_cust_config_setup(fm_s8 * filename)
 {
 	fm_s32 ret;
-#if (defined(MT6620_FM)||defined(MT6628_FM)||defined(MT6627_FM))
+#if (defined(MT6620_FM)||defined(MT6628_FM))
 #ifdef MT6628_FM	
 	ret = MT6628fm_cust_config_setup(filename);
 	if(ret < 0)
@@ -2440,13 +2312,6 @@ fm_s32 fm_cust_config_setup(fm_s8 * filename)
 #endif
 #ifdef MT6620_FM
 	ret = MT6620fm_cust_config_setup(filename);
-	if(ret < 0)
-	{
-        WCN_DBG(FM_ERR | MAIN, "MT6620fm_cust_config_setup failed\n");
-	}
-#endif
-#ifdef MT6627_FM
-	ret = MT6627fm_cust_config_setup(filename);
 	if(ret < 0)
 	{
         WCN_DBG(FM_ERR | MAIN, "MT6620fm_cust_config_setup failed\n");
@@ -2732,7 +2597,7 @@ fm_s32 fm_env_setup(void)
     fm_s32 ret = 0;
 
     WCN_DBG(FM_NTC | MAIN, "%s\n", __func__);
-#if (defined(MT6620_FM)||defined(MT6628_FM)||defined(MT6627_FM)||defined(MT6630_FM))
+#if (defined(MT6620_FM)||defined(MT6628_FM))
 #ifdef MT6620_FM	
     //register call back functions
     ret = fm_callback_register(&MT6620fm_low_ops);
@@ -2768,46 +2633,6 @@ fm_s32 fm_env_setup(void)
     WCN_DBG(FM_NTC | MAIN, "2. fm low ops registered\n");
     //get rds level functions
     ret = MT6628fm_rds_ops_register(&MT6628fm_low_ops);
-    if (ret) {
-        return ret;
-    }
-    WCN_DBG(FM_NTC | MAIN, "3. fm rds ops registered\n");
-#endif	
-#ifdef MT6627_FM	
-    //register call back functions
-    ret = fm_callback_register(&MT6627fm_low_ops);
-    if (ret) {
-        return ret;
-    }
-    WCN_DBG(FM_NTC | MAIN, "1. fm callback registered\n");
-    //get low level functions
-    ret = MT6627fm_low_ops_register(&MT6627fm_low_ops);
-    if (ret) {
-        return ret;
-    }
-    WCN_DBG(FM_NTC | MAIN, "2. fm low ops registered\n");
-    //get rds level functions
-    ret = MT6627fm_rds_ops_register(&MT6627fm_low_ops);
-    if (ret) {
-        return ret;
-    }
-    WCN_DBG(FM_NTC | MAIN, "3. fm rds ops registered\n");
-#endif	
-#ifdef MT6630_FM	
-    //register call back functions
-    ret = fm_callback_register(&MT6630fm_low_ops);
-    if (ret) {
-        return ret;
-    }
-    WCN_DBG(FM_NTC | MAIN, "1. fm callback registered\n");
-    //get low level functions
-    ret = MT6630fm_low_ops_register(&MT6630fm_low_ops);
-    if (ret) {
-        return ret;
-    }
-    WCN_DBG(FM_NTC | MAIN, "2. fm low ops registered\n");
-    //get rds level functions
-    ret = MT6630fm_rds_ops_register(&MT6630fm_low_ops);
     if (ret) {
         return ret;
     }
@@ -2903,7 +2728,7 @@ fm_s32 fm_env_destroy(void)
 
     fm_link_release();
 
-#if (defined(MT6620_FM)||defined(MT6628_FM)||defined(MT6627_FM)||defined(MT6630_FM))
+#if (defined(MT6620_FM)||defined(MT6628_FM))
 #if defined(MT6620_FM)
     //register call back functions
 		ret = fm_callback_unregister(&MT6620fm_low_ops);
@@ -2941,48 +2766,6 @@ fm_s32 fm_env_destroy(void)
 	
 		//put rds func
 		ret = MT6628fm_rds_ops_unregister(&MT6628fm_low_ops);
-	
-		if (ret) {
-			return -1;
-		}
-#endif
-#if defined(MT6627_FM)
-		//register call back functions
-		ret = fm_callback_unregister(&MT6627fm_low_ops);
-
-		if (ret) {
-			return -1;
-		}
-		//put low level functions
-		ret = MT6627fm_low_ops_unregister(&MT6627fm_low_ops);
-
-		if (ret) {
-			return -1;
-		}
-	
-		//put rds func
-		ret = MT6627fm_rds_ops_unregister(&MT6627fm_low_ops);
-	
-		if (ret) {
-			return -1;
-		}
-#endif
-#if defined(MT6630_FM)
-		//register call back functions
-		ret = fm_callback_unregister(&MT6630fm_low_ops);
-
-		if (ret) {
-			return -1;
-		}
-		//put low level functions
-		ret = MT6630fm_low_ops_unregister(&MT6630fm_low_ops);
-
-		if (ret) {
-			return -1;
-		}
-	
-		//put rds func
-		ret = MT6630fm_rds_ops_unregister(&MT6630fm_low_ops);
 	
 		if (ret) {
 			return -1;
@@ -3096,9 +2879,9 @@ fm_s32 fm_priv_unregister(struct fm_priv *pri, struct fm_pub *pub)
  */
 fm_s32 fm_get_channel_space(fm_s32 freq)
 {
-    if ((freq >= 640) && (freq <= 1080)) {
+    if ((freq >= 760) && (freq <= 1080)) {
         return 0;
-    } else if ((freq >= 6400) && (freq <= 10800)) {
+    } else if ((freq >= 7600) && (freq <= 10800)) {
         return 1;
     } else {
         return -1;

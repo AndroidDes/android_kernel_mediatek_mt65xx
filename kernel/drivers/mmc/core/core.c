@@ -267,70 +267,29 @@ static int __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
 static void mmc_wait_for_req_done(struct mmc_host *host,
 				  struct mmc_request *mrq)
 {
-#if 0
-    struct scatterlist *sg;
-    unsigned int  num;
-    unsigned int  left;
-    unsigned int  *ptr;
-    unsigned int  i;
-#endif
-
 	struct mmc_command *cmd;
 
 	while (1) {
 		if(!wait_for_completion_timeout(&mrq->completion,DAT_TIMEOUT)){
 			printk(KERN_ERR "MSDC wait request timeout CMD<%d>ARG<0x%x>\n",mrq->cmd->opcode,mrq->cmd->arg);
 			if(mrq->data){
+				mrq->data->error = (unsigned int)-ETIMEDOUT;
+				printk(KERN_ERR "MSDC wait request timeout DAT<%d>\n",(mrq->data->blocks) * (mrq->data->blksz));
 				host->ops->dma_error_reset(host);
 				}
+			}
 
-            if(mrq->data)
-                mrq->data->error = (unsigned int)-ETIMEDOUT;
+		cmd = mrq->cmd;
+		if (!cmd->error || !cmd->retries ||
+		    mmc_card_removed(host->card))
+			break;
 
-
-            printk(KERN_ERR "MSDC wait request timeout DAT<%d>\n",(mrq->data->blocks) * (mrq->data->blksz));
-        }
-
-#if 0
-    if ((mrq->cmd->arg == 0) && (mrq->data) && 
-            ((mrq->cmd->opcode == 17)||(mrq->cmd->opcode == 18))){ 
-        printk("read MBR  cmd%d: blocks %d arg %08x, sg_len = %d\n", mrq->cmd->opcode, mrq->data->blocks, mrq->cmd->arg, mrq->data->sg_len);
-            sg = mrq->data->sg;
-            num = mrq->data->sg_len;
-
-            while (num) {
-                left = sg_dma_len(sg);
-                ptr = sg_virt(sg);
-
-                printk("====left: %d\n===\n", left);
-                for (i = 0; i <= left/4; i++){
-                    printk("0x%x ", *(ptr + i));
-                    if (0 == (i + 1)%16)
-                        printk("\n");
-                }
-
-                //page = sg_to_page(sg);
-
-                /* physic addr */
-                //paddr = page_to_phys(page);
-
-                sg = sg_next(sg); 
-                num--;
-            }; 
-    }
-#endif
-
-        cmd = mrq->cmd;
-        if (!cmd->error || !cmd->retries ||
-                mmc_card_removed(host->card))
-            break;
-
-        pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
-                mmc_hostname(host), cmd->opcode, cmd->error);
-        cmd->retries--;
-        cmd->error = 0;
-        host->ops->request(host, mrq);
-    }
+		pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
+			 mmc_hostname(host), cmd->opcode, cmd->error);
+		cmd->retries--;
+		cmd->error = 0;
+		host->ops->request(host, mrq);
+	}
 }
 
 /**
@@ -345,13 +304,13 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
  *	performed while another request is running on the host.
  */
 static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
-        bool is_first_req)
+		 bool is_first_req)
 {
-    if (host->ops->pre_req) {
-        mmc_host_clk_hold(host);
-        host->ops->pre_req(host, mrq, is_first_req);
-        mmc_host_clk_release(host);
-    }
+	if (host->ops->pre_req) {
+		mmc_host_clk_hold(host);
+		host->ops->pre_req(host, mrq, is_first_req);
+		mmc_host_clk_release(host);
+	}
 }
 
 /**

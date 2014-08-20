@@ -102,8 +102,14 @@
  ****************************************************************************
 */
 
-#define BOARD_ID                MT6582_EVB
+#define BOARD_ID                TINNO
+//MMD2
+//#define CS_PART_NUMBER[0]       H9TP32A8JDMCPR_KGM_MMD2		//H9TP32A8JDMCPR_KGM
+//#define CS_PART_NUMBER[1]       H9TP17A8JDACNR_MMD2
+//MMD1
+#define CS_PART_NUMBER[0]       H9TP32A8JDMCPR_KGM		//H9TP32A8JDMCPR_KGM
+#define CS_PART_NUMBER[1]       H9TP17A8JDACNR
 
-#define CS_PART_NUMBER[0]       H9TP32A8JDACPR_KGM
-#define CS_PART_NUMBER[1]       KMK5U000VM_B309
+//#define CS_PART_NUMBER[1]       KMNJS000ZM_B205		//H9TP32A8JDMCPR_KGM
+
 #endif /* __CUSTOM_MEMORYDEVICE__ */

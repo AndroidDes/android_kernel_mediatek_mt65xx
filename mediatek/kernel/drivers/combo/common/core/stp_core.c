@@ -2242,7 +2242,7 @@ int mtk_wcn_stp_parser_data(UINT8 *buffer, UINT32 length)
                             if (0 == mtk_wcn_stp_coredump_flag_get()) {
                                 STP_ERR_FUNC("fw error happend but coredump disabled\n");
                             } else {
-                            osal_dbg_assert_aee(stp_core_ctx.rx_buf, stp_core_ctx.rx_buf);
+                                osal_dbg_assert_aee(stp_core_ctx.rx_buf, stp_core_ctx.rx_buf);
                             }
                             
                             /*Whole Chip Reset Procedure Invoke*/
@@ -2701,7 +2701,7 @@ INT32 mtk_wcn_stp_send_data(const UINT8 *buffer, const UINT32 length, const UINT
     {
 	    //if(stp_is_apply_powersaving()) 
 	   {
-		    if((MTK_WCN_BOOL_FALSE == stp_is_privileges_cmd(buffer, length , type))) 
+		    if((MTK_WCN_BOOL_FALSE == stp_is_privileges_cmd(buffer, length , type)))
 		    {
 			
 		    	/*-----------------------------STP_PSM_UnLock----------------------------------------*/

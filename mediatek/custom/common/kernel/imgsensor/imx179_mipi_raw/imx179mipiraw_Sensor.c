@@ -63,15 +63,7 @@ kal_bool IMX179MIPI_Auto_Flicker_mode = KAL_FALSE;
 kal_uint8 IMX179MIPI_sensor_write_I2C_address = IMX179MIPI_WRITE_ID;
 kal_uint8 IMX179MIPI_sensor_read_I2C_address = IMX179MIPI_READ_ID;
 
-#define IMX179_USE_OTP
 
-#ifdef IMX179_USE_OTP
-static uint16_t used_otp = 0;
-static uint16_t ret = -1;
-extern int imx179_update_otp_wb(void);
-extern int imx179_update_awb_gain(void);
-extern int imx179_check_mid(uint mid);
-#endif
 	
 static struct IMX179MIPI_sensor_STRUCT IMX179MIPI_sensor={IMX179MIPI_WRITE_ID,IMX179MIPI_READ_ID,KAL_TRUE,KAL_FALSE,KAL_TRUE,KAL_FALSE,
 KAL_FALSE,KAL_FALSE,KAL_FALSE,259200000,259200000,259200000,0,0,0,64,64,64,IMX179MIPI_PV_LINE_LENGTH_PIXELS,IMX179MIPI_PV_FRAME_LENGTH_LINES,
@@ -769,7 +761,7 @@ static void IMX179MIPI_Sensor_Init(void)
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x01);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x00);//STREAM OFF 	
 	IMX179MIPI_write_cmos_sensor(0x0103, 0x01);//SW reset
-	IMX179MIPI_write_cmos_sensor(0x0101, 0x03);//0x00-HV,0x03-NORMAL
+	IMX179MIPI_write_cmos_sensor(0x0101, 0x00); 		 
 	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);		   
 	IMX179MIPI_write_cmos_sensor(0x0202, 0x09); //0x0202, 0x09		 
 	IMX179MIPI_write_cmos_sensor(0x0203, 0xcc);//(0x0203, 0xcc)
@@ -832,14 +824,6 @@ static void IMX179MIPI_Sensor_Init(void)
 	IMX179MIPI_write_cmos_sensor(0x4100, 0x0E);             
 	IMX179MIPI_write_cmos_sensor(0x4108, 0x01);             
 	IMX179MIPI_write_cmos_sensor(0x4109, 0x7C);
-#ifdef IMX179_USE_OTP
-        if(ret == 0)
-        {
-	    SENSORDB("[IMX179_USE_OTP]IMX179MIPI_Sensor_Init function,imx179_update_awb_gain\n");
-	    imx179_update_awb_gain();
-        }
-#endif
-
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x00);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x01);//STREAM ON
 	// The register only need to enable 1 time.    
@@ -855,7 +839,7 @@ void VideoFullSizeSetting(void)//16:9   6M
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x01);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x00);//STREAM OFF 	
 	IMX179MIPI_write_cmos_sensor(0x0103, 0x01);//SW reset
-	IMX179MIPI_write_cmos_sensor(0x0101, 0x03);//0x00-HV,0x03-NORMAL
+	IMX179MIPI_write_cmos_sensor(0x0101, 0x00); 		 
 	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);		   
 	IMX179MIPI_write_cmos_sensor(0x0202, 0x09); //0x0202, 0x09		 
 	IMX179MIPI_write_cmos_sensor(0x0203, 0xcc);//(0x0203, 0xcc)
@@ -918,195 +902,10 @@ void VideoFullSizeSetting(void)//16:9   6M
 	IMX179MIPI_write_cmos_sensor(0x4100, 0x0E);             
 	IMX179MIPI_write_cmos_sensor(0x4108, 0x01);             
 	IMX179MIPI_write_cmos_sensor(0x4109, 0x7C);
-#ifdef IMX179_USE_OTP
-        if(ret == 0)
-        {
-	    SENSORDB("[IMX179_USE_OTP]VideoFullSizeSetting function,imx179_update_awb_gain\n");
-	    imx179_update_awb_gain();
-        }
-#endif
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x00);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x01);//STREAM ON
 	SENSORDB("[IMX179MIPI]exit VideoFullSizeSetting function\n");
 }
-
-
-void VideoUsePreviewSetting(void)
-{
-	SENSORDB("[IMX179MIPI]enter VideoUsePreviewSetting function\n");
-	IMX179MIPI_write_cmos_sensor(0x41C0, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0104, 0x01);//group
-	IMX179MIPI_write_cmos_sensor(0x0100, 0x00);//STREAM OFF 	
-	IMX179MIPI_write_cmos_sensor(0x0103, 0x01);//SW reset
-	IMX179MIPI_write_cmos_sensor(0x0101, 0x03);//0x00-HV,0x03-NORMAL
-	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);		   
-	IMX179MIPI_write_cmos_sensor(0x0202, 0x09); //0x0202, 0x09		 
-	IMX179MIPI_write_cmos_sensor(0x0203, 0xcc);//(0x0203, 0xcc)
-	//PLL setting
-	IMX179MIPI_write_cmos_sensor(0x0301, 0x05); 		 
-	IMX179MIPI_write_cmos_sensor(0x0303, 0x01); 		 
-	IMX179MIPI_write_cmos_sensor(0x0305, 0x06); 		 
-	IMX179MIPI_write_cmos_sensor(0x0309, 0x05); 		 
-	IMX179MIPI_write_cmos_sensor(0x030B, 0x01); 		 
-	IMX179MIPI_write_cmos_sensor(0x030C, 0x00); 		 
-	IMX179MIPI_write_cmos_sensor(0x030D, 0xA2); //(0x030D, 0xA2)
-	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);
-	
-	IMX179MIPI_write_cmos_sensor(0x0340, 0x09);//(0x0340, 0x09)
-	IMX179MIPI_write_cmos_sensor(0x0341, 0xD0); 		 
-	IMX179MIPI_write_cmos_sensor(0x0342, 0x0D); 		
-	IMX179MIPI_write_cmos_sensor(0x0343, 0x70);//(0x0343, 0x0D) 		 
-	IMX179MIPI_write_cmos_sensor(0x0344, 0x00); 		 
-	IMX179MIPI_write_cmos_sensor(0x0345, 0x00); 		 
-	IMX179MIPI_write_cmos_sensor(0x0346, 0x00); 		 
-	IMX179MIPI_write_cmos_sensor(0x0347, 0x00);// (0x0347, 0x00)		 
-	IMX179MIPI_write_cmos_sensor(0x0348, 0x0C); 		
-	IMX179MIPI_write_cmos_sensor(0x0349, 0xCF); 		 
-	IMX179MIPI_write_cmos_sensor(0x034A, 0x09);// (0x034A, 0x09)		 
-	IMX179MIPI_write_cmos_sensor(0x034B, 0x9F);//(0x034B, 0x9F) 		 
-	IMX179MIPI_write_cmos_sensor(0x034C, 0x06); 		 
-	IMX179MIPI_write_cmos_sensor(0x034D, 0x68); 		 
-	IMX179MIPI_write_cmos_sensor(0x034E, 0x04); 		 
-	IMX179MIPI_write_cmos_sensor(0x034F, 0xD0);//(0x034F, 0xD0)		 
-	IMX179MIPI_write_cmos_sensor(0x0383, 0x01); 		 
-	IMX179MIPI_write_cmos_sensor(0x0387, 0x01); 		
-	IMX179MIPI_write_cmos_sensor(0x0390, 0x01); 		 
-	IMX179MIPI_write_cmos_sensor(0x0401, 0x00); 		 
-	IMX179MIPI_write_cmos_sensor(0x0405, 0x10); 		 
-	IMX179MIPI_write_cmos_sensor(0x3020, 0x10); 		 
-	IMX179MIPI_write_cmos_sensor(0x3041, 0x15); 		 
-	IMX179MIPI_write_cmos_sensor(0x3042, 0x87); 		 
-	IMX179MIPI_write_cmos_sensor(0x3089, 0x4F); 		 
-	IMX179MIPI_write_cmos_sensor(0x3309, 0x9A); 		 
-	IMX179MIPI_write_cmos_sensor(0x3344, 0x57);//(0x3344, 0x57)		 
-	IMX179MIPI_write_cmos_sensor(0x3345, 0x1F); 		 
-	IMX179MIPI_write_cmos_sensor(0x3362, 0x0A); 		 
-	IMX179MIPI_write_cmos_sensor(0x3363, 0x0A); 		 
-	IMX179MIPI_write_cmos_sensor(0x3364, 0x00); 		
-	IMX179MIPI_write_cmos_sensor(0x3368, 0x18); 		 
-	IMX179MIPI_write_cmos_sensor(0x3369, 0x00); 		 
-	IMX179MIPI_write_cmos_sensor(0x3370, 0x77);// (0x3370, 0x77)		 	 
-	IMX179MIPI_write_cmos_sensor(0x3371, 0x2F);//(0x3371, 0x2F)             
-	IMX179MIPI_write_cmos_sensor(0x3372, 0x4F);             
-	IMX179MIPI_write_cmos_sensor(0x3373, 0x2F);             
-	IMX179MIPI_write_cmos_sensor(0x3374, 0x2F);             
-	IMX179MIPI_write_cmos_sensor(0x3375, 0x37);             
-	IMX179MIPI_write_cmos_sensor(0x3376, 0x9F);             
-	IMX179MIPI_write_cmos_sensor(0x3377, 0x37);             
-	IMX179MIPI_write_cmos_sensor(0x33C8, 0x00);             
-	IMX179MIPI_write_cmos_sensor(0x33D4, 0x06);             
-	IMX179MIPI_write_cmos_sensor(0x33D5, 0x68);             
-	IMX179MIPI_write_cmos_sensor(0x33D6, 0x04);             
-	IMX179MIPI_write_cmos_sensor(0x33D7, 0xD0);             
-	IMX179MIPI_write_cmos_sensor(0x4100, 0x0E);             
-	IMX179MIPI_write_cmos_sensor(0x4108, 0x01);             
-	IMX179MIPI_write_cmos_sensor(0x4109, 0x7C);
-#ifdef IMX179_USE_OTP
-        if(ret == 0)
-        {
-	    SENSORDB("[IMX179_USE_OTP]PreviewSetting function,imx179_update_awb_gain\n");
-	    imx179_update_awb_gain();
-        }
-#endif
-	IMX179MIPI_write_cmos_sensor(0x0104, 0x00);//group
-	IMX179MIPI_write_cmos_sensor(0x0100, 0x01);//STREAM ON
-	// The register only need to enable 1 time.    
-	spin_lock(&imx179_drv_lock);  
-	IMX179MIPI_Auto_Flicker_mode = KAL_FALSE;	  // reset the flicker status	 
-	spin_unlock(&imx179_drv_lock);
-	SENSORDB("[IMX179MIPI]exit VideoUsePreviewSetting function\n");
-}
-
-
-void Video720pSetting(void) // 720P  // Brown
-{
-	SENSORDB("[IMX179MIPI]enter Video 720P function. -----Warning!!!  No AE in video call \n");
-#if 0    
-	IMX179MIPI_write_cmos_sensor(0x41C0, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0104, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0100, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x0103, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0101, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0202, 0x09);
-	IMX179MIPI_write_cmos_sensor(0x0203, 0xcA);
-	//PLL setting                              
-	IMX179MIPI_write_cmos_sensor(0x0301, 0x05);
-	IMX179MIPI_write_cmos_sensor(0x0303, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0305, 0x06);
-	IMX179MIPI_write_cmos_sensor(0x0309, 0x05);
-	IMX179MIPI_write_cmos_sensor(0x030B, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x030C, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x030D, 0xA0);
-	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);
-	                                           
-	IMX179MIPI_write_cmos_sensor(0x0340, 0x09);
-	IMX179MIPI_write_cmos_sensor(0x0341, 0xCE);
-	IMX179MIPI_write_cmos_sensor(0x0342, 0x0D);
-	IMX179MIPI_write_cmos_sensor(0x0343, 0x48);
-	IMX179MIPI_write_cmos_sensor(0x0344, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0345, 0x60);
-	IMX179MIPI_write_cmos_sensor(0x0346, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0347, 0x08);
-	IMX179MIPI_write_cmos_sensor(0x0348, 0x0B);
-	IMX179MIPI_write_cmos_sensor(0x0349, 0x6F);
-	IMX179MIPI_write_cmos_sensor(0x034A, 0x08);
-	IMX179MIPI_write_cmos_sensor(0x034B, 0x97);
-                                             
-	IMX179MIPI_write_cmos_sensor(0x034C, 0x05);
-	IMX179MIPI_write_cmos_sensor(0x034D, 0x08);
-	IMX179MIPI_write_cmos_sensor(0x034E, 0x03);
-	IMX179MIPI_write_cmos_sensor(0x034F, 0xC8);
-                                             
-                                             
-	IMX179MIPI_write_cmos_sensor(0x0383, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0387, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0390, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x0401, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x0405, 0x10);
-	IMX179MIPI_write_cmos_sensor(0x3020, 0x10);
-	IMX179MIPI_write_cmos_sensor(0x3041, 0x15);
-	IMX179MIPI_write_cmos_sensor(0x3042, 0x87);
-	IMX179MIPI_write_cmos_sensor(0x3089, 0x4F);
-	IMX179MIPI_write_cmos_sensor(0x3309, 0x9A);
-	IMX179MIPI_write_cmos_sensor(0x3344, 0x57);
-	IMX179MIPI_write_cmos_sensor(0x3345, 0x1F);
-	IMX179MIPI_write_cmos_sensor(0x3362, 0x0A);
-	IMX179MIPI_write_cmos_sensor(0x3363, 0x0A);
-	IMX179MIPI_write_cmos_sensor(0x3364, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x3368, 0x18);
-	IMX179MIPI_write_cmos_sensor(0x3369, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x3370, 0x77);
-	IMX179MIPI_write_cmos_sensor(0x3371, 0x2F);
-	IMX179MIPI_write_cmos_sensor(0x3372, 0x4F);
-	IMX179MIPI_write_cmos_sensor(0x3373, 0x2F);
-	IMX179MIPI_write_cmos_sensor(0x3374, 0x2F);
-	IMX179MIPI_write_cmos_sensor(0x3375, 0x37);
-	IMX179MIPI_write_cmos_sensor(0x3376, 0x9F);
-	IMX179MIPI_write_cmos_sensor(0x3377, 0x37);
-	IMX179MIPI_write_cmos_sensor(0x33C8, 0x00);
-	IMX179MIPI_write_cmos_sensor(0x33D4, 0x05);
-	IMX179MIPI_write_cmos_sensor(0x33D5, 0x08);
-	IMX179MIPI_write_cmos_sensor(0x33D6, 0x03); // Jiangde 02--> 03
-	IMX179MIPI_write_cmos_sensor(0x33D7, 0xc8); // Jiangde d6--> c8
-	IMX179MIPI_write_cmos_sensor(0x4100, 0x0E);
-	IMX179MIPI_write_cmos_sensor(0x4108, 0x01);
-	IMX179MIPI_write_cmos_sensor(0x4109, 0x7C);
-    
-#ifdef IMX179_USE_OTP
-        if(ret == 0)
-        {
-	    SENSORDB("[IMX179_USE_OTP]VideoFullSizeSetting function,imx179_update_awb_gain\n");
-	    imx179_update_awb_gain();
-        }
-#endif
-
-	IMX179MIPI_write_cmos_sensor(0x0104, 0x00);//group
-	IMX179MIPI_write_cmos_sensor(0x0100, 0x01);//STREAM ON
-#endif
-	SENSORDB("[IMX179MIPI]exit Video720pSetting function\n");
-}
-
 void PreviewSetting(void)
 {
 	SENSORDB("[IMX179MIPI]enter PreviewSetting function\n");
@@ -1114,7 +913,7 @@ void PreviewSetting(void)
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x01);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x00);//STREAM OFF 	
 	IMX179MIPI_write_cmos_sensor(0x0103, 0x01);//SW reset
-	IMX179MIPI_write_cmos_sensor(0x0101, 0x03);//0x00-HV,0x03-NORMAL
+	IMX179MIPI_write_cmos_sensor(0x0101, 0x00); 		 
 	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);		   
 	IMX179MIPI_write_cmos_sensor(0x0202, 0x09); //0x0202, 0x09		 
 	IMX179MIPI_write_cmos_sensor(0x0203, 0xcc);//(0x0203, 0xcc)
@@ -1177,13 +976,6 @@ void PreviewSetting(void)
 	IMX179MIPI_write_cmos_sensor(0x4100, 0x0E);             
 	IMX179MIPI_write_cmos_sensor(0x4108, 0x01);             
 	IMX179MIPI_write_cmos_sensor(0x4109, 0x7C);
-#ifdef IMX179_USE_OTP
-        if(ret == 0)
-        {
-	    SENSORDB("[IMX179_USE_OTP]PreviewSetting function,imx179_update_awb_gain\n");
-	    imx179_update_awb_gain();
-        }
-#endif
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x00);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x01);//STREAM ON
 	// The register only need to enable 1 time.    
@@ -1200,7 +992,7 @@ void IMX179MIPI_set_8M(void)
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x01);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x00);//STREAM OFF 	
 	IMX179MIPI_write_cmos_sensor(0x0103, 0x01);//SW reset
-	IMX179MIPI_write_cmos_sensor(0x0101, 0x03);//0x00-HV,0x03-NORMAL
+	IMX179MIPI_write_cmos_sensor(0x0101, 0x00); 		 
 	IMX179MIPI_write_cmos_sensor(0x030E, 0x01);		   
 	IMX179MIPI_write_cmos_sensor(0x0202, 0x0C); //0x0202, 0x09		 
 	IMX179MIPI_write_cmos_sensor(0x0203, 0x40);//(0x0203, 0xcc)
@@ -1263,13 +1055,6 @@ void IMX179MIPI_set_8M(void)
 	IMX179MIPI_write_cmos_sensor(0x4100, 0x0E);             
 	IMX179MIPI_write_cmos_sensor(0x4108, 0x01);             
 	IMX179MIPI_write_cmos_sensor(0x4109, 0x7C);
-#ifdef IMX179_USE_OTP
-        if(ret == 0)
-        {
-	    SENSORDB("[IMX179_USE_OTP]IMX179MIPI_set_8M function,imx179_update_awb_gain\n");
-	    imx179_update_awb_gain();
-        }
-#endif
 	IMX179MIPI_write_cmos_sensor(0x0104, 0x00);//group
 	IMX179MIPI_write_cmos_sensor(0x0100, 0x01);//STREAM ON
 	SENSORDB("[IMX179MIPI]exit IMX179MIPI_set_8M function\n"); 
@@ -1296,19 +1081,6 @@ void IMX179MIPI_set_8M(void)
 
 UINT32 IMX179MIPIOpen(void)
 {
-#ifdef IMX179_USE_OTP
-    if(0 == used_otp){
-	printk("[IMX179_USE_OTP] before update otp wb...........................................\n");
-	printk("[IMX179_USE_OTP] before update otp wb...........................................\n");
-	printk("[IMX179_USE_OTP] before update otp wb...........................................\n");
-	ret = imx179_update_otp_wb();
-
-	used_otp =1;
-	printk("[IMX179_USE_OTP] after update otp wb............................................\n");
-	printk("[IMX179_USE_OTP] after update otp wb............................................\n");
-	printk("[IMX179_USE_OTP] after update otp wb............................................\n");
-    }
-#endif
     int  retry = 0; 
 	kal_uint16 sensorid;
     // check if sensor ID correct
@@ -1332,7 +1104,6 @@ UINT32 IMX179MIPIOpen(void)
 	spin_lock(&imx179_drv_lock);	
     IMX179MIPI_sensor_gain_base = sensorid;
 	spin_unlock(&imx179_drv_lock);
-	mdelay(50); // Jiangde ++    
 	SENSORDB("[IMX179MIPI]exit IMX179MIPIOpen function\n");
     return ERROR_NONE;
 }
@@ -1360,17 +1131,9 @@ UINT32 IMX179MIPIGetSensorID(UINT32 *sensorID)
     // check if sensor ID correct
     do {		
 	   *sensorID =(kal_uint16)(((IMX179MIPI_read_cmos_sensor(0x0002)&&0x0f)<<8) | IMX179MIPI_read_cmos_sensor(0x0003)); 
-
-        SENSORDB("HJDDBG, [IMX179MIPI] sensorID = 0x%x. \n");
         if (*sensorID == IMX179MIPI_SENSOR_ID)
             break;
-        retry--;
-
-        if (retry > 0)
-        {
-            mdelay(2); // Jiangde, retry after a while
-            SENSORDB("HJDDBG, [IMX179MIPI] retry after a while, retry=%d. \n", retry);
-        }
+        retry--; 
     } while (retry > 0);
 
     if (*sensorID != IMX179MIPI_SENSOR_ID) {
@@ -1518,7 +1281,7 @@ UINT32 IMX179MIPIClose(void)
 void IMX179MIPISetFlipMirror(kal_int32 imgMirror)
 {
     kal_uint8  iTemp; 
-    SENSORDB("[IMX179MIPI]enter IMX179MIPISetFlipMirror function,imgMirror == %d\n",imgMirror);
+	SENSORDB("[IMX179MIPI]enter IMX179MIPISetFlipMirror function\n");
     iTemp = IMX179MIPI_read_cmos_sensor(0x0101) & 0x03;	//Clear the mirror and flip bits.
     switch (imgMirror)
     {
@@ -1568,7 +1331,6 @@ UINT32 IMX179MIPIPreview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	IMX179MIPI_sensor.capture_mode=KAL_FALSE;
 	spin_unlock(&imx179_drv_lock);
 	PreviewSetting();
-	IMX179MIPISetFlipMirror(IMAGE_NORMAL);
 	iStartX += IMX179MIPI_IMAGE_SENSOR_PV_STARTX;
 	iStartY += IMX179MIPI_IMAGE_SENSOR_PV_STARTY;
 	spin_lock(&imx179_drv_lock);	
@@ -1591,7 +1353,6 @@ UINT32 IMX179MIPIPreview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	image_window->GrabStartY= iStartY;
 	image_window->ExposureWindowWidth= IMX179MIPI_REAL_PV_WIDTH ;
 	image_window->ExposureWindowHeight= IMX179MIPI_REAL_PV_HEIGHT ; 
-	mdelay(50); // Jiangde ++    
 	SENSORDB("[IMX179MIPI]eXIT IMX179MIPIPreview function\n"); 
 	return ERROR_NONE;
 	}	/* IMX179MIPIPreview() */
@@ -1615,16 +1376,7 @@ UINT32 IMX179MIPIVideo(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	IMX179MIPI_sensor.pv_mode=KAL_FALSE;
 	IMX179MIPI_sensor.capture_mode=KAL_FALSE;
 	spin_unlock(&imx179_drv_lock);
-    
-#ifndef USE_PREVIW_FOR_VIDEO
-    VideoFullSizeSetting();
-#else
-    VideoUsePreviewSetting(); // Jiangde
-	// Video720pSetting(); // Jiangde
-  	// PreviewSetting(); // Jiangde 
-#endif
-  	
-	IMX179MIPISetFlipMirror(IMAGE_NORMAL);
+	VideoFullSizeSetting();
 	iStartX += IMX179MIPI_IMAGE_SENSOR_VIDEO_STARTX;
 	iStartY += IMX179MIPI_IMAGE_SENSOR_VIDEO_STARTY;
 	spin_lock(&imx179_drv_lock);	
@@ -1645,7 +1397,6 @@ UINT32 IMX179MIPIVideo(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	spin_unlock(&imx179_drv_lock);
 	image_window->GrabStartX= iStartX;
 	image_window->GrabStartY= iStartY;    
-	mdelay(50); // Jiangde ++    
     SENSORDB("[IMX179MIPI]eXIT IMX179MIPIVideo function\n"); 
 	return ERROR_NONE;
 }	/* IMX179MIPIPreview() */
@@ -1665,7 +1416,7 @@ UINT32 IMX179MIPICapture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	IMX179MIPI_sensor.cp_dummy_lines = 0;
 	spin_unlock(&imx179_drv_lock);
 	IMX179MIPI_set_8M();
-	IMX179MIPISetFlipMirror(IMAGE_NORMAL); 
+	//IMX179MIPISetFlipMirror(sensor_config_data->SensorImageMirror); 
 	spin_lock(&imx179_drv_lock);    
 	IMX179MIPI_sensor.cp_line_length=IMX179MIPI_FULL_LINE_LENGTH_PIXELS+IMX179MIPI_sensor.cp_dummy_pixels;
 	IMX179MIPI_sensor.cp_frame_length=IMX179MIPI_FULL_FRAME_LENGTH_LINES+IMX179MIPI_sensor.cp_dummy_lines;
@@ -1680,7 +1431,6 @@ UINT32 IMX179MIPICapture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	spin_lock(&imx179_drv_lock);	
 	memcpy(&IMX179MIPISensorConfigData, sensor_config_data, sizeof(MSDK_SENSOR_CONFIG_STRUCT));
 	spin_unlock(&imx179_drv_lock);
-	mdelay(50); // Jiangde ++    
 	SENSORDB("[IMX179MIPI]exit IMX179MIPICapture function\n");
 	return ERROR_NONE;
 }	/* IMX179MIPICapture() */
@@ -1728,7 +1478,7 @@ UINT32 IMX179MIPIGetInfo(MSDK_SCENARIO_ID_ENUM ScenarioId,
     pSensorInfo->SensorWebCamCaptureFrameRate=24;
     pSensorInfo->SensorResetActiveHigh=FALSE;
     pSensorInfo->SensorResetDelayCount=5;
-    pSensorInfo->SensorOutputDataFormat=SENSOR_OUTPUT_FORMAT_RAW_B;//SENSOR_OUTPUT_FORMAT_RAW_R
+    pSensorInfo->SensorOutputDataFormat=SENSOR_OUTPUT_FORMAT_RAW_R;
     pSensorInfo->SensorClockPolarity=SENSOR_CLOCK_POLARITY_LOW; /*??? */
     pSensorInfo->SensorClockFallingPolarity=SENSOR_CLOCK_POLARITY_LOW;
     pSensorInfo->SensorHsyncPolarity = SENSOR_CLOCK_POLARITY_LOW;

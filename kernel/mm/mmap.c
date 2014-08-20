@@ -1090,18 +1090,6 @@ static unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	//Add User-Space MMAP No-Cache support.
 	if(reqprot&PROT_NOCACHE)
 		vm_flags|=VM_SAO;
-	if(reqprot&PROT_MALLOCFROMBIONIC)
-                vm_flags|=VM_MERGEABLE;
-	else
-		vm_flags&= ~VM_MERGEABLE;
-	if(vm_flags&VM_NOHUGEPAGE)//use to mark MMAP path.
-	{
-		printk("############## MMAP already set VM_NOHUGEPAGE................");
-	}//use to mark MMAP path.
-	else
-	{
-		vm_flags|=VM_NOHUGEPAGE;
-	}
 	return mmap_region(file, addr, len, flags, vm_flags, pgoff);
 }
 
@@ -2090,13 +2078,6 @@ int split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
  * work.  This now handles partial unmappings.
  * Jeremy Fitzhardinge <jeremy@goop.org>
  */
-#ifdef MTK_USE_RESERVED_EXT_MEM
-extern bool IsInMspace(unsigned long pa);
-extern void * getVirtFromMspace(void * pa);
-extern size_t GetMspaceMemSize(unsigned long pgoff);
-extern void extmem_free(void* mem);
-#endif
-
 int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {
 	unsigned long end;
@@ -2114,12 +2095,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 		return 0;
 	prev = vma->vm_prev;
 	/* we have  start < vma->vm_end  */
-
-#ifdef MTK_USE_RESERVED_EXT_MEM
-	/* get correct mmap size if in mspace. */
-    	if(IsInMspace(vma->vm_pgoff))
-		len = GetMspaceMemSize(vma->vm_pgoff);
-#endif
 
 	/* if it doesn't overlap, we have nothing.. */
 	end = start + len;
@@ -2177,12 +2152,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * Remove the vma's, and unmap the actual pages
 	 */
 	detach_vmas_to_be_unmapped(mm, vma, prev, end);
-    
-#ifdef MTK_USE_RESERVED_EXT_MEM
-    	if(IsInMspace(vma->vm_pgoff))
-        	extmem_free((void *)getVirtFromMspace((vma->vm_pgoff << PAGE_SHIFT)));
-#endif
-
 	unmap_region(mm, vma, prev, start, end);
 
 	/* Fix up all other VM information */

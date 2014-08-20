@@ -1539,7 +1539,8 @@ static __init int event_trace_init(void)
 #ifdef CONFIG_SMP
     ftrace_set_clr_event("sched_migrate_task", 1);
 #endif
-    ftrace_set_clr_event("irq:", 1);
+    ftrace_set_clr_event("irq_handler_entry", 1);
+    ftrace_set_clr_event("irq_handler_exit", 1);
 
     // only update buffer eariler if we want to collect boot-time ftrace
     // to avoid the boot time impacted by early-expanded ring buffer

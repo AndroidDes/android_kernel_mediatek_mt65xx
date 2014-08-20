@@ -16,25 +16,19 @@ fi
 
 
 # export variables to shell environments
-eval `TARGET_PRODUCT=${TARGET_PRODUCT} _prefix_=$1 _postfix_=$2 make --no-print-directory -i -f $1/mediatek/build/libs/shell.mk`
+eval `TARGET_PRODUCT=${TARGET_PRODUCT} _prefix_=$1 _postfix_=$2 make -i -f $1/mediatek/build/libs/shell.mk`
 
 # for legacy "Download folder". Will be removed once nobody use it.
 function make_legacy_download_folder() {
-  if [ ${OUT_DIR:0:1}x == '/x' ]; then
-    legacy_download_path=${OUT_DIR}/Download
-  else
-    legacy_download_path=${TO_ROOT}/out/Download
-  fi
+  legacy_download_path=${TO_ROOT}/out/Download
   if [ ! -d ${legacy_download_path} ]; then
     mkdir -p ${legacy_download_path}/sdcard
     mkdir -p ${legacy_download_path}/flash
   fi
-  ln -sf ${legacy_download_path} Download
-  if [ ${OUT_DIR:0:1}x == '/x' ]; then
-    legacy_download_path=${OUT_DIR}/Download/$1
-  else
-    legacy_download_path=${TO_ROOT}/out/Download/$1
+  if [ ! -e Download ]; then
+      ln -s ${legacy_download_path} Download
   fi
+  legacy_download_path=${TO_ROOT}/out/Download/$1
 }
 
 function copy_to_legacy_download_folder() {

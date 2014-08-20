@@ -20,6 +20,6 @@ FM Seek/scan width
 FM factory mode test freq
 Unit:100KHz
 */
-uint16_t fm_freq_list[] = {876, 900, 974, 1018};
+uint16_t fm_freq_list[] = {1043, 974, 900, 876};
 
 #endif /* CUST_FM_H */

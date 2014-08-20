@@ -1,5 +1,3 @@
-
-#include <linux/version.h>
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -227,22 +225,9 @@ unsigned int m4u_user_v2p(unsigned int va)
     pte = pte_offset_map(pmd, va);
     if(pte_present(*pte)) 
     { 
-
-        if((long long)pte_val(pte[PTE_HWTABLE_PTRS]) == (long long)0)
-        {
-        	M4UDBG("user_v2p, va=0x%x, *ppte=%08llx", va,
-        	       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
-            pte_unmap(pte);
-            return 0;
-        }
-        
         pa=(pte_val(*pte) & (PAGE_MASK)) | pageOffset; 
-        pte_unmap(pte);
         return pa; 
-    }   
-
-    pte_unmap(pte);
-
+    }     
 
     M4UDBG("m4u_user_v2p(), va=0x%x, pte invalid! \n", va);
     // m4u_dump_maps(va);
@@ -265,7 +250,6 @@ int __m4u_get_user_pages(int eModuleID, struct task_struct *tsk, struct mm_struc
 {
         int i;
         unsigned long vm_flags;
-	int trycnt;
 
         if (nr_pages <= 0)
                 return 0;
@@ -297,9 +281,9 @@ int __m4u_get_user_pages(int eModuleID, struct task_struct *tsk, struct mm_struc
                 {
                     M4UMSG("error: the vma is not found, start=0x%x, module=%d \n", 
                            (unsigned int)start, eModuleID);
-                    return i ? i : -EFAULT;
+                    return i ? : -EFAULT;
                 } 
-                if( ((~vma->vm_flags) & (VM_IO|VM_PFNMAP|VM_SHARED|VM_WRITE)) == 0 )
+                if( ((~vma->vm_flags) & (VM_IO|VM_RESERVED|VM_PFNMAP|VM_SHARED|VM_WRITE)) == 0 )
                 {
                     M4UMSG("error: m4u_get_pages(): bypass pmem garbage pages! vma->vm_flags=0x%x, start=0x%x, module=%d \n", 
                             (unsigned int)(vma->vm_flags), (unsigned int)start, eModuleID);
@@ -396,38 +380,12 @@ int __m4u_get_user_pages(int eModuleID, struct task_struct *tsk, struct mm_struc
                                 return i ? i : PTR_ERR(page);
 			            }
                         if (pages) {
-				int ret;
                                 pages[i] = page;
                                 MMProfileLogEx(M4U_MMP_Events[PROFILE_MLOCK], MMProfileFlagStart, eModuleID, start&(~0xFFF));
-				
-				/* Use retry version to guarantee it will succeed in getting the lock */
-				trycnt = 3000;
-				do {
-					if (trylock_page(page)) {
-						mlock_vma_page(page);
-						unlock_page(page);
-
-                        //make sure hw pte is not 0
-                        {
-                            int i;
-                            for(i=0; i<3000; i++)
-                            {   
-                                if(!m4u_user_v2p(start))
-                                {
-                                    handle_mm_fault(mm, vma, start, (foll_flags & FOLL_WRITE)? FAULT_FLAG_WRITE : 0);
-                                    cond_resched();
+                                if (trylock_page(page)) {
+                                    mlock_vma_page(page);
+                                    unlock_page(page);
                                 }
-                                else
-                                    break;
-                            }
-                            if(i==3000)
-                                M4UMSG("error: cannot handle_mm_fault to get hw pte: va=0x%x\n", start);
-                        }
-
-                        break;
-					}
-				} while (trycnt-- > 0);
-
                                 if(PageMlocked(page)==0)
                                 {
                                     M4UMSG("Can't mlock page\n");

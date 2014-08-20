@@ -347,13 +347,6 @@ p2pFuncGetSpecAttri(
     IN UINT_16 u2AttriID
     );
 
-
-BOOLEAN
-p2pFuncIsChannelGrant(
-    IN P_ADAPTER_T prAdapter
-    );
-
-
 WLAN_STATUS wfdChangeMediaState(
     IN P_ADAPTER_T prAdapter,
     IN ENUM_NETWORK_TYPE_INDEX_T eNetworkTypeIdx,

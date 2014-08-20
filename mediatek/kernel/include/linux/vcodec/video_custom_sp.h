@@ -59,11 +59,7 @@ typedef enum
     CODEC_DEC_MAX       = (0x1<<6)
 } VIDEO_DECODER_T;
 
-#if 1   //defined(MT6572)     //VCODEC_MULTI_THREAD
-VIDEO_DEC_API_T  *GetDecoderAPI(VIDEO_DECODER_T eDecType, HANDLE hWrapper, void **ppDrvModule, unsigned int bUseMultiCoreCodec);
-#else
-VIDEO_DEC_API_T  *GetDecoderAPI(VIDEO_DECODER_T, HANDLE); // HANDLE : wrapper's handle
-#endif
+//VIDEO_DEC_API_T  *GetDecoderAPI(VIDEO_DECODER_T, HANDLE); // HANDLE : wrapper's handle
 //VCODEC_DEC_API_T *GetMPEG4DecoderAPI(void);
 //VCODEC_DEC_API_T *GetH264DecoderAPI(void);
 //VCODEC_DEC_API_T *GetRVDecoderAPI(void);

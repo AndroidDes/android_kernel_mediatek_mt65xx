@@ -130,8 +130,8 @@ typedef enum
 // DGI0 (Base Address:+400h/+500h)
 // 1.Basic setting
 #define DGI0_DEC_CTRL      0x0400
-  #define RESET_COUNTER      0x08000000  //[27] reset the counter for timing generate
-  #define CLEAR_COUNTER      0x00000000
+  #define RESET_COUNTER      0x08008000  //[27] reset the counter for timing generate
+  #define CLEAR_COUNTER      0x00008000
 	
 #define DGI0_FIFO_CTRL     0x0404
   #define SW_RST             0x00080000  //[19] soft reset

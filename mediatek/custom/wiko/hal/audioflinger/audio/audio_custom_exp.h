@@ -64,9 +64,15 @@
 * Audio_Customization_Common.h or  can undefine  the definitations in this file,just like:
 *#undef ENABLE_AUDIO_COMPENSATION_FILTER
 ***********************************************************************************/
-
+/*
+#ifdef HAVE_SRSAUDIOEFFECT
+#undef ENABLE_AUDIO_COMPENSATION_FILTER
+#undef ENABLE_AUDIO_DRC_SPEAKER
+#undef ENABLE_HEADPHONE_COMPENSATION_FILTER
+#endif
+*/
 /*****************************************************************
-** refine volume
+** Mt6589 refine volume
 *****************************************************************/
 #define DEVICE_MAX_VOLUME       (8)
 #define DEVICE_VOICE_MAX_VOLUME (8)
@@ -78,10 +84,11 @@
 #define DEVICE_VOLUME_STEP      (256)
 
 /******************************************************************
-** define using which flag
+** mt6589 , define using which flag
 ******************************************************************/
-//LINE <audio> <DATE2013819> <audio out put mode classAB> zhangxiaofei
-//#define USING_CLASSD_AMP                // define using which flag
-#define USING_EXTAMP_HP                // define using which flag
+#define USING_CLASSD_AMP                // define using which flag
+//#define USING_CLASSAB_AMP
+//#define USING_EXTAMP_HP                // define using which flag
+
 #endif
 

@@ -15,10 +15,9 @@ int __xlog_output(int level, const char *tag, const char *fmt, va_list args)
 	if (!tag) 
 		return -1;
 
-#ifdef HAVE_XLOG_FEATURE
 	if (!xLog_isOn(tag, level)) 
 		return -1;
-#endif
+
 	switch (level) {
 	case ANDROID_LOG_VERBOSE:
 		level_str = KERN_DEBUG;

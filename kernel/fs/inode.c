@@ -177,7 +177,7 @@ int inode_init_always(struct super_block *sb, struct inode *inode)
         {
 #endif 
             // default path
-            if (get_nr_inodes() >= 5500) {
+            if (get_nr_inodes() >= 4625) {
                 mapping_set_gfp_mask(mapping, GFP_HIGHUSER_MOVABLE);
             } else {
                 mapping_set_gfp_mask(mapping, GFP_HIGHUSER_MOVABLE & 

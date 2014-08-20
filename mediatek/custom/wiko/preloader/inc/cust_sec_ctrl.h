@@ -39,14 +39,18 @@
 
 #include "typedefs.h"
 #include "proj_cfg.h"
-#include "keypad.h"
+#include "mtk_key.h"
 
 /**************************************************************************
  * [ROM INFO]
  **************************************************************************/
 #define PROJECT_NAME                        "CUST"
-#define PLATFORM_NAME                       "MT6582"
+#define PLATFORM_NAME                       "MT6589"
 
+/**************************************************************************
+ * [SEC ENV CONTROL]
+ **************************************************************************/
+#define SEC_ENV_ENABLE                      TRUE 
 
 /**************************************************************************
  * [CRYPTO SEED]
@@ -69,57 +73,31 @@
 #define ATTR_SUSBDL_ENABLE                  0x11
 #define ATTR_SUSBDL_ONLY_ENABLE_ON_SCHIP    0x22
 /* S-USBDL Control */
-#define SEC_USBDL_CFG                       CUSTOM_SUSBDL_CFG
+#define SEC_USBDL_CFG                       CUSTOM_SUSBDL_CFG 
 
 /**************************************************************************
- * [FLASHTOOL SECURE CONFIG for (for both of SLA and NON-SLA mode], 32bits
- * It's not recommended to use 32 bits (v3) mode now. Please use FLASHTOOL_SEC_CFG_64 instead
+ * [FLASHTOOL SECURE CONFIG for (for both of SLA and NON-SLA mode]
  **************************************************************************/
 //#define FLASHTOOL_SEC_CFG
-//#define BYPASS_CHECK_IMAGE_0_NAME           ""
-//#define BYPASS_CHECK_IMAGE_0_OFFSET         0x0
-//#define BYPASS_CHECK_IMAGE_0_LENGTH         0x0
-//#define BYPASS_CHECK_IMAGE_1_NAME           ""
-//#define BYPASS_CHECK_IMAGE_1_OFFSET         0x0
-//#define BYPASS_CHECK_IMAGE_1_LENGTH         0x0
-//#define BYPASS_CHECK_IMAGE_2_NAME           ""
-//#define BYPASS_CHECK_IMAGE_2_OFFSET         0x0
-//#define BYPASS_CHECK_IMAGE_2_LENGTH         0x0
-
-/**************************************************************************
- * [FLASHTOOL SECURE CONFIG (for both of SLA and NON-SLA mode], 64 bits for v4 sign format
- **************************************************************************/
-//#define FLASHTOOL_SEC_CFG_64
-#ifdef FLASHTOOL_SEC_CFG_64
 #define BYPASS_CHECK_IMAGE_0_NAME           ""
 #define BYPASS_CHECK_IMAGE_0_OFFSET         0x0
+#define BYPASS_CHECK_IMAGE_0_LENGTH         0x0
 #define BYPASS_CHECK_IMAGE_1_NAME           ""
 #define BYPASS_CHECK_IMAGE_1_OFFSET         0x0
+#define BYPASS_CHECK_IMAGE_1_LENGTH         0x0
 #define BYPASS_CHECK_IMAGE_2_NAME           ""
 #define BYPASS_CHECK_IMAGE_2_OFFSET         0x0
-#endif
+#define BYPASS_CHECK_IMAGE_2_LENGTH         0x0
 /**************************************************************************
- * [FLASHTOOL FORBIT DOWNLOAD CONFIG (for NSLA mode only)] , 32 bits
- * It's not recommended to use 32 bits (v3) mode now. Please use FLASHTOOL_FORBID_DL_NSLA_CFG_64 instead
+ * [FLASHTOOL FORBIT DOWNLOAD CONFIG (for NSLA mode only)]
  **************************************************************************/
 //#define FLASHTOOL_FORBID_DL_NSLA_CFG
-//#define FORBID_DL_IMAGE_0_NAME              ""
-//#define FORBID_DL_IMAGE_0_OFFSET            0x0
-//#define FORBID_DL_IMAGE_0_LENGTH            0x0
-//#define FORBID_DL_IMAGE_1_NAME              ""
-//#define FORBID_DL_IMAGE_1_OFFSET            0x0
-//#define FORBID_DL_IMAGE_1_LENGTH            0x0
-
-/**************************************************************************
- * [FLASHTOOL FORBIT DOWNLOAD CONFIG (for NSLA mode only)], 64 bits for v4 sign format
- **************************************************************************/
-//#define FLASHTOOL_FORBID_DL_NSLA_CFG_64
-#ifdef FLASHTOOL_FORBID_DL_NSLA_CFG_64
 #define FORBID_DL_IMAGE_0_NAME              ""
 #define FORBID_DL_IMAGE_0_OFFSET            0x0
+#define FORBID_DL_IMAGE_0_LENGTH            0x0
 #define FORBID_DL_IMAGE_1_NAME              ""
 #define FORBID_DL_IMAGE_1_OFFSET            0x0
-#endif
+#define FORBID_DL_IMAGE_1_LENGTH            0x0
 
 #define SEC_USBDL_WITHOUT_SLA_ENABLE
 
@@ -140,19 +118,15 @@
 #define ATTR_SBOOT_ENABLE                   0x11
 #define ATTR_SBOOT_ONLY_ENABLE_ON_SCHIP     0x22
 /* S-BOOT Control */
-#define SEC_BOOT_CFG                        CUSTOM_SBOOT_CFG
+#define SEC_BOOT_CFG                        CUSTOM_SBOOT_CFG 
 
-/* Customized Secure Boot */
-//#define CUSTOMIZED_SECURE_PARTITION_SUPPORT
-#ifdef CUSTOMIZED_SECURE_PARTITION_SUPPORT
-#define SBOOT_CUST_PART1    ""
-#define SBOOT_CUST_PART2    ""
-#endif
-
-/* For Custom Partition Verification*/
-#define VERIFY_PART_CUST                   (FALSE)
-#define VERIFY_PART_CUST_NAME              ""
-
+/* Note : these attributes only work when S-BOOT is enabled */
+#define VERIFY_PART_UBOOT                   (TRUE)
+#define VERIFY_PART_LOGO                    (TRUE)
+#define VERIFY_PART_BOOTIMG                 (TRUE)
+#define VERIFY_PART_RECOVERY                (TRUE)
+#define VERIFY_PART_ANDSYSIMG               (TRUE)
+#define VERIFY_PART_SECSTATIC               (TRUE)
 
 /**************************************************************************
  * [DEFINITION CHECK]
@@ -163,21 +137,21 @@
 #endif
 #endif
 
-#if MTK_SECURITY_SW_SUPPORT
-#ifndef SEC_USBDL_CFG
-#error "MTK_SECURITY_SW_SUPPORT is NOT disabled. Should define SEC_USBDL_CFG "
+#if SEC_USBDL_CFG
+#if !SEC_ENV_ENABLE
+#error "SEC_USBDL_CFG is NOT disabled. Should set SEC_ENV_ENABLE as TRUE"
 #endif
 #endif
 
-#if MTK_SECURITY_SW_SUPPORT
-#ifndef SEC_BOOT_CFG
-#error "MTK_SECURITY_SW_SUPPORT is NOT disabled. Should define SEC_BOOT_CFG"
+#if SEC_BOOT_CFG
+#if !SEC_ENV_ENABLE
+#error "SEC_BOOT_CFG is NOT disabled. Should set SEC_ENV_ENABLE as TRUE"
 #endif
 #endif
 
-#if MTK_SECURITY_SW_SUPPORT
-#ifndef SEC_USBDL_WITHOUT_SLA_ENABLE
-#error "MTK_SECURITY_SW_SUPPORT is NOT disabled. Should define SEC_USBDL_WITHOUT_SLA_ENABLE"
+#ifdef SEC_USBDL_WITHOUT_SLA_ENABLE
+#if !SEC_ENV_ENABLE
+#error "SEC_USBDL_WITHOUT_SLA_ENABLE is NOT disabled. Should set SEC_ENV_ENABLE as TRUE"
 #endif
 #endif
 

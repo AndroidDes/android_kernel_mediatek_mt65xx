@@ -21,7 +21,6 @@
 
 #include "sched.h"
 
-//#define TEST_SCHED_DEBUG_ENHANCEMENT
 #define TRYLOCK_NUM 10
 #include <linux/delay.h>
 
@@ -343,18 +342,6 @@ static int sched_debug_show(struct seq_file *m, void *v)
 	unsigned long flags;
 	int cpu;
 
-#ifdef TEST_SCHED_DEBUG_ENHANCEMENT
-	static int i=0;
-	i++;
-	if(i==10){
-		struct rq *rq = cpu_rq(0);
-		raw_spin_lock_irq(&rq->lock);
-		spin_lock_irqsave(&sched_debug_lock, flags);
-		write_lock_irqsave(&tasklist_lock, flags);
-		BUG_ON(1);
-	}
-#endif
-
 	local_irq_save(flags);
 	ktime = ktime_to_ns(ktime_get());
 	sched_clk = sched_clock();
@@ -561,9 +548,7 @@ int read_trylock_n_irqsave(rwlock_t *lock, unsigned long *flags, struct seq_file
 	}while((!locked) && (trylock_cnt < TRYLOCK_NUM));
 
 	if (!locked){
-#ifdef CONFIG_DEBUG_SPINLOCK		
 		struct task_struct *owner = NULL;
-#endif		
 		SEQ_printf(m, "Warning: fail to get lock in %s\n", msg);
 #ifdef CONFIG_DEBUG_SPINLOCK
 		if (lock->owner && lock->owner != SPINLOCK_OWNER_INIT )
@@ -590,9 +575,7 @@ int raw_spin_trylock_n_irqsave(raw_spinlock_t *lock, unsigned long *flags, struc
 	}while((!locked) && (trylock_cnt < TRYLOCK_NUM));
 
 	if (!locked){
-#ifdef CONFIG_DEBUG_SPINLOCK		
 		struct task_struct *owner = NULL;
-#endif		
 		SEQ_printf(m, "Warning: fail to get lock in %s\n", msg);
 #ifdef CONFIG_DEBUG_SPINLOCK
 		if (lock->owner && lock->owner != SPINLOCK_OWNER_INIT )
@@ -620,17 +603,15 @@ int spin_trylock_n_irqsave(spinlock_t *lock, unsigned long *flags, struct seq_fi
 	}while((!locked) && (trylock_cnt < TRYLOCK_NUM));
 
 	if (!locked){
-#ifdef CONFIG_DEBUG_SPINLOCK		
 		raw_spinlock_t rlock = lock->rlock;
 		struct task_struct *owner = NULL;
-#endif				
 		SEQ_printf(m, "Warning: fail to get lock in %s\n", msg);
 #ifdef CONFIG_DEBUG_SPINLOCK
 		if (rlock.owner && rlock.owner != SPINLOCK_OWNER_INIT )
 			owner = rlock.owner;
-		SEQ_printf(m, " lock: %x, .magic: %08x, .owner: %s/%d, "
+		SEQ_printf(m, " lock: %p, .magic: %08x, .owner: %s/%d, "
 				".owner_cpu: %d, value: %d\n", 
-			(int) &rlock, rlock.magic, 
+			rlock, rlock.magic, 
 			owner ? owner-> comm: "<<none>>", 	
 			owner ? task_pid_nr(owner): -1, 
 			rlock.owner_cpu, rlock.raw_lock.lock);

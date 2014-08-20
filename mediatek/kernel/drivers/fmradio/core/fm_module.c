@@ -166,16 +166,6 @@ static long fm_ops_ioctl(struct file *filp, fm_u32 cmd, unsigned long arg)
         }
         break;
 	}    
-	case FM_IOCTL_PRE_SEARCH:
-	{
-	    ret = fm_pre_search(fm);
-	    break;
-	}
-	case FM_IOCTL_RESTORE_SEARCH:
-	{
-	    ret = fm_restore_search(fm);
-	    break;
-	}
 	case FM_IOCTL_SEEK: {
         struct fm_seek_parm parm;
         WCN_DBG(FM_NTC | MAIN, "FM_IOCTL_SEEK:0\n");
@@ -483,72 +473,6 @@ static long fm_ops_ioctl(struct file *filp, fm_u32 cmd, unsigned long arg)
 
         if ((parm_ctl.rw_flag == 0x01) && (!ret)) {
             if (copy_to_user((void*)arg, &parm_ctl, sizeof(struct fm_ctl_parm))) {
-                ret = -EFAULT;
-                goto out;
-            }
-        }
-
-        break;
-    }
-    case FM_IOCTL_TOP_RDWR: 
-    {
-        struct fm_top_rw_parm parm_ctl;
-        WCN_DBG(FM_DBG | MAIN, "FM_IOCTL_TOP_RDWR\n");
-
-        if (copy_from_user(&parm_ctl, (void*)arg, sizeof(struct fm_top_rw_parm))) 
-        {
-            ret = -EFAULT;
-            goto out;
-        }
-
-        if (parm_ctl.rw_flag == 0) 
-        {
-            ret = fm_top_write(fm, parm_ctl.addr, parm_ctl.val);
-        }
-        else 
-        {
-            ret = fm_top_read(fm, parm_ctl.addr, &parm_ctl.val);
-        }
-        if (ret < 0) 
-        	goto out;
-
-        if ((parm_ctl.rw_flag == 0x01) && (!ret)) 
-        {
-            if (copy_to_user((void*)arg, &parm_ctl, sizeof(struct fm_top_rw_parm))) 
-            {
-                ret = -EFAULT;
-                goto out;
-            }
-        }
-
-        break;
-    }
-    case FM_IOCTL_HOST_RDWR: 
-    {
-        struct fm_host_rw_parm parm_ctl;
-        WCN_DBG(FM_DBG | MAIN, "FM_IOCTL_TOP_RDWR\n");
-
-        if (copy_from_user(&parm_ctl, (void*)arg, sizeof(struct fm_host_rw_parm))) 
-        {
-            ret = -EFAULT;
-            goto out;
-        }
-
-        if (parm_ctl.rw_flag == 0) 
-        {
-            ret = fm_host_write(fm, parm_ctl.addr, parm_ctl.val);
-        }
-        else 
-        {
-            ret = fm_host_read(fm, parm_ctl.addr, &parm_ctl.val);
-        }
-        if (ret < 0) 
-        	goto out;
-
-        if ((parm_ctl.rw_flag == 0x01) && (!ret)) 
-        {
-            if (copy_to_user((void*)arg, &parm_ctl, sizeof(struct fm_host_rw_parm))) 
-            {
                 ret = -EFAULT;
                 goto out;
             }

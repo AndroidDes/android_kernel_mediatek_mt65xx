@@ -38,8 +38,6 @@
 #include <linux/wakelock.h>
 //add for fix resume issue end
 
-#include <mach/upmu_common.h>
-
 #define SENSOR_INVALID_VALUE -1
 #define MAX_CHOOSE_G_NUM 5
 #define MAX_CHOOSE_M_NUM 5
@@ -165,7 +163,7 @@ static void hwmsen_work_func(struct work_struct *work)
 	time.tv_sec = time.tv_nsec = 0;    
 	time = get_monotonic_coarse(); 
 	nt = time.tv_sec*1000000000LL+time.tv_nsec;
-	//mutex_lock(&obj_data.lock);
+	mutex_lock(&obj_data.lock);
 	for(idx = 0; idx < MAX_ANDROID_SENSOR_NUM; idx++)
 	{
 		cxt = obj->dc->cxt[idx];
@@ -180,14 +178,11 @@ static void hwmsen_work_func(struct work_struct *work)
 		{
 			if(obj_data.data_updata[idx] == 1)
 			{
-				mutex_lock(&obj_data.lock);
 				event_type |= (1 << idx);
 				obj_data.data_updata[idx] = 0;
-				mutex_unlock(&obj_data.lock);
 			}
 			continue;
 		}
-		
 		
 		//added to surpport set delay to specified sensor
 		if(cxt->delayCount > 0)
@@ -225,14 +220,12 @@ static void hwmsen_work_func(struct work_struct *work)
 			{
 				// data changed, update the data
 				if(sensor_data.values[0] != obj_data.sensors_data[idx].values[0])
-				{
-					mutex_lock(&obj_data.lock);
+				{					
 					obj_data.sensors_data[idx].values[0] = sensor_data.values[0];
 					obj_data.sensors_data[idx].value_divide = sensor_data.value_divide;
 					obj_data.sensors_data[idx].status = sensor_data.status;
 					obj_data.sensors_data[idx].time = nt;
 					event_type |= (1 << idx);
-					mutex_unlock(&obj_data.lock);
 					//HWM_LOG("get %d sensor, values: %d!\n", idx, sensor_data.values[0]);
 				}
 			}
@@ -246,10 +239,8 @@ static void hwmsen_work_func(struct work_struct *work)
 				    if( 0 == sensor_data.values[0] && 0==sensor_data.values[1] 
 						&& 0 == sensor_data.values[2])
 				    {
-				    	
 				       continue;
 				    }
-					mutex_lock(&obj_data.lock);
 					obj_data.sensors_data[idx].values[0] = sensor_data.values[0];
 					obj_data.sensors_data[idx].values[1] = sensor_data.values[1];
 					obj_data.sensors_data[idx].values[2] = sensor_data.values[2];
@@ -257,16 +248,15 @@ static void hwmsen_work_func(struct work_struct *work)
 					obj_data.sensors_data[idx].status = sensor_data.status;
 					obj_data.sensors_data[idx].time = nt;
 					event_type |= (1 << idx);
-					mutex_unlock(&obj_data.lock);
 					//HWM_LOG("get %d sensor, values: %d, %d, %d!\n", idx, 
 						//sensor_data.values[0], sensor_data.values[1], sensor_data.values[2]);
 				}
-			}
+			}			
 		}			
 	}
 
 	//
-	//mutex_unlock(&obj_data.lock);
+	mutex_unlock(&obj_data.lock);
 
 	if(enable_again == true)
 	{
@@ -320,8 +310,16 @@ static void hwmsen_work_func(struct work_struct *work)
 
 	if(obj->dc->polling_running == 1)
 	{
-
-		mod_timer(&obj->timer, jiffies + atomic_read(&obj->delay)/(1000/HZ)); 
+	    if(1 == atomic_read(&hwm_obj->early_suspend))
+	    {
+	       // slow down polling rate at early suspend  let system have chance to sleep
+	       mod_timer(&obj->timer, jiffies + (HZ/2));
+		   HWM_LOG("hwm_dev early suspend work polling\n");
+	    }
+		else
+		{
+		  mod_timer(&obj->timer, jiffies + atomic_read(&obj->delay)/(1000/HZ)); 
+		}
 	}
 }
 
@@ -517,15 +515,6 @@ static int hwmsen_enable(struct hwmdev_object *obj, int sensor, int enable)
 	
 	if(enable == 1)
 	{
-#ifdef MT6582
-//{@for mt6582 blocking issue work around		
-		if(sensor == 7){
-			HWM_LOG("P-sensor disable LDO low power\n");
-			upmu_set_vio18_lp_sel(0);
-			upmu_set_vio28_lp_sel(0);
-			}
-//@}
-#endif
 		enable_again = true;
 		obj->active_data_sensor |= sensor_type;
 		if((obj->active_sensor & sensor_type) == 0)	// no no-data active
@@ -553,15 +542,6 @@ static int hwmsen_enable(struct hwmdev_object *obj, int sensor, int enable)
 	}
 	else
 	{
-#ifdef MT6582
-//{@for mt6582 blocking issue work around
-		if(sensor == 7){
-			HWM_LOG("P-sensor enable LDO low power\n");
-			upmu_set_vio18_lp_sel(1);
-			upmu_set_vio28_lp_sel(1);
-			}
-//@}
-#endif
 		obj->active_data_sensor &= ~sensor_type;
 		if((obj->active_sensor & sensor_type) == 0)	// no no-data active
 		{

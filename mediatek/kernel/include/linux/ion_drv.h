@@ -19,8 +19,6 @@ typedef enum
 typedef enum
 {
     ION_MM_CONFIG_BUFFER,
-    ION_MM_SET_DEBUG_INFO,
-    ION_MM_GET_DEBUG_INFO
 } ION_MM_CMDS;
 
 typedef enum
@@ -36,9 +34,6 @@ typedef enum
     ION_CACHE_CLEAN_BY_RANGE,
     ION_CACHE_INVALID_BY_RANGE,
     ION_CACHE_FLUSH_BY_RANGE,
-    ION_CACHE_CLEAN_BY_RANGE_USE_VA,
-    ION_CACHE_INVALID_BY_RANGE_USE_VA,
-    ION_CACHE_FLUSH_BY_RANGE_USE_VA,   
     ION_CACHE_CLEAN_ALL,
     ION_CACHE_INVALID_ALL,
     ION_CACHE_FLUSH_ALL
@@ -52,8 +47,6 @@ typedef enum
 typedef struct ion_sys_cache_sync_param
 {
     struct ion_handle* handle;
-    unsigned int va;
-    unsigned int size;
     ION_CACHE_SYNC_TYPE sync_type;
 } ion_sys_cache_sync_param_t;
 
@@ -89,40 +82,16 @@ typedef struct ion_mm_config_buffer_param
     unsigned int coherent;
 } ion_mm_config_buffer_param_t;
 
-#define ION_MM_DBG_NAME_LEN 16
-
-typedef struct __ion_mm_buf_debug_info
-{
-    struct ion_handle* handle;
-    char dbg_name[ION_MM_DBG_NAME_LEN];
-    unsigned int value1;
-    unsigned int value2;
-    unsigned int value3;
-    unsigned int value4;
-}ion_mm_buf_debug_info_t;
-
 typedef struct ion_mm_data
 {
     ION_MM_CMDS mm_cmd;
     union
     {
         ion_mm_config_buffer_param_t config_buffer_param;
-        ion_mm_buf_debug_info_t  buf_debug_info_param;
     };
 } ion_mm_data_t;
 
 #ifdef __KERNEL__
-
-#define ION_LOG_TAG "ion_dbg"
-
-#define IONMSG(string, args...)	xlog_printk(ANDROID_LOG_INFO, ION_LOG_TAG, string,##args)
-#define IONTMP(string, args...)  xlog_printk(ANDROID_LOG_INFO, ION_LOG_TAG, string,##args)
-#define ion_aee_print(string, args...) do{\
-    char ion_name[100];\
-    snprintf(ion_name,100, "["ION_LOG_TAG"]"string, ##args); \
-  aee_kernel_warning(ion_name, "["ION_LOG_TAG"]error:"string,##args);  \
-}while(0)
-
 // Exported global variables
 extern struct ion_device *g_ion_device;
 

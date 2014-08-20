@@ -43,8 +43,8 @@ typedef struct mtk_dispif_info {
 	unsigned int displayFormat;
 	MTKFB_DISPIF_MODE displayMode;
 	unsigned int vsyncFPS;
-	unsigned int physicalWidth;
-	unsigned int physicalHeight;
+	unsigned int xDPI;
+	unsigned int yDPI;
 	unsigned int isConnected;
 } mtk_dispif_info_t;
 

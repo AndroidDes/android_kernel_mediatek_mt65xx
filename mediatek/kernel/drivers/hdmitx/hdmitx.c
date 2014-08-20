@@ -58,13 +58,7 @@
 #include <mach/mt_clkmgr.h>
 
 #include "hdmitx.h"
-#ifdef MTK_INTERNAL_HDMI_SUPPORT
-#include "internal_hdmi_drv.h"
-#elif defined(MTK_INTERNAL_MHL_SUPPORT)
-#include "inter_mhl_drv.h"
-#else
 #include "hdmi_drv.h"
-#endif
 #include "hdmi_utils.h"
 
 #include "dpi_reg.h"
@@ -607,7 +601,7 @@ void hdmi_reg_dump(void)
 {
 	hdmi_drv->dump();
 }
-#if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT)
+#ifdef MTK_MT8193_HDMI_SUPPORT
 void hdmi_read_reg(unsigned char u8Reg, unsigned int *p4Data)
 {
 	hdmi_drv->read(u8Reg, p4Data);
@@ -829,7 +823,6 @@ void hdmi_rdma_buffer_switch(void)
             // if hdmi_buffer_read_id_tmp has not be writen to working register, drop it
             HDMI_BUFFER_LOG("drop %d\n", hdmi_buffer_read_id_tmp);
             hdmi_release_buffer(hdmi_buffer_read_id_tmp);
-			return;
         }
 
         MMProfileLogEx(HDMI_MMP_Events.SwitchRDMABuffer, MMProfileFlagStart, acquired, hdmi_buffer_read_id_tmp);
@@ -993,7 +986,6 @@ static void hdmi_update_impl(void)
         pddp.dstHStride = p->hdmi_height;
         pddp.dstPlaneNum = 1;
 
-#if 0
         if(p->lcm_height > p->lcm_width)
         {
             pddp.orientation = 270;
@@ -1002,23 +994,9 @@ static void hdmi_update_impl(void)
         {
             pddp.orientation = 0;
         }
-#else
-		pddp.orientation = p->orientation;
-#endif
-		if(((pddp.orientation == 0 || pddp.orientation == 180) && p->lcm_height > p->lcm_width) ||
-                         ((pddp.orientation == 90 || pddp.orientation == 270) && p->lcm_height < p->lcm_width))
-		{
-			if(p->lcm_height > p->lcm_width)
-			    pddp.dstW = ALIGN_TO(p->lcm_width * p->hdmi_height / p->lcm_height, 4);
-			else
-			    pddp.dstW = ALIGN_TO(p->lcm_height * p->hdmi_height / p->lcm_width, 4);
-			pddp.dstH = ALIGN_TO(p->hdmi_height,4);
-		}
-		else
-		{
-			pddp.dstW = ALIGN_TO(p->hdmi_width * scaling / 100, 4);
-			pddp.dstH = ALIGN_TO(p->hdmi_height * scaling / 100, 4);
-		}
+
+        pddp.dstW = ALIGN_TO(p->hdmi_width * scaling / 100, 4);
+        pddp.dstH = ALIGN_TO(p->hdmi_height * scaling / 100, 4);
 
         dstOffset = (p->hdmi_height - pddp.dstH ) / 2 * p->hdmi_width * hdmi_bpp +
                     (p->hdmi_width - pddp.dstW) / 2 * hdmi_bpp;
@@ -1985,7 +1963,7 @@ void hdmi_state_callback(HDMI_STATE state)
 
             break;
         }
-		#if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT) 
+		#ifdef MTK_MT8193_HDMI_SUPPORT
 		case HDMI_STATE_PLUGIN_ONLY:
         {   
             switch_set_state(&hdmi_switch_data, HDMI_STATE_PLUGIN_ONLY);
@@ -2040,7 +2018,7 @@ void hdmi_state_callback(HDMI_STATE state)
 	// When we suspend the phone, and then plug out hdmi cable, the hdmi chip status will change immediately
 	// But when we resume the phone and check hdmi status, the irq will never come again
 	// So we have to reset hdmi state manually, to ensure the status is the same between the host and hdmi chip.
-	#if (!defined(MTK_MT8193_HDMI_SUPPORT))&&( !defined(MTK_INTERNAL_HDMI_SUPPORT))&&(!defined(MTK_INTERNAL_MHL_SUPPORT))
+	#ifndef MTK_MT8193_HDMI_SUPPORT
     if(p->is_force_disable == false)
     {
         if (IS_HDMI_FAKE_PLUG_IN())
@@ -2148,7 +2126,7 @@ void hdmi_state_callback(HDMI_STATE state)
 /*static*/ void hdmi_setorientation(int orientation)
 {
 	HDMI_FUNC();
-    ///RET_VOID_IF(!p->is_enabled);
+    RET_VOID_IF(!p->is_enabled);
 
 	if(down_interruptible(&hdmi_update_mutex))
 	{
@@ -2408,7 +2386,7 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	void __user *argp = (void __user *)arg;
 
 	int r = 0;
-	#if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT)
+	#ifdef MTK_MT8193_HDMI_SUPPORT
     hdmi_device_write w_info;
 	hdmi_hdcp_key key;
 	send_slt_data send_sltdata;
@@ -2421,26 +2399,12 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	CEC_SEND_MSG_T cecsendframe;
 	READ_REG_VALUE regval;
     #endif
-	#ifdef MTK_INTERNAL_HDMI_SUPPORT
-	HDMIDRV_AUDIO_PARA audio_para;
-	#endif	
+	
 	HDMI_LOG("[HDMI] hdmi ioctl= %s(%d), arg = %lu\n", _hdmi_ioctl_spy(cmd),cmd&0xff, arg);
 
     switch(cmd)
     {
-       #if defined(MTK_INTERNAL_HDMI_SUPPORT) 
-	   case MTK_HDMI_AUDIO_SETTING:
-       {
-           if (copy_from_user(&audio_para, (void __user *)arg, sizeof(audio_para))) {
-               HDMI_LOG("copy_from_user failed! line:%d \n", __LINE__);
-               r = -EFAULT;
-           } else {
-               hdmi_drv->audiosetting(&audio_para);
-           }            
-           break;
-       }	   
-	   #endif
-       #if defined(MTK_MT8193_HDMI_SUPPORT) || defined(MTK_INTERNAL_HDMI_SUPPORT) 
+       #ifdef MTK_MT8193_HDMI_SUPPORT
        case MTK_HDMI_WRITE_DEV:
        {
            if (copy_from_user(&w_info, (void __user *)arg, sizeof(w_info))) {
@@ -2718,7 +2682,7 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
             }
             else
             {
-                #if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT)
+                #ifdef MTK_MT8193_HDMI_SUPPORT
                 switch_set_state(&hdmi_switch_data, HDMI_STATE_NO_DEVICE);
 				#endif
                 hdmi_power_off();
@@ -2749,7 +2713,7 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         {
             HDMI_LOG("video resolution configuration, arg=%ld\n", arg);
 
-#if (!defined(MTK_MT8193_HDMI_SUPPORT))&&(!defined(MTK_INTERNAL_HDMI_SUPPORT))&&(!defined(MTK_INTERNAL_MHL_SUPPORT))
+#ifndef MTK_MT8193_HDMI_SUPPORT
             if (arg > 1)
             {
                 arg = 1;
@@ -3212,7 +3176,6 @@ static int __init hdmi_init(void)
     }
 
     p->output_mode = hdmi_params->output_mode;
-	p->orientation = 0;
     hdmi_drv->init();
     HDMI_LOG("Output mode is %s\n", (hdmi_params->output_mode==HDMI_OUTPUT_MODE_DPI_BYPASS)?"HDMI_OUTPUT_MODE_DPI_BYPASS":"HDMI_OUTPUT_MODE_LCD_MIRROR");
 

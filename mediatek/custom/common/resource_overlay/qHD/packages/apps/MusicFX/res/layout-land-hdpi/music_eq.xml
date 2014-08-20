@@ -27,8 +27,7 @@
         android:layout_height="match_parent"
         android:layout_marginTop="10dip"
         android:layout_marginBottom="32dip"
-        android:layout_marginRight="5dip"
-        android:layout_marginLeft="5dip">
+        android:layout_marginRight="10dip">
 
         <TextView
             android:id="@+id/maxLevelText"
@@ -66,7 +65,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand0TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -83,7 +82,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand1TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -100,7 +99,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand2TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -117,7 +116,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand3TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -134,7 +133,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand4TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -151,7 +150,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand5TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -167,7 +166,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand6TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -183,7 +182,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand7TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -199,7 +198,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand8TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -215,7 +214,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand9TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -231,7 +230,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand10TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -247,7 +246,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand11TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -263,7 +262,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand12TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -279,7 +278,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand13TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -295,7 +294,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand14TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -311,7 +310,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand15TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -327,7 +326,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand16TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -343,7 +342,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand17TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -359,7 +358,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand18TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -375,7 +374,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand19TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -391,7 +390,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand20TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -407,7 +406,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand21TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -423,7 +422,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand22TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -439,7 +438,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand23TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -455,7 +454,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand24TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -471,7 +470,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand25TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -487,7 +486,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand26TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -503,7 +502,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand27TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -519,7 +518,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand28TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -535,7 +534,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand29TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -551,7 +550,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand30TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>
@@ -567,7 +566,7 @@
             android:layout_height="@dimen/eq_slider_height" />
         <TextView
             android:id="@+id/EQBand31TextView"
-            android:layout_width="55dip"
+            android:layout_width="50dip"
             android:layout_height="wrap_content"
             android:layout_gravity="center" />
     </LinearLayout>

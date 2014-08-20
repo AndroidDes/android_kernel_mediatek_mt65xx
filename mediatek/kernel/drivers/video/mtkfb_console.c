@@ -3,9 +3,9 @@
 #include <linux/semaphore.h>
 #include <linux/slab.h>
 
-#include <mach/mt_typedefs.h>
+#include <disp_drv_platform.h>
 #include "mtkfb_console.h"
-#include "ddp_hal.h"
+
 // ---------------------------------------------------------------------------
 
 typedef struct

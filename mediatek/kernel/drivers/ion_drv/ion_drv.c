@@ -27,23 +27,15 @@
 #include <linux/err.h>
 #include <linux/export.h>
 #include <linux/mmprofile.h>
-#include "ion_profile.h"
 
 #define ION_FUNC_ENTER  //MMProfileLogMetaString(MMP_ION_DEBUG, MMProfileFlagStart, __func__);
 #define ION_FUNC_LEAVE  //MMProfileLogMetaString(MMP_ION_DEBUG, MMProfileFlagEnd, __func__);
-#define ION_DEBUG_INFO KERN_DEBUG
-#define ION_DEBUG_TRACE KERN_DEBUG
-#define ION_DEBUG_ERROR KERN_ERR
-#define ION_DEBUG_WARN KERN_WARNING
 
 //#pragma GCC optimize ("O0")
 #define DEFAULT_PAGE_SIZE 0x1000
 #define PAGE_ORDER 12
 extern int record_ion_info(int from_kernel,ion_sys_record_t *param);
 extern char *get_userString_from_hashTable(char *string_name,unsigned int len);
-extern struct ion_heap *ion_mm_heap_create(struct ion_platform_heap *unused);
-
-
 struct ion_device *g_ion_device;
 struct ion_heap *g_ion_heaps[ION_HEAP_IDX_MAX];
 
@@ -62,22 +54,14 @@ static long ion_sys_cache_sync(struct ion_client *client, ion_sys_cache_sync_par
     if (pParam->sync_type < ION_CACHE_CLEAN_ALL)
     {
         // By range operation
-        unsigned int start;
-        size_t size;
-        unsigned int end, page_num, i, page_start;
+        unsigned int start = (unsigned int) ion_map_kernel(client, pParam->handle);
+        size_t size = ion_handle_buffer(pParam->handle)->size;
+        unsigned int end;
+        unsigned int page_num;
+        unsigned int i;
+        unsigned int page_start;
         struct page* ppage;
-
-        if(pParam->sync_type < ION_CACHE_CLEAN_BY_RANGE_USE_VA)
-        {
-            start = (unsigned int) ion_map_kernel(client, pParam->handle);
-            size = ion_handle_buffer(pParam->handle)->size;
-        }
-        else
-        {
-            start = pParam->va;
-            size = pParam->size;
-        }
-        
+        phys_addr_t phys_addr;
         // Cache line align
         end = start + size;
         start = (start / L1_CACHE_BYTES * L1_CACHE_BYTES);
@@ -85,32 +69,25 @@ static long ion_sys_cache_sync(struct ion_client *client, ion_sys_cache_sync_par
         page_num = ((start&(~PAGE_MASK))+size+(~PAGE_MASK))>>PAGE_ORDER;
         page_start = start & PAGE_MASK;
         // L1 cache sync
-        if((pParam->sync_type==ION_CACHE_CLEAN_BY_RANGE) || (pParam->sync_type==ION_CACHE_CLEAN_BY_RANGE_USE_VA))
+        if (pParam->sync_type == ION_CACHE_CLEAN_BY_RANGE)
         {
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_CLEAN_RANGE], MMProfileFlagStart, size, 0);
-            //printk("[ion_sys_cache_sync]: ION cache clean by range. start=0x%08X size=0x%08X\n", start, size);
+            printk("[ion_sys_cache_sync]: ION cache clean by range. start=0x%08X size=0x%08X\n", start, size);
             dmac_map_area((void*)start, size, DMA_TO_DEVICE);
         }
-        else if ((pParam->sync_type == ION_CACHE_INVALID_BY_RANGE)||(pParam->sync_type == ION_CACHE_INVALID_BY_RANGE_USE_VA))
+        else if (pParam->sync_type == ION_CACHE_INVALID_BY_RANGE)
         {
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_INVALID_RANGE], MMProfileFlagStart, size, 0);
-            //printk("[ion_sys_cache_sync]: ION cache invalid by range. start=0x%08X size=0x%08X\n", start, size);
+            printk("[ion_sys_cache_sync]: ION cache invalid by range. start=0x%08X size=0x%08X\n", start, size);
             dmac_unmap_area((void*)start, size, DMA_FROM_DEVICE);
         }
-        else if ((pParam->sync_type == ION_CACHE_FLUSH_BY_RANGE)||(pParam->sync_type == ION_CACHE_FLUSH_BY_RANGE_USE_VA))
+        else if (pParam->sync_type == ION_CACHE_FLUSH_BY_RANGE)
         {
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_FLUSH_RANGE], MMProfileFlagStart, size, 0);
-            //printk("[ion_sys_cache_sync]: ION cache flush by range. start=0x%08X size=0x%08X\n", start, size);
+            printk("[ion_sys_cache_sync]: ION cache flush by range. start=0x%08X size=0x%08X\n", start, size);
             dmac_flush_range((void*)start, (void*)(start+size-1));
         }
-
-#if 0
         // L2 cache sync
-        //printk("[ion_sys_cache_sync]: page_start=0x%08X, page_num=%d\n", page_start, page_num);
+        printk("[ion_sys_cache_sync]: page_start=0x%08X, page_num=%d\n", page_start, page_num);
         for (i=0; i<page_num; i++, page_start+=DEFAULT_PAGE_SIZE)
         {
-            phys_addr_t phys_addr;
-
             if (page_start>=VMALLOC_START && page_start<=VMALLOC_END)
             {
                 ppage = vmalloc_to_page((void*)page_start);
@@ -131,48 +108,29 @@ static long ion_sys_cache_sync(struct ion_client *client, ion_sys_cache_sync_par
             else if (pParam->sync_type == ION_CACHE_FLUSH_BY_RANGE)
                 outer_flush_range(phys_addr, phys_addr+DEFAULT_PAGE_SIZE);
         }
-#endif
-
-        if(pParam->sync_type < ION_CACHE_CLEAN_BY_RANGE_USE_VA)
-        {
-            ion_unmap_kernel(client, pParam->handle);
-        }
-
-        if (pParam->sync_type == ION_CACHE_CLEAN_BY_RANGE)
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_CLEAN_RANGE], MMProfileFlagEnd, size, 0);
-        else if (pParam->sync_type == ION_CACHE_INVALID_BY_RANGE)
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_INVALID_RANGE], MMProfileFlagEnd, size, 0);
-        else if (pParam->sync_type == ION_CACHE_FLUSH_BY_RANGE)
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_FLUSH_RANGE], MMProfileFlagEnd, size, 0);
-        
+        ion_unmap_kernel(client, pParam->handle);
     }
     else
     {
         // All cache operation
         if (pParam->sync_type == ION_CACHE_CLEAN_ALL)
         {
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_CLEAN_ALL], MMProfileFlagStart, 1, 1);
-            //printk("[ion_sys_cache_sync]: ION cache clean all.\n");
+            printk("[ion_sys_cache_sync]: ION cache clean all.\n");
             smp_inner_dcache_flush_all();
             outer_clean_all();
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_CLEAN_ALL], MMProfileFlagEnd, 1, 1);
         }
         else if (pParam->sync_type == ION_CACHE_INVALID_ALL)
         {
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_INVALID_ALL], MMProfileFlagStart, 1, 1);
-            //printk("[ion_sys_cache_sync]: ION cache invalid all.\n");
+            printk("[ion_sys_cache_sync]: ION cache invalid all.\n");
             smp_inner_dcache_flush_all();
             outer_inv_all();
             //outer_flush_all();
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_INVALID_ALL], MMProfileFlagEnd, 1, 1);
         }
         else if (pParam->sync_type == ION_CACHE_FLUSH_ALL)
         {
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_FLUSH_ALL], MMProfileFlagStart, 1, 1);
-            //printk("[ion_sys_cache_sync]: ION cache flush all.\n");
+            printk("[ion_sys_cache_sync]: ION cache flush all.\n");
             smp_inner_dcache_flush_all();
             outer_flush_all();
-            MMProfileLogEx(ION_MMP_Events[PROFILE_DMA_FLUSH_ALL], MMProfileFlagEnd, 1, 1);
         }
     }
     ION_FUNC_LEAVE;
@@ -214,10 +172,10 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd, unsigned 
 	     //copy mapping info from userspace to kernel space 
 	     if(!from_kernel && (Param.record_param.backtrace_num > 0))
 	     {
-		//printk(ION_DEBUG_INFO "[ion_sys_ioctl]prepare to copy mapping info from userspace\n");
+		printk("[ion_sys_ioctl]prepare to copy mapping info from userspace\n");
 	     	for(i = 0 ; i < Param.record_param.backtrace_num;i++)
 	     	{
-			//printk(ION_DEBUG_INFO "[ion_sys_ioctl]mapping[%d] name 0x%x address 0x%x size %d\n",i,Param.record_param.mapping_record[i].name,Param.record_param.mapping_record[i].address,Param.record_param.mapping_record[i].size);
+			//printk("[ion_sys_ioctl]mapping[%d] name 0x%x address 0x%x size %d\n",i,Param.record_param.mapping_record[i].name,Param.record_param.mapping_record[i].address,Param.record_param.mapping_record[i].size);
 			if(Param.record_param.mapping_record[i].size > 0 )
 			{
 				unsigned int string_len = 0;
@@ -234,36 +192,36 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd, unsigned 
 					}
 					else
 					{
-						printk(ION_DEBUG_ERROR "[ION_FUNC%d][ion_sys_ioctl]tmp_string is NULL\n",Param.record_param.action);
+						printk("[ION_FUNC%d][ion_sys_ioctl]tmp_string is NULL\n",Param.record_param.action);
 					}
 				}
 				else
 				{
-					printk(ION_DEBUG_ERROR "[ION_FUNC%d][ion_sys_ioctl]mapping info error can't get right string len \n",Param.record_param.action);
+					printk("[ION_FUNC%d][ion_sys_ioctl]mapping info error can't get right string len \n",Param.record_param.action);
 				}
 			}
 	     	}
 	     }
 	     Param.record_param.client = client;
-	     printk(ION_DEBUG_TRACE "[ION_FUNC%d][ion_sys_record] PID :%d client 0x%x from_kernel [%d] backtrace[%d]\n",Param.record_param.action,Param.record_param.pid,(unsigned int)Param.record_param.client,from_kernel,Param.record_param.backtrace_num);
+	     printk("[ION_FUNC%d][ion_sys_record] PID :%d client 0x%x from_kernel [%d] backtrace[%d]\n",Param.record_param.action,Param.record_param.pid,(unsigned int)Param.record_param.client,from_kernel,Param.record_param.backtrace_num);
 	     if(Param.record_param.handle != NULL)
 	     {
 		Param.record_param.buffer = ion_handle_buffer(Param.record_param.handle);
 		if(Param.record_param.buffer != NULL)
 		{
-			printk(ION_DEBUG_TRACE "[ION_FUNC%d][ion_sys_record]BUFFER :[%x] size :[%d]\n",Param.record_param.action,(unsigned int)Param.record_param.buffer,Param.record_param.buffer->size);
+			printk("[ION_FUNC%d][ion_sys_record]BUFFER :[%x] size :[%d]\n",Param.record_param.action,(unsigned int)Param.record_param.buffer,Param.record_param.buffer->size);
 	    	}
 		else
 		{
-		       printk(ION_DEBUG_INFO "[ION_FUNC%d]buffer is NULL\n",Param.record_param.action);
+		       printk("[ION_FUNC%d]buffer is NULL\n",Param.record_param.action);
 		} 
 	     }
 	     record_ion_info(from_kernel,&Param.record_param);
-	     printk(ION_DEBUG_TRACE "[ION_FUNC%d][ion_sys_ioctl]DONE\n",Param.record_param.action);
+	     printk("[ION_FUNC%d][ion_sys_ioctl]DONE\n",Param.record_param.action);
 	     break;
 	}
     default:
-        printk(ION_DEBUG_ERROR "[ion_sys_ioctl]: Error. Invalid command.\n");
+        printk("[ion_sys_ioctl]: Error. Invalid command.\n");
         ret = -EFAULT;
         break;
     }
@@ -323,23 +281,23 @@ int ion_drv_probe(struct platform_device *pdev)
     g_ion_heaps[ION_HEAP_IDX_SYSTEM_CONTIG]->ops = &sys_contig_heap_ops;
     g_ion_heaps[ION_HEAP_IDX_SYSTEM_CONTIG]->type = ION_HEAP_TYPE_SYSTEM_CONTIG;
     g_ion_heaps[ION_HEAP_IDX_SYSTEM_CONTIG]->id = ION_HEAP_TYPE_SYSTEM_CONTIG;
-    g_ion_heaps[ION_HEAP_IDX_SYSTEM_CONTIG]->name = "ion_system_contig_heap";
+    g_ion_heaps[ION_HEAP_IDX_SYSTEM_CONTIG]->name = "ION System Contiguous Heap";
     ion_device_add_heap(g_ion_device, g_ion_heaps[ION_HEAP_IDX_SYSTEM_CONTIG]);
 
     // Add multimedia heap. (using M4U MVA as physical address)
-    g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA] = ion_mm_heap_create(NULL);
-    if (IS_ERR_OR_NULL(g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]))
+    g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA] = kzalloc(sizeof(struct ion_heap), GFP_KERNEL);
+    if (!g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA])
     {
         printk("Cannot allocate memory for g_ion_heaps[ION_HEAP_ID_MULTIMEDIA]\n");
         return (int)(ERR_PTR(-ENOMEM));
     }
-    g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]->name = "ion_mm_heap";
+    g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]->ops = &mm_heap_ops;
+    g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]->type = ION_HEAP_TYPE_MULTIMEDIA;
+    g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]->name = "ION Multimedia Heap";
     g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]->id = ION_HEAP_TYPE_MULTIMEDIA;
 	ion_device_add_heap(g_ion_device, g_ion_heaps[ION_HEAP_IDX_MULTIMEDIA]);
-    
-	platform_set_drvdata(pdev, g_ion_device);
 
-    ion_profile_init();
+	platform_set_drvdata(pdev, g_ion_device);
 	return 0;
 }
 

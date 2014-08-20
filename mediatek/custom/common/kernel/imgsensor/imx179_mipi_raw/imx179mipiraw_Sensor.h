@@ -66,7 +66,6 @@ typedef enum group_enum {
 
 #define ENGINEER_START_ADDR 10
 #define FACTORY_START_ADDR 0
-#define USE_PREVIW_FOR_VIDEO           // LINE <><20130922><use 720p to cut down current> Jiangde
 
 typedef enum engineer_index
 {
@@ -121,18 +120,8 @@ typedef struct
 /* Real CAP Size, i.e. the size after all ISP processing (so already -4/-6), before MDP. */
 #define IMX179MIPI_REAL_CAP_WIDTH				3264//3280
 #define IMX179MIPI_REAL_CAP_HEIGHT				2448//2464
-#ifndef USE_PREVIW_FOR_VIDEO
-//#define IMX179MIPI_REAL_VIDEO_WIDTH				3272//3280-8
-//#define IMX179MIPI_REAL_VIDEO_HEIGHT			1846//1852-6
-#define IMX179MIPI_REAL_VIDEO_WIDTH			    3264//3272//3280-8//LINE <SNTZT-259> <DATE20130731> <dither when EIS recording> wupingzhou
-#define IMX179MIPI_REAL_VIDEO_HEIGHT            1836//1846//1852-6//LINE <SNTZT-259> <DATE20130731> <dither when EIS recording> wupingzhou
-#else
-// Preview
-// #define IMX179MIPI_REAL_VIDEO_WIDTH          1632 // 720p=(1288 - 8) // 3272
-// #define IMX179MIPI_REAL_VIDEO_HEIGHT         1224 // 720p=(968 - 6)  // 1846
-#define IMX179MIPI_REAL_VIDEO_WIDTH             1616 // (1632-16) // (1288 - 8) // 3272
-#define IMX179MIPI_REAL_VIDEO_HEIGHT            1216 // (1224-8) // (968 - 6)  // 1846
-#endif
+#define IMX179MIPI_REAL_VIDEO_WIDTH				3272//3280-8
+#define IMX179MIPI_REAL_VIDEO_HEIGHT			1846//1852-6
 
 /* X/Y Starting point */
 #define IMX179MIPI_IMAGE_SENSOR_PV_STARTX       2
@@ -156,14 +145,8 @@ typedef struct
 #define IMX179MIPI_PV_FRAME_LENGTH_LINES						(2512)	
 #define IMX179MIPI_FULL_LINE_LENGTH_PIXELS 						(3440)
 #define IMX179MIPI_FULL_FRAME_LENGTH_LINES			            (3140)
-
-#ifndef USE_PREVIW_FOR_VIDEO
 #define IMX179MIPI_VIDEO_LINE_LENGTH_PIXELS 					(3440)
 #define IMX179MIPI_VIDEO_FRAME_LENGTH_LINES						(2512)
-#else
-#define IMX179MIPI_VIDEO_LINE_LENGTH_PIXELS 					(3440) // 720p=(3400)
-#define IMX179MIPI_VIDEO_FRAME_LENGTH_LINES						(2512) // 720p=(2510)
-#endif
 
 
 //#define IMX179MIPI_SHUTTER_LINES_GAP	  3

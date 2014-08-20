@@ -30,8 +30,8 @@ typedef struct{
 }VBAT_TO_PERCENT;
 
 /* Battery Temperature Protection */
-#define MAX_CHARGE_TEMPERATURE  50
-#define MIN_CHARGE_TEMPERATURE  0
+#define MAX_CHARGE_TEMPERATURE  60
+#define MIN_CHARGE_TEMPERATURE  -10
 #define ERR_CHARGE_TEMPERATURE  0xFF
 
 /* Recharging Battery Voltage */
@@ -40,6 +40,8 @@ typedef struct{
 /* Charging Current Setting */
 #define USB_CHARGER_CURRENT					Cust_CC_450MA
 #define AC_CHARGER_CURRENT					Cust_CC_650MA	
+//Ivan added
+#define FAN5405_AC_CHARGING_CURRENT_750
 
 /* Battery Meter Solution */
 #define CONFIG_ADC_SOLUTION 	1
@@ -67,7 +69,7 @@ VBAT_TO_PERCENT Batt_VoltToPercent_Table[] = {
 
 #define CHARGING_IDLE_MODE	 1
 
-#define CHARGING_PICTURE	 1
+#define CHARGING_PICTURE	 0
 
 /* Common setting */
 #define R_CURRENT_SENSE 2				// 0.2 Ohm
@@ -84,17 +86,17 @@ VBAT_TO_PERCENT Batt_VoltToPercent_Table[] = {
 /* Teperature related setting */
 #define RBAT_PULL_UP_R             39000
 #define RBAT_PULL_UP_VOLT          1800
-#define TBAT_OVER_CRITICAL_LOW     68237
+//#define TBAT_OVER_CRITICAL_LOW     68237
 //#define TBAT_OVER_CRITICAL_LOW     483954
+#define TBAT_OVER_CRITICAL_LOW     67790
 #define BAT_TEMP_PROTECT_ENABLE    1
-#define BAT_NTC_10 1
-#define BAT_NTC_47 0
+#define BAT_NTC_10 0
+#define BAT_NTC_TINNO_10 1
 
+//#define BAT_NTC_47 0
+//#define BAT_NTC_CG103JF103F 0
+ 
 /* The option of new charging animation */
-#define ANIMATION_NEW
-
-//Line added by mickal.ma
-#define MTK_JEITA_STANDARD_SUPPORT
-
+//#define ANIMATION_NEW
 
 #endif /* _CUST_BAT_H_ */ 

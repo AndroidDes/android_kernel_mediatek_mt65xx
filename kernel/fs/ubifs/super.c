@@ -44,10 +44,6 @@
  */
 #define UBIFS_KMALLOC_OK (128*1024)
 
-/*sync() when free size less than*/
-#define UFIFS_FREE_SIZE_SYNC_TH (10*1024*1024)
-static int ubifs_sync_fs(struct super_block *sb, int wait)
-/**/
 /* Slab cache for UBIFS inodes */
 struct kmem_cache *ubifs_inode_slab;
 
@@ -401,17 +397,11 @@ static int ubifs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	struct ubifs_info *c = dentry->d_sb->s_fs_info;
 	unsigned long long free;
 	__le32 *uuid = (__le32 *)c->uuid;
-	unsigned long long free_size_th = UFIFS_FREE_SIZE_SYNC_TH;	
 
 	free = ubifs_get_free_space(c);
 	dbg_gen("free space %lld bytes (%lld blocks)",
 		free, free >> UBIFS_BLOCK_SHIFT);
-	if(free <= free_size_th){
-		ubifs_sync_fs(dentry->d_sb,1);
-		free = ubifs_get_free_space(c);
-		printk("[ubifs_statfs]free space %lld B after sync\n",free);
-	}	
-	
+
 	buf->f_type = UBIFS_SUPER_MAGIC;
 	buf->f_bsize = UBIFS_BLOCK_SIZE;
 	buf->f_blocks = c->block_cnt;

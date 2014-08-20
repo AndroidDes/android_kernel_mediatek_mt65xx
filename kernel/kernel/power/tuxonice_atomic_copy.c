@@ -144,14 +144,6 @@ void toi_copy_pageset1(void)
 		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1,
 		    was_present1, was_present2;
 
-#ifdef CONFIG_MTK_HIBERNATION
-        if (!pfn_valid(source_index) || !pfn_valid(dest_index)) {
-            pr_err("[%s] dest_index:%lu, source_index:%lu\n", __func__, dest_index, source_index);
-            set_abort_result(TOI_ABORT_REQUESTED);
-            return;
-        }
-#endif
-
 		origpage = pfn_to_page(source_index);
 		copypage = pfn_to_page(dest_index);
 
@@ -248,11 +240,6 @@ int __toi_post_context_save(void)
 	if (!test_action_state(TOI_TEST_FILTER_SPEED) &&
 	    !test_action_state(TOI_TEST_BIO))
 		toi_copy_pageset1();
-
-#ifdef CONFIG_MTK_HIBERNATION
-    if (test_result_state(TOI_ABORTED)) // may set inside toi_copy_pageset1()
-        return 1;
-#endif
 
 	return 0;
 }

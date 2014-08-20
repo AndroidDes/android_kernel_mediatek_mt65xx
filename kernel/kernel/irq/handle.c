@@ -148,9 +148,7 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 	do {
 		irqreturn_t res;
 
-#ifndef CONFIG_MTK_SCHED_TRACERS
 		trace_irq_handler_entry(irq, action);
-#endif
 #ifdef CONFIG_MTPROF_IRQ_DURATION
 		t1 = sched_clock();
 		res = action->handler(irq, action->dev_id);
@@ -222,9 +220,7 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 #else
 		res = action->handler(irq, action->dev_id);
 #endif
-#ifndef CONFIG_MTK_SCHED_TRACERS
 		trace_irq_handler_exit(irq, action, res);
-#endif
 
 		if (WARN_ONCE(!irqs_disabled(),"irq %u handler %pF enabled interrupts\n",
 			      irq, action->handler))

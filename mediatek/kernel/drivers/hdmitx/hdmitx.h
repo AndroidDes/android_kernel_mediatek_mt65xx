@@ -49,7 +49,7 @@ struct hdmi_video_buffer_info
     unsigned int src_size;
 };
 
-#if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT)||defined(MTK_INTERNAL_MHL_SUPPORT)
+#ifdef MTK_MT8193_HDMI_SUPPORT
 typedef struct
 {
 	unsigned int u4Addr;
@@ -182,22 +182,6 @@ typedef struct
 }	READ_REG_VALUE;
 
 #endif
-
-
-#if defined(MTK_INTERNAL_HDMI_SUPPORT) ||defined(MTK_INTERNAL_MHL_SUPPORT)
-typedef struct 
-{
-	unsigned char	e_hdmi_aud_in;
-	unsigned char	e_iec_frame;
-	unsigned char	e_hdmi_fs;
-	unsigned char	e_aud_code;
-	unsigned char	u1Aud_Input_Chan_Cnt;
-	unsigned char	e_I2sFmt;
-	unsigned char	u1HdmiI2sMclk;
-	unsigned char	bhdmi_LCh_status[5];
-	unsigned char	bhdmi_RCh_status[5];
-}	HDMITX_AUDIO_PARA;
-#endif
 extern unsigned int mtkfb_get_fb_phys_addr(void);
 extern unsigned int mtkfb_get_fb_size(void);
 extern unsigned int mtkfb_get_fb_va(void);
@@ -228,7 +212,7 @@ extern unsigned int mtkfb_get_fb_va(void);
 #define MTK_HDMI_REGISTER_VIDEO_BUFFER          HDMI_IOW(19, struct hdmi_video_buffer_info)
 #define MTK_HDMI_POST_VIDEO_BUFFER              HDMI_IOW(20, struct hdmi_video_buffer_info)
 #define MTK_HDMI_FACTORY_MODE_ENABLE            HDMI_IOW(21, int)
-#if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT)
+#ifdef MTK_MT8193_HDMI_SUPPORT
 #define MTK_HDMI_WRITE_DEV           HDMI_IOWR(22, hdmi_device_write)
 #define MTK_HDMI_READ_DEV            HDMI_IOWR(23, unsigned int)
 #define MTK_HDMI_ENABLE_LOG          HDMI_IOWR(24, unsigned int)
@@ -271,9 +255,7 @@ struct ext_buffer{
 #define MTK_EXT_DISPLAY_GET_MEMORY_INFO		HDMI_IOW(45, struct ext_memory_info)
 #define MTK_EXT_DISPLAY_GET_BUFFER						HDMI_IOW(46, struct ext_buffer)
 #define MTK_EXT_DISPLAY_FREE_BUFFER						HDMI_IOW(47, struct ext_buffer)
-#if defined(MTK_INTERNAL_HDMI_SUPPORT)||defined(MTK_INTERNAL_MHL_SUPPORT)
-#define MTK_HDMI_AUDIO_SETTING      HDMI_IOWR(48, HDMITX_AUDIO_PARA)
-#endif
+
 
 
 enum HDMI_report_state
@@ -300,7 +282,7 @@ int hdmi_audio_enable(bool enable);
 int hdmi_audio_delay_mute(int latency);
 void hdmi_set_mode(unsigned char ucMode);
 void hdmi_reg_dump(void);
-#if defined(MTK_MT8193_HDMI_SUPPORT)|| defined(MTK_INTERNAL_HDMI_SUPPORT)||defined(MTK_INTERNAL_MHL_SUPPORT)
+#ifdef MTK_MT8193_HDMI_SUPPORT
 void hdmi_read_reg(unsigned char u8Reg, unsigned int *p4Data);
 #else
 void hdmi_read_reg(unsigned char u8Reg);

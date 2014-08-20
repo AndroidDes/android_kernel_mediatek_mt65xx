@@ -7,9 +7,9 @@ on post-fs
     chown system system /dev/ttyMT2
 
     # STP, SDIO, WMT, GPS, FM and BT Driver
-#   insmod /system/lib/modules/mtk_hif_sdio.ko
+    insmod /system/lib/modules/mtk_hif_sdio.ko
     insmod /system/lib/modules/mtk_stp_wmt.ko
-#   insmod /system/lib/modules/mtk_stp_uart.ko
+    insmod /system/lib/modules/mtk_stp_uart.ko
     insmod /system/lib/modules/mtk_stp_gps.ko
     insmod /system/lib/modules/mtk_stp_bt.ko
     insmod /system/lib/modules/mtk_fm_drv.ko
@@ -38,17 +38,16 @@ on post-fs
 
 #
 # Connectivity related modules and character device nodes (Ends)
+#
 
 on boot
-
 
 #
 # Connectivity related services (Begin)
 #
-service conn_launcher /system/bin/logwrapper /system/bin/6620_launcher -p /system/etc/firmware/
+service 662x_launcher /system/bin/logwrapper /system/bin/6620_launcher -b 4000000 -p /system/etc/firmware/ -d /dev/ttyMT2
     user system
     group system
-    
 
 service wlanLoader /system/bin/wlan_loader
     user root

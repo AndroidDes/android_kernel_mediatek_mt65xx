@@ -451,6 +451,7 @@ TVOUT_STATUS tvbuf_Init(void)
 
     TV_INFO("using M4U!");
 
+
     mva_size = tvout_get_vram_size();
 	tmpBufVAForM4U = (unsigned char*)vmalloc(mva_size);
 	if (tmpBufVAForM4U == NULL)
@@ -474,7 +475,7 @@ TVOUT_STATUS tvbuf_Init(void)
 	M4uPort.Distance = 1;
 	M4uPort.Direction = 0;
 	m4u_config_port(&M4uPort);
-	//m4u_dump_reg();
+	//_m4u_tvout_func.m4u_dump_reg();
 
     //Allocate MVA for TVC
     if (TVC_AllocMva((unsigned int)tmpBufVAForM4U, mva_size, &mva_tvc) != TVC_STATUS_OK)
@@ -574,6 +575,7 @@ TVOUT_STATUS tv_video_buf_init(void)
         return TVOUT_STATUS_OK;
     }
     memset(tvVdoBuf, 0, sizeof(TV_Buffer)*TVOUT_BUFFERS);
+
 
 
 	video_buffer_addr = (unsigned char*)vmalloc(video_buffer_size*TVOUT_BUFFERS);
@@ -1361,8 +1363,18 @@ static void tvout_enable_power(BOOL enable)
 {
 	TV_INFO("TVout Power (%s)",(enable?"on":"off"));
     if (enable) {
+#if defined(CONFIG_MT6575_EVB_BOARD)
+    if( get_chip_eco_ver() == CHIP_E1) {
+        TV_INFO("PMIC Analog swith to 0x0");
+        hwSPKClassABAnalogSwitchSelect(0x0);
+    } else {
         TV_INFO("PMIC Analog swith to 0x1");
         hwSPKClassABAnalogSwitchSelect(0x1);
+    }
+#else
+        TV_INFO("PMIC Analog swith to 0x1");
+        hwSPKClassABAnalogSwitchSelect(0x1);
+#endif
         TVC_CHECK_RET(TVC_PowerOn());
         TVE_CHECK_RET(TVE_PowerOn());
         TVE_CHECK_RET(TVE_ResetDefaultSettings());
@@ -1454,7 +1466,7 @@ TVOUT_STATUS tvout_setup_video_buffer_list(unsigned int va, unsigned int bFlipUV
     /* 2, va is a new one, allocate MVA for it*/
     if (is_va_in_list == false)
     {
-        //m4u_dump_pagetable(M4U_CLNTMOD_TVC);
+        //_m4u_tvout_func.m4u_dump_pagetable(M4U_CLNTMOD_TVC);
         pBufLink = (tvout_video_buffer*)kmalloc(sizeof(tvout_video_buffer), GFP_KERNEL);
         if (pBufLink == NULL) {
             TV_ERROR("kmalloc error");
@@ -1466,7 +1478,7 @@ TVOUT_STATUS tvout_setup_video_buffer_list(unsigned int va, unsigned int bFlipUV
             return TVOUT_STATUS_ERROR;
         }
 
-        //m4u_dump_pagetable(M4U_CLNTMOD_TVC);
+        //_m4u_tvout_func.m4u_dump_pagetable(M4U_CLNTMOD_TVC);
         *addr_hw_access = pBufLink->vd_mva;
         pBufLink->vd_va = va;
         pBufLink->vd_size = bufSize;
@@ -2846,6 +2858,7 @@ static int TVout_Drv_Probe(struct platform_device *pdev)
 
 #if defined MTK_M4U_SUPPORT
 #endif
+
 	//Init TV-out engines
 	TVC_CHECK_RET(TVC_Init());
     TVE_CHECK_RET(TVE_Init());

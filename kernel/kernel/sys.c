@@ -53,9 +53,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unistd.h>
-#ifdef CONFIG_MT_PRIO_TRACER
- #include <linux/prio_tracer.h>
-#endif
 
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a,b)	(-EINVAL)
@@ -168,11 +165,7 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
 	}
 	if (error == -ESRCH)
 		error = 0;
-#ifdef CONFIG_MT_PRIO_TRACER
-	set_user_nice_syscall(p, niceval);
-#else
 	set_user_nice(p, niceval);
-#endif
 out:
 	return error;
 }
@@ -1211,6 +1204,8 @@ static int override_release(char __user *release, size_t len)
 	}
 	return ret;
 }
+
+
 
 SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 {

@@ -1,7 +1,7 @@
 #ifndef __aed_h
 #define __aed_h
 
-#include <generated/autoconf.h>
+#include <linux/autoconf.h>
 #include <linux/types.h>
 #include <linux/bug.h>
 #include <linux/aee.h>
@@ -12,13 +12,6 @@
 #define AE_INVALID              0xAEEFF000
 #define AE_NOT_AVAILABLE        0xAEE00000
 #define AE_DEFAULT              0xAEE00001
-
-typedef enum {
-    AEE_MODE_MTK_ENG = 1,
-    AEE_MODE_MTK_USER,
-    AEE_MODE_CUSTOMER_ENG,
-    AEE_MODE_CUSTOMER_USER 
-} AEE_MODE;
 
 typedef enum {
     AE_SUCC, 
@@ -118,7 +111,6 @@ struct aee_process_bt {
 #define AEEIOCTL_SETCOLOR       _IOW('p', 0x03, struct aee_dal_setcolor) /* RGB color 0x00RRGGBB */
 #define AEEIOCTL_GET_PROCESS_BT _IOW('p', 0x04, struct aee_process_bt)
 #define AEEIOCTL_GET_SMP_INFO   _IOR('p', 0x05, int)
-#define AEEIOCTL_SET_AEE_MODE   _IOR('p', 0x06, int)
 /* AED debug support */
 
 

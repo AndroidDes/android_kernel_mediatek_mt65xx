@@ -470,9 +470,9 @@ void __stack_chk_fail(void)
 	panic("stack-protector: Kernel stack is corrupted in: %p\n",
 		__builtin_return_address(0));
 */
-    BUG();
-    printk(KERN_ERR "stack-protector: Kernel stack is corrupted in: %p\n",
+	printk(KERN_ERR "stack-protector: Kernel stack is corrupted in: %p\n",
 		__builtin_return_address(0));
+    BUG();
 }
 EXPORT_SYMBOL(__stack_chk_fail);
 

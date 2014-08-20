@@ -67,7 +67,6 @@ unsigned long long mtprof_get_cpu_iowait(int cpu)
 }
 void mt_task_times(struct task_struct *p, cputime_t *ut, cputime_t *st){
     task_times(p,ut,st);
-   //task_cputime_adjusted(p,ut,st);
 }
 /********************
      MT cputime prof
@@ -104,7 +103,6 @@ void setup_mtproc_info(struct task_struct *p, unsigned long long ts)
 	p->se.mtk_isr_time = 0;
 	p->se.mtk_isr_count = 0;
 	mtproc->next = NULL;
-
 	mt_task_times(p,&mtproc->utime_init, &mtproc->stime_init);
 	strcpy(mtproc->comm, p->comm);
 	if(mt_proc_head != NULL)
@@ -122,11 +120,12 @@ void setup_mtproc_info(struct task_struct *p, unsigned long long ts)
 void save_mtproc_info(struct task_struct *p, unsigned long long ts)
 {
 	struct mt_proc_struct *mtproc;
+
 	mutex_lock(&mt_cputime_lock);
 	if(0 == mtsched_enabled)
 	{
 		mutex_unlock(&mt_cputime_lock);
-        return;
+		return;
 	}
 	
 	mutex_unlock(&mt_cputime_lock);

@@ -54,30 +54,27 @@ struct key {
 	char name[KEYS_NAME_LEN + 1];	/* recommend: max 6 chars */
 };
 
-//Start modified by mickal.ma
+//#define KEYS_PWRKEY_MAP		{ KEY_ENDCALL, "PwrEnd" }
 #define KEYS_PWRKEY_MAP		{ KEY_POWER, "Power" }
-
 #define DEFINE_KEYS_KEYMAP(x)		\
 struct key x[] = {			\
 	KEYS_PWRKEY_MAP,		\
-	{ KEY_MENU,       "Menu" },	\
-	{ KEY_HOMEPAGE,       "Home" },	\
-	{ KEY_BACK,       "Back" },	\
 	{ KEY_VOLUMEUP,   "VLUp" },	\
 	{ KEY_VOLUMEDOWN, "VLDown" },	\
+	{ KEY_F1,       "Menu" },	\
+	{ KEY_F2,       "Home" },	\
+	{ KEY_F3,       "Back" },	\
 }
 
 #define CUST_KEY_UP		KEY_UP
 #define CUST_KEY_VOLUP		KEY_VOLUMEUP
 #define CUST_KEY_DOWN		KEY_DOWN
 #define CUST_KEY_VOLDOWN	KEY_VOLUMEDOWN
-#define CUST_KEY_LEFT		KEY_MENU
-#define CUST_KEY_CENTER		KEY_HOMEPAGE
-#define CUST_KEY_RIGHT		KEY_BACK
+#define CUST_KEY_LEFT		KEY_F1
+#define CUST_KEY_CENTER		KEY_F2
+#define CUST_KEY_RIGHT		KEY_F3
+
+#define CUST_KEY_CONFIRM	KEY_F1
+#define CUST_KEY_BACK		KEY_F3
 #define CUST_POWER_KEY		KEY_POWER
-
-#define CUST_KEY_CONFIRM	KEY_MENU 
-#define CUST_KEY_BACK		KEY_BACK
-//end modfied by mickal.ma
-
 #endif /* FTM_CUST_KEYS_H */

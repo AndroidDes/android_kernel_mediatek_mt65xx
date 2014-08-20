@@ -1,5 +1,5 @@
 config-type   := auto-merge
-merge-tool := $(MTK_ROOT_BUILD)/tools/config/merge-kconfig.py
+merge-command := python $(MTK_ROOT_BUILD)/tools/config/merge-kconfig.py
 TARGET_BUILD_VARIANT := user
 merge-order   := \
     common \
@@ -9,7 +9,5 @@ merge-order   := \
     project \
     $(if $(call seq,yes,$(BUILD_DEBUG_KERNEL)),project_debug,) \
     flavor \
-    $(if $(call seq,user,$(TARGET_BUILD_VARIANT)),USER,) \
-    $(if $(call seq,userdebug,$(TARGET_BUILD_VARIANT)),USER,) \
-    $(if $(call seq,userdebug,$(TARGET_BUILD_VARIANT)),USERDEBUG,)
+    $(if $(call seq,user,$(TARGET_BUILD_VARIANT)),USER,)
 

@@ -701,16 +701,23 @@ void vHDMIVideoOutput(u8 ui1Res, u8 ui1ColorSpace)
    {
      vWriteHdmiDGIMsk(ctrl_422_444, rpt_422_444, rpt_422_444|bypass_422_444);
 	 vWriteHdmiDGIMsk(data_out_ctrl, (0x1<<0)|(0x0<<2)|(0x0<<4), y_out_delay|c1_out_delay|c2_out_delay);
+	 vWriteHdmiDGIMsk(dgi1_yuv2rgb_ctr, 0, rg_yuv709_rgb|rg_yuv2rgb_en);
    }
    else if(ui1ColorSpace==HDMI_YCBCR_422)
    {
      vWriteHdmiDGIMsk(ctrl_422_444, bypass_422_444, rpt_422_444|bypass_422_444);
 	 vWriteHdmiDGIMsk(data_out_ctrl, (0x1<<0)|(0x0<<2)|(0x0<<4), y_out_delay|c1_out_delay|c2_out_delay);
+	 vWriteHdmiDGIMsk(dgi1_yuv2rgb_ctr, 0, rg_yuv709_rgb|rg_yuv2rgb_en);
+   }
+   else if(ui1ColorSpace==HDMI_RGB)
+   {
+     vWriteHdmiDGIMsk(ctrl_422_444, 0, rpt_422_444|bypass_422_444);
+     vWriteHdmiDGIMsk(data_out_ctrl, (0x2<<0)|(0x0<<2)|(0x0<<4), y_out_delay|c1_out_delay|c2_out_delay);
+	 vWriteHdmiDGIMsk(dgi1_yuv2rgb_ctr, rg_yuv709_rgb|rg_yuv2rgb_en, rg_yuv709_rgb|rg_yuv2rgb_en);
    }
    else
    {
-     vWriteHdmiDGIMsk(ctrl_422_444, 0, rpt_422_444|bypass_422_444);
-     vWriteHdmiDGIMsk(data_out_ctrl, (0x1<<0)|(0x0<<2)|(0x0<<4), y_out_delay|c1_out_delay|c2_out_delay);
+	   printk("color space type error\n");
    }
 }
 

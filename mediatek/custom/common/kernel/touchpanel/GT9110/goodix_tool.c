@@ -32,7 +32,7 @@
 #include "cust_gpio_usage.h"
 #include <asm/uaccess.h>
 
-#include "tpd_custom_gt9xx.h"
+#include "tpd_custom_gt9110.h"
 
 
 #pragma pack(1)
@@ -192,7 +192,7 @@ s32 init_wr_node(struct i2c_client *client)
 
     register_i2c_func();
 
-    goodix_proc_entry = create_proc_entry(GOODIX_ENTRY_NAME, 0664, NULL);
+    goodix_proc_entry = create_proc_entry(GOODIX_ENTRY_NAME, 0666, NULL);
 
     if (goodix_proc_entry == NULL)
     {

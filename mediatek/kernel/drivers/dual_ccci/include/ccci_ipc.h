@@ -11,8 +11,8 @@
  *
  ****************************************************************************/
 
-#ifndef __CCCI_IPC_H__
-#define __CCCI_IPC_H__
+#ifndef __CCCI_IPC_H
+#define __CCCI_IPC_H
 #include <linux/kernel.h>
 #include <asm/types.h>
 #include <linux/spinlock.h>
@@ -124,4 +124,4 @@ extern void __exit ccci_ipc_exit(int);
 
 
 
-#endif //__CCCI_IPC_H__
+#endif

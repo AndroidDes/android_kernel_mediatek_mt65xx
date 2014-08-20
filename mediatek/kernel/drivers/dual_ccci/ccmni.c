@@ -17,7 +17,11 @@
  *   
  *
  ****************************************************************************/
-#include <ccci.h>
+
+#include <ccci_common.h>
+#include <ccmni_net.h>
+
+
 extern int  ccmni_v1_init(int md_id);
 extern void ccmni_v1_exit(int md_id);
 extern int  ccmni_v2_init(int md_id);
@@ -58,10 +62,8 @@ int ccmni_init(int md_id)
 	int ccmni_version = 0;
 	
 	if(ccci_get_sub_module_cfg(md_id, "net", (char*)&ccmni_version, sizeof(int)) != sizeof(int)) {
-		CCCI_MSG_INF(md_id, "net", "[Error]get ccmni version fail\n");
+		CCCI_MSG_INF(md_id, "net", "get ccmni version fail\n");
 		return -1;
-	} else {
-		CCCI_MSG_INF(md_id, "net", "ccmni driver v%d\n", ccmni_version);
 	}
 	
 	switch(ccmni_version)
@@ -102,12 +104,10 @@ void ccmni_exit(int md_id)
 int ccmni_ipo_h_restore(int md_id)
 {
 	int ccmni_version = 0;
-	
 	if(ccci_get_sub_module_cfg(md_id, "net", (char*)&ccmni_version, sizeof(int)) != sizeof(int)) {
 		CCCI_MSG("Get ccmni verion fail\n");
 		return -1;
 	}
-	
 	switch(ccmni_version)
 	{
 		case 1:

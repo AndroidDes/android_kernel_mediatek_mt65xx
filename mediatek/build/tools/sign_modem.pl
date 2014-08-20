@@ -1,9 +1,5 @@
 #!/usr/bin/perl
 
-use lib "mediatek/build/tools";
-use pack_dep_gen;
-PrintDependModule($0);
-
 ##########################################################
 # Initialize Variables
 ##########################################################
@@ -14,7 +10,7 @@ my $modem_encode = $ARGV[1];
 my $modem_auth = $ARGV[2];
 my $custom_dir = $ARGV[3];
 my $secro_ac = $ARGV[4];
-my $MTK_SECURITY_SW_SUPPORT = $ENV{"MTK_SECURITY_SW_SUPPORT"};
+
 my $modem_cipher = "yes";
 
 my $sml_dir = "mediatek/custom/$custom_dir/security/sml_auth";
@@ -40,15 +36,15 @@ if (${modem_auth} eq "yes")
 	}
 }
 
-if (${MTK_SECURITY_SW_SUPPORT} ne "yes")
+if (${prj} eq "mt6577_evb_mt" || ${prj} eq "mt6577_phone_mt" || ${prj} eq "moto77_ics")
 {
 	$modem_cipher = "no"
 }
 
+
 print "parameter check pass (2 MDs)\n";
 print "MTK_SEC_MODEM_AUTH    =  $modem_auth\n";
 print "MTK_SEC_MODEM_ENCODE  =  $modem_encode\n";
-print "MTK_SECURITY_SW_SUPPORT  =  $MTK_SECURITY_SW_SUPPORT\n";
 print "modem_cipher  =  $modem_cipher\n";
 
 ##########################################################
@@ -59,18 +55,37 @@ my $md_load = "mediatek/custom/out/$prj/modem/modem.img";
 my $b_md_load = "mediatek/custom/out/$prj/modem/modem.img.bak";
 my $c_md_load = "mediatek/custom/out/$prj/modem/cipher_modem.img";
 my $s_md_load = "mediatek/custom/out/$prj/modem/signed_modem.img";
+&process_modem_image;
 
-opendir(DIR, "mediatek/custom/out/$prj/modem");
-@files = grep(/\.img/,readdir(DIR));
-foreach my $file (@files)
-{
-	$md_load = "mediatek/custom/out/$prj/modem/$file";
-	$b_md_load = "mediatek/custom/out/$prj/modem/$file.bak";
-	$c_md_load = "mediatek/custom/out/$prj/modem/cipher_$file";
-	$s_md_load = "mediatek/custom/out/$prj/modem/signed_$file";
-	&process_modem_image;
-}
-closedir(DIR);
+$md_load = "mediatek/custom/out/$prj/modem/modem_E1.img";
+$b_md_load = "mediatek/custom/out/$prj/modem/modem_E1.img.bak";
+$c_md_load = "mediatek/custom/out/$prj/modem/cipher_modem_E1.img";
+$s_md_load = "mediatek/custom/out/$prj/modem/signed_modem_E1.img";
+&process_modem_image;
+
+$md_load = "mediatek/custom/out/$prj/modem/modem_E2.img";
+$b_md_load = "mediatek/custom/out/$prj/modem/modem_E2.img.bak";
+$c_md_load = "mediatek/custom/out/$prj/modem/cipher_modem_E2.img";
+$s_md_load = "mediatek/custom/out/$prj/modem/signed_modem_E2.img";
+&process_modem_image;
+
+$md_load = "mediatek/custom/out/$prj/modem/modem_sys2.img";
+$b_md_load = "mediatek/custom/out/$prj/modem/modem_sys2.img.bak";
+$c_md_load = "mediatek/custom/out/$prj/modem/cipher_modem_sys2.img";
+$s_md_load = "mediatek/custom/out/$prj/modem/signed_modem_sys2.img";
+&process_modem_image;
+
+$md_load = "mediatek/custom/out/$prj/modem/modem_sys2_E1.img";
+$b_md_load = "mediatek/custom/out/$prj/modem/modem_sys2_E1.img.bak";
+$c_md_load = "mediatek/custom/out/$prj/modem/cipher_modem_sys2_E1.img";
+$s_md_load = "mediatek/custom/out/$prj/modem/signed_modem_sys2_E1.img";
+&process_modem_image;
+
+$md_load = "mediatek/custom/out/$prj/modem/modem_sys2_E2.img";
+$b_md_load = "mediatek/custom/out/$prj/modem/modem_sys2_E2.img.bak";
+$c_md_load = "mediatek/custom/out/$prj/modem/cipher_modem_sys2_E2.img";
+$s_md_load = "mediatek/custom/out/$prj/modem/signed_modem_sys2_E2.img";
+&process_modem_image;
 
 sub process_modem_image
 {
@@ -96,9 +111,6 @@ sub process_modem_image
 			{
 				if (${modem_cipher} eq "yes")
 				{
-					PrintDependency("$sml_dir/SML_ENCODE_KEY.ini");
-					PrintDependency("$sml_dir/SML_ENCODE_CFG.ini");
-					PrintDependency($md_load);
 					system("./$cipher_tool ENC $sml_dir/SML_ENCODE_KEY.ini $sml_dir/SML_ENCODE_CFG.ini $md_load $c_md_load") == 0 or die "Cipher Tool return error\n";
 				
 					if(-e "$c_md_load")
@@ -107,9 +119,6 @@ sub process_modem_image
 						system("mv -f $c_md_load $md_load") == 0 or die "can't generate cipher modem binary\n";
 					}
 				}
-				PrintDependency("$sml_dir/SML_AUTH_KEY.ini");
-				PrintDependency("$sml_dir/SML_AUTH_CFG.ini");
-				PrintDependency("$md_load");
 				
 				system("./$sign_tool $sml_dir/SML_AUTH_KEY.ini $sml_dir/SML_AUTH_CFG.ini $md_load $s_md_load");
 	
@@ -143,7 +152,6 @@ print "********************************************\n";
 my $secro_def_cfg = "mediatek/custom/common/secro/SECRO_DEFAULT_LOCK_CFG.ini";
 my $secro_out = "mediatek/custom/$custom_dir/secro/AC_REGION";
 my $secro_script = "mediatek/build/tools/SecRo/secro_post.pl";
-PrintDependency($secro_def_cfg);
 system("./$secro_script $secro_def_cfg $prj $custom_dir $secro_ac $secro_out") == 0 or die "SECRO post process return error\n";
 
 ##########################################################

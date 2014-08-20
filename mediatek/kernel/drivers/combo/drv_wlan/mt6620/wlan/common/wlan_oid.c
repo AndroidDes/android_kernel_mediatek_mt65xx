@@ -12,10 +12,6 @@
 /*
 ** $Log: wlan_oid.c $
 **
-** 01 21 2013 cp.wu
-** [ALPS00438894] ?wifi?????????CTIA?wifi?????
-** reject scan request when disabling online scan facility
-**
 ** 07 19 2012 yuche.tsai
 ** NULL
 ** Code update for JB.
@@ -1566,12 +1562,6 @@ wlanoidSetBssidListScan (
             if (kalGetMediaStateIndicated(prAdapter->prGlueInfo) != PARAM_MEDIA_STATE_CONNECTED){
                 aisFsmScanRequest(prAdapter, prSsid, NULL, 0);
             }
-            else {
-                return WLAN_STATUS_FAILURE;
-            }
-        }
-        else {
-            return WLAN_STATUS_FAILURE;
         }
     }
     else
@@ -1582,9 +1572,6 @@ wlanoidSetBssidListScan (
         }
         else if(kalGetMediaStateIndicated(prAdapter->prGlueInfo) != PARAM_MEDIA_STATE_CONNECTED) {
             aisFsmScanRequest(prAdapter, prSsid, NULL, 0);
-        }
-        else {
-            return WLAN_STATUS_FAILURE;
         }
     }
 
@@ -1663,12 +1650,6 @@ wlanoidSetBssidListScanExt (
             if (kalGetMediaStateIndicated(prAdapter->prGlueInfo) != PARAM_MEDIA_STATE_CONNECTED){
                 aisFsmScanRequest(prAdapter, prSsid, pucIe, u4IeLength);
             }
-            else {
-                return WLAN_STATUS_FAILURE;
-            }
-        }
-        else {
-            return WLAN_STATUS_FAILURE;
         }
     }
     else
@@ -1679,9 +1660,6 @@ wlanoidSetBssidListScanExt (
         }
         else if(kalGetMediaStateIndicated(prAdapter->prGlueInfo) != PARAM_MEDIA_STATE_CONNECTED) {
             aisFsmScanRequest(prAdapter, prSsid, pucIe, u4IeLength);
-        }
-        else {
-            return WLAN_STATUS_FAILURE;
         }
     }
 

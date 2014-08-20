@@ -70,11 +70,8 @@
 #include "ov8835mipiraw_Camera_Sensor_para.h"
 #include "ov8835mipiraw_CameraCustomized.h"
 
-// #define OV8835_TEMPERATURE_TEST // Jiangde
-
 #ifdef OV8835MIPI_DEBUG
-//#define SENSORDB printk
-#define SENSORDB(fmt, arg...) printk( "[OV8835MIPIRaw] "  fmt, ##arg)
+#define SENSORDB printk
 #else
 #define SENSORDB(x,...)
 #endif
@@ -103,23 +100,15 @@ extern int iWriteRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u16 i2cId);
 #define OV8835MIPI_ZSD_PRE_CLK 273000000 //117000000
 #define OV8835MIPI_VIDEO_CLK 273000000 //117000000
 #else
-
-    #define OV8835MIPI_PREVIEW_CLK 208000000  //65000000
-#ifdef USE_24FPS_SETTING // LINE <><2013.10.31><Use 24FPS to test blc> Jiangde
-    #define OV8835MIPI_CAPTURE_CLK 216666667  
-    #define OV8835MIPI_ZSD_PRE_CLK 216666667 // test for 24fps
-#else
-    #define OV8835MIPI_CAPTURE_CLK 260000000  //117000000  //69333333 
-    #define OV8835MIPI_ZSD_PRE_CLK 260000000 //117000000
-#endif
-    #define OV8835MIPI_VIDEO_CLK 260000000 //117000000 Jiangde video 1/3
-    
+#define OV8835MIPI_PREVIEW_CLK 208000000  //65000000
+#define OV8835MIPI_CAPTURE_CLK 260000000  //117000000  //69333333
+#define OV8835MIPI_ZSD_PRE_CLK 260000000 //117000000
+#define OV8835MIPI_VIDEO_CLK 260000000 //117000000
 #endif
 #endif
 #endif
 
 //#define OV8835MIPI_ZSD_PRE_CLK 134333333 //117000000
-#define OV8835MIPI_TEST_PATTERN_CHECKSUM (0x8974faf0)
 
 MSDK_SCENARIO_ID_ENUM OV8835MIPIMIPIRAWCurrentScenarioId = MSDK_SCENARIO_ID_CAMERA_PREVIEW;//ACDK_SCENARIO_ID_CAMERA_PREVIEW;
 
@@ -189,632 +178,714 @@ kal_uint16 OV8835MIPI_write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
 }
 
 
-#define OV8835MIPI_USE_OTP //LINE <> <DATE20130625> <truly ov8835 OTP> wupingzhou
-
-#ifdef OV8835MIPI_USE_OTP //LINE <> <DATE20130625> <truly ov8835 OTP> wupingzhou
-
-#define OTP_DATA_ADDR         0x3D00
-#define OTP_LOAD_ADDR         0x3D81
-#define OTP_BANK_ADDR         0x3D84
-
-#define LENC_START_ADDR       0x5800
-#define LENC_REG_SIZE         62
-
-#define OTP_LENC_GROUP_ADDR   0x3D00
-
-#define OTP_WB_GROUP_ADDR     0x3D00
-#define OTP_WB_GROUP_SIZE     16
-
-#define GAIN_RH_ADDR          0x3400
-#define GAIN_RL_ADDR          0x3401
-#define GAIN_GH_ADDR          0x3402
-#define GAIN_GL_ADDR          0x3403
-#define GAIN_BH_ADDR          0x3404
-#define GAIN_BL_ADDR          0x3405
-
-#define GAIN_DEFAULT_VALUE    0x0400 // 1x gain
-
-#define OTP_MID               0x02
 
 
-// R/G and B/G of current camera module
-static unsigned short rg_ratio = 0;
-static unsigned short bg_ratio = 0;
+#ifdef OV8835MIPI_USE_OTP
 
-static unsigned char otp_lenc_data[62];
+//index:index of otp group.(0,1,2)
+//return:	0:group index is empty.
+//		1.group index has invalid data
+//		2.group index has valid data
 
-
-// Enable OTP read function
-static void otp_read_enable(void)
+kal_uint16 ov8835mipi_check_otp_wb(kal_uint16 index)
 {
-	OV8835MIPI_write_cmos_sensor(OTP_LOAD_ADDR, 0x01);
-	mdelay(15); // sleep > 10ms
-}
+	kal_uint16 temp,flag;
+	kal_uint32 address;
 
-// Disable OTP read function
-static void otp_read_disable(void)
-{
-	OV8835MIPI_write_cmos_sensor(OTP_LOAD_ADDR, 0x00);
-	mdelay(15); // sleep > 10ms
-}
+    if(index < 2)
+    	{
+    		//select bank 0
+    		OV8835MIPI_write_cmos_sensor(0x3d84,0xc0);
+			//load otp to buffer
+			OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+			msleep(10);
 
-static void otp_read(unsigned short otp_addr, unsigned char* otp_data)
-{
-	otp_read_enable();
-	*otp_data = OV8835MIPI_read_cmos_sensor(otp_addr);
-	otp_read_disable();
-}
+			//disable otp read
+			OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
 
-/*******************************************************************************
-* Function    :  otp_clear
-* Description :  Clear OTP buffer 
-* Parameters  :  none
-* Return      :  none
-*******************************************************************************/	
-static void otp_clear(void)
-{
-	// After read/write operation, the OTP buffer should be cleared to avoid accident write
-	unsigned char i;
-	for (i=0; i<16; i++) 
-	{
-		OV8835MIPI_write_cmos_sensor(OTP_DATA_ADDR+i, 0x00);
-	}
-}
+			//read flag
+			address = 0x3d05+index*9;
+			flag = OV8835MIPI_read_cmos_sensor(address);
+    	}
+	else
+		{
+			//select bank 1
+    		OV8835MIPI_write_cmos_sensor(0x3d84,0xc1);
+			//load otp to buffer
+			OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+			msleep(10);
 
-/*******************************************************************************
-* Function    :  otp_check_wb_group
-* Description :  Check OTP Space Availability
-* Parameters  :  [in] index : index of otp group (0, 1, 2)
-* Return      :  0, group index is empty
-                 1, group index has invalid data
-                 2, group index has valid data
-                -1, group index error
-*******************************************************************************/	
-static signed char otp_check_wb_group(unsigned char index)
-{   
-	unsigned char  flag;
+			//disable otp read
+			OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
 
-    if (index > 2)
-	{
-		SENSORDB("OTP input wb group index %d error\n", index);
-		return -1;
-	}
-		
-	// select bank 1-3
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, 0xc0 | (index+1));
+			//read flag
+        address = 0x3d07;
+			flag = OV8835MIPI_read_cmos_sensor(address);
+		}
+	//disable otp read
+	//OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
 
-	otp_read(OTP_WB_GROUP_ADDR, &flag);
-	otp_clear();
-
-	// Check all bytes of a group. If all bytes are '0', then the group is empty. 
-	// Check from group 1 to group 2, then group 3.
+	if(NULL == flag)
+		{
+			
+			SENSORDB("[ov8835mipi_check_otp_wb]index[%x]read flag[%x][0]\n",index,flag);
+			return 0;
+			
+		}
+	else if(!(flag&0x80) && (flag&0x7f))
+		{
+			SENSORDB("[ov8835mipi_check_otp_wb]index[%x]read flag[%x][2]\n",index,flag);
+			return 2;
+		}
+	else
+		{
+			SENSORDB("[ov8835mipi_check_otp_wb]index[%x]read flag[%x][1]\n",index,flag);
+		    return 1;
+		}
 	
-	flag &= 0xc0;
-	if (!flag)
-	{
-		SENSORDB("wb group %d is empty\n", index);
-		return 0;
-	}
-	else if (flag == 0x40)
-	{
-		SENSORDB("wb group %d has valid data\n", index);
-		return 2;
-	}
-	else
-	{
-		SENSORDB("wb group %d has invalid data\n", index);
+}
+
+//index:index of otp group.(0,1,2)
+//return:	0.group index is empty.
+//		1.group index has invalid data
+//		2.group index has valid data
+
+kal_uint16 ov8835mipi_check_otp_lenc(kal_uint16 index)
+{
+   kal_uint16 temp,flag,i;
+   kal_uint32 address;
+
+   //select bank :index*4+2
+   OV8835MIPI_write_cmos_sensor(0x3d84,0xc2+index*4);
+
+   //read otp
+   OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+   msleep(10);
+
+   //disable otp read
+   OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+   //read flag
+   address = 0x3d00; 
+   flag = OV8835MIPI_read_cmos_sensor(address);
+   flag = flag & 0xc0;
+
+   //disable otp read
+   OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+   //clear otp buffer
+   address = 0x3d00;
+   for(i = 0;i<16; i++)
+   	{
+   		OV8835MIPI_write_cmos_sensor(address+i,0x00);
+   	}
+
+   if(NULL == flag)
+   	{
+   		SENSORDB("[ov8835mipi_check_otp_lenc]index[%x]read flag[%x][0]\n",index,flag);
+   	    return 0;
+   	}
+   else if(0x40 == flag)
+   	{
+   		SENSORDB("[ov8835mipi_check_otp_lenc]index[%x]read flag[%x][2]\n",index,flag);
+   	    return 2;
+   	}
+   else
+   	{
+   		SENSORDB("[ov8835mipi_check_otp_lenc]index[%x]read flag[%x][1]\n",index,flag);
 		return 1;
-	}
+   	}
 }
 
-/*******************************************************************************
-* Function    :  otp_read_wb_group
-* Description :  Read group value and store it in OTP Struct 
-* Parameters  :  [in] index : index of otp group (0, 1, 2)
-* Return      :  group index (0, 1, 2)
-                 -1, error
-*******************************************************************************/	
-static signed char otp_read_wb_group(signed char index)
+kal_uint16 ov8835mipi_check_otp_blc(kal_uint16 index)
 {
-	unsigned char  mid, AWB_light_LSB, rg_ratio_MSB, bg_ratio_MSB;
+	kal_uint16 temp,flag;
+	kal_uint32 address;
+	
+    	{
+			
+			//select bank 31: 0x1f
+    		OV8835MIPI_write_cmos_sensor(0x3d84,0xc0+0x1f);
+			//load otp to buffer
+			OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+			msleep(10);
 
-	if (index == -1)
-	{
-		// Check first OTP with valid data
-		for (index=0; index<3; index++)
+			//disable otp read
+			OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+			//read flag
+			address = 0x3d01;
+			flag = OV8835MIPI_read_cmos_sensor(address);
+    	}
+
+	//disable otp read
+	//OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+	if(NULL == flag)
 		{
-			if (otp_check_wb_group(index) == 2)
-			{
-				SENSORDB("read wb from group %d\n", index);
+			
+			SENSORDB("[ov8835mipi_check_otp_blc] read flag[%x]\n",index,flag);
+			return 0;			
+		}
+	else
+		{
+			SENSORDB("[ov8835mipi_check_otp_blc] read flag[%x]\n",index,flag);
+			return 1;
+		}	
+}
+
+//for otp_af
+struct ov8835mipi_otp_af_struct 
+{
+	kal_uint16 group1_data;
+	kal_uint16 group1_far_h8;
+	kal_uint16 group1_far_l8;
+	kal_uint16 group1_near_h8;
+	kal_uint16 group1_near_l8;
+
+	kal_uint16 group2_data;
+	kal_uint16 group2_far_h8;
+	kal_uint16 group2_far_l8;
+	kal_uint16 group2_near_h8;
+	kal_uint16 group2_near_l8;
+
+	kal_uint16 group3_data;
+	kal_uint16 group3_far_h8;
+	kal_uint16 group3_far_l8;
+	kal_uint16 group3_near_h8;
+	kal_uint16 group3_near_l8;
+};
+
+struct ov8835mipi_otp_af_struct ov8835mipi_read_otp_af(void)
+{
+	struct ov8835mipi_otp_af_struct otp;
+	kal_uint16 i;
+	kal_uint32 address;
+
+	//select bank 15
+	OV8835MIPI_write_cmos_sensor(0x3d84,0xcf);
+	//load otp to buffer
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+	msleep(10);
+				
+	//disable otp read
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+	otp.group1_data = OV8835MIPI_read_cmos_sensor(0x3d00);
+	otp.group1_far_h8 = OV8835MIPI_read_cmos_sensor(0x3d01);
+	otp.group1_far_l8 = OV8835MIPI_read_cmos_sensor(0x3d02);
+	otp.group1_near_h8 = OV8835MIPI_read_cmos_sensor(0x3d03);
+	otp.group1_near_l8 = OV8835MIPI_read_cmos_sensor(0x3d04);
+
+	otp.group2_data = OV8835MIPI_read_cmos_sensor(0x3d05);
+	otp.group2_far_h8 = OV8835MIPI_read_cmos_sensor(0x3d06);
+	otp.group2_far_l8 = OV8835MIPI_read_cmos_sensor(0x3d07);
+	otp.group2_near_h8 = OV8835MIPI_read_cmos_sensor(0x3d08);
+	otp.group2_near_l8 = OV8835MIPI_read_cmos_sensor(0x3d09);
+
+	otp.group3_data = OV8835MIPI_read_cmos_sensor(0x3d0a);
+	otp.group3_far_h8 = OV8835MIPI_read_cmos_sensor(0x3d0b);
+	otp.group3_far_l8 = OV8835MIPI_read_cmos_sensor(0x3d0c);
+	otp.group3_near_h8 = OV8835MIPI_read_cmos_sensor(0x3d0d);
+	otp.group3_near_l8 = OV8835MIPI_read_cmos_sensor(0x3d0e);
+
+
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group1_data[%x]\n",0x3d00,otp.group1_data);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group1_far_h8[%x]\n",0x3d01,otp.group1_far_h8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group1_far_l8[%x]\n",0x3d02,otp.group1_far_l8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group1_near_h8[%x]\n",0x3d03,otp.group1_near_h8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group1_near_l8[%x]\n",0x3d04,otp.group1_near_l8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_data[%x]\n",0x3d05,otp.group2_data);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_far_h8[%x]\n",0x3d06,otp.group2_far_h8);	
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_far_l8[%x]\n",0x3d07,otp.group2_far_l8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d08,otp.group2_near_h8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d09,otp.group2_near_l8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d0a,otp.group3_data);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d0b,otp.group3_far_h8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d0c,otp.group3_far_l8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d0d,otp.group3_near_h8);
+	SENSORDB("[ov8835mipi_read_otp_af]address[%x]group2_near_h8[%x]\n",0x3d0e,otp.group3_near_l8);
+	//disable otp read
+	//OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+	
+	//clear otp buffer
+	address = 0x3d00;
+	for(i =0; i<32; i++)
+		{
+			OV8835MIPI_write_cmos_sensor(0x3d00,0x00);
+		}
+
+	return otp;
+}
+//end otp_af
+
+//index:index of otp group.(0,1,2)
+//return: 0
+kal_uint16 ov8835mipi_read_otp_wb(kal_uint16 index, struct ov8835mipi_otp_struct *otp)
+{
+	kal_uint16 temp,i;
+	kal_uint32 address;
+
+	switch(index)
+		{
+			case 0:
+				
+				//select bank 0
+				OV8835MIPI_write_cmos_sensor(0x3d84,0xc0);
+				//load otp to buffer
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+				msleep(10);
+				
+				//disable otp read
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+                address = 0x3d05;
+                otp->module_integrator_id = (OV8835MIPI_read_cmos_sensor(address)&0x7f);
+				otp->lens_id = OV8835MIPI_read_cmos_sensor(address+1);
+				otp->rg_ratio = OV8835MIPI_read_cmos_sensor(address+2);
+				otp->bg_ratio = OV8835MIPI_read_cmos_sensor(address+3);
+				otp->user_data[0] = OV8835MIPI_read_cmos_sensor(address+4);
+				otp->user_data[1] = OV8835MIPI_read_cmos_sensor(address+5);
+				otp->user_data[2] = OV8835MIPI_read_cmos_sensor(address+6);
+				otp->user_data[3] = OV8835MIPI_read_cmos_sensor(address+7);
+				otp->user_data[4] = OV8835MIPI_read_cmos_sensor(address+8);
 				break;
+			case 1:
+				//select bank 0
+				OV8835MIPI_write_cmos_sensor(0x3d84,0xc0);
+				//load otp to buffer
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+				msleep(10);
+				
+				//disable otp read
+                OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+                address = 0x3d0e;
+                otp->module_integrator_id = (OV8835MIPI_read_cmos_sensor(address)&0x7f);
+                otp->lens_id = OV8835MIPI_read_cmos_sensor(address+1);
+
+				//select bank 1
+				OV8835MIPI_write_cmos_sensor(0x3d84,0xc1);
+				//load otp to buffer
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+				msleep(10);
+				
+				//disable otp read
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+				address = 0x3d00;
+				otp->rg_ratio = OV8835MIPI_read_cmos_sensor(address);
+				otp->bg_ratio = OV8835MIPI_read_cmos_sensor(address+1);
+				otp->user_data[0] = OV8835MIPI_read_cmos_sensor(address+2);
+				otp->user_data[1] = OV8835MIPI_read_cmos_sensor(address+3);
+				otp->user_data[2] = OV8835MIPI_read_cmos_sensor(address+4);
+				otp->user_data[3] = OV8835MIPI_read_cmos_sensor(address+5);
+				otp->user_data[4] = OV8835MIPI_read_cmos_sensor(address+6);
+				break;
+			case 2:
+				//select bank 1
+				OV8835MIPI_write_cmos_sensor(0x3d84,0xc1);
+				//load otp to buffer
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+				msleep(10);
+				
+                //disable otp read
+                OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+                address = 0x3d07;
+                otp->module_integrator_id = (OV8835MIPI_read_cmos_sensor(address)&0x7f);
+                otp->lens_id = OV8835MIPI_read_cmos_sensor(address+1);
+                otp->rg_ratio = OV8835MIPI_read_cmos_sensor(address+2);
+				otp->bg_ratio = OV8835MIPI_read_cmos_sensor(address+3);
+				otp->user_data[0] = OV8835MIPI_read_cmos_sensor(address+4);
+				otp->user_data[1] = OV8835MIPI_read_cmos_sensor(address+5);
+				otp->user_data[2] = OV8835MIPI_read_cmos_sensor(address+6);
+				otp->user_data[3] = OV8835MIPI_read_cmos_sensor(address+7);
+				otp->user_data[4] = OV8835MIPI_read_cmos_sensor(address+8);
+				break;
+			default:
+				break;
+				
+		}
+
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]module_integrator_id[%x]\n",address,otp->module_integrator_id);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]lens_id[%x]\n",address,otp->lens_id);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]rg_ratio[%x]\n",address,otp->rg_ratio);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]bg_ratio[%x]\n",address,otp->bg_ratio);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[0][%x]\n",address,otp->user_data[0]);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[1][%x]\n",address,otp->user_data[1]);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[2][%x]\n",address,otp->user_data[2]);	
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[3][%x]\n",address,otp->user_data[3]);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[4][%x]\n",address,otp->user_data[4]);
+
+	//disable otp read
+	//OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+        //clear otp buffer
+        address = 0x3d00;
+        for(i =0; i<16; i++)
+        {
+            OV8835MIPI_write_cmos_sensor(address+i, 0x00);
+        }
+
+        return 0;
+	
+}
+
+kal_uint16 ov8835mipi_read_otp_lenc(kal_uint16 index,struct ov8835mipi_otp_struct *otp)
+{
+	kal_uint16 bank,temp,i;
+	kal_uint32 address;
+
+    //select bank: index*4 +2;
+    bank = index*4+2;
+	temp = 0xc0|bank;
+	OV8835MIPI_write_cmos_sensor(0x3d84,temp);
+
+	//read otp
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+	msleep(10);
+
+	//disabe otp read
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+	
+	address = 0x3d01;
+	for(i = 0; i < 15; i++)
+		{
+			otp->lenc[i] = OV8835MIPI_read_cmos_sensor(address);
+			address++;
+		}
+
+	//select bank+1
+    bank++;
+	temp = 0xc0|bank;
+	OV8835MIPI_write_cmos_sensor(0x3d84,temp);
+
+	//read otp
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+	msleep(10);
+
+	//disabe otp read
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+
+        address = 0x3d00;
+        for(i = 15; i < 31; i++)
+        {
+                otp->lenc[i] = OV8835MIPI_read_cmos_sensor(address);
+                address++;
+        }
+
+	//select bank+2
+    bank++;
+	temp = 0xc0|bank;
+	OV8835MIPI_write_cmos_sensor(0x3d84,temp);
+
+	//read otp
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+	msleep(10);
+
+	//disabe otp read
+        OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+
+        address = 0x3d00;
+        for(i = 31; i < 47; i++)
+        {
+                otp->lenc[i] = OV8835MIPI_read_cmos_sensor(address);
+                address++;
+        }
+
+	//select bank+3
+    bank++;
+	temp = 0xc0|bank;
+	OV8835MIPI_write_cmos_sensor(0x3d84,temp);
+
+	//read otp
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+	msleep(10);
+
+	//disabe otp read
+	OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+
+        address = 0x3d00;
+        for(i = 47; i < 62; i++)
+        {
+            otp->lenc[i] = OV8835MIPI_read_cmos_sensor(address);
+            address++;
+        }
+
+	//disable otp read
+	//OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+	
+	//clear otp buffer
+		address = 0x3d00;
+		for(i =0; i<32; i++)
+			{
+				OV8835MIPI_write_cmos_sensor(0x3d00,0x00);
 			}
-		}
-
-		if (index > 2)
-		{
-			SENSORDB("no group has valid data\n");
-			return -1;
-		}
-	}
-	else
-	{
-		if (otp_check_wb_group(index) != 2)
-		{
-			SENSORDB("read wb from group %d failed\n", index);
-			return -1;
-		}
-	}
-
-
-	// select bank 1-3
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, 0xc0 | (index+1));
-
-	otp_read(OTP_WB_GROUP_ADDR+1, &mid);
-	if (mid != OTP_MID)
-	{
-		return -1;
-	}
-
-	otp_read(OTP_WB_GROUP_ADDR+6, &rg_ratio_MSB);
-	otp_read(OTP_WB_GROUP_ADDR+7, &bg_ratio_MSB);
-	otp_read(OTP_WB_GROUP_ADDR+10, &AWB_light_LSB);	
-	otp_clear();
-	rg_ratio = (rg_ratio_MSB<<2) | ((AWB_light_LSB & 0xC0)>>6);
-	bg_ratio = (bg_ratio_MSB<<2) | ((AWB_light_LSB & 0x30)>>4);
-	SENSORDB("rg_ratio =0x%x\n",rg_ratio);
-	SENSORDB("bg_ratio =0x%x\n",bg_ratio);
-	SENSORDB("read wb finished\n");
-	return index;
+	return 0;
 }
 
-#ifdef SUPPORT_FLOATING //Use this if support floating point values
-/*******************************************************************************
-* Function    :  otp_apply_wb
-* Description :  Calcualte and apply R, G, B gain to module
-* Parameters  :  [in] golden_rg : R/G of golden camera module
-                 [in] golden_bg : B/G of golden camera module
-* Return      :  1, success; 0, fail
-*******************************************************************************/	
-static bool otp_apply_wb(unsigned short golden_rg, unsigned short golden_bg)
+kal_uint16 ov8835mipi_read_otp_blc(kal_uint16 index, struct ov8835mipi_otp_struct *otp)
 {
-	unsigned short gain_r = GAIN_DEFAULT_VALUE;
-	unsigned short gain_g = GAIN_DEFAULT_VALUE;
-	unsigned short gain_b = GAIN_DEFAULT_VALUE;
+	kal_uint16 temp,i;
+	kal_uint32 address;
 
-	double ratio_r, ratio_g, ratio_b;
-	double cmp_rg, cmp_bg;
 
-	if (!golden_rg || !golden_bg)
-	{
-		SENSORDB("golden_rg / golden_bg can not be zero\n");
-		return 0;
-	}
-
-	// Calcualte R, G, B gain of current module from R/G, B/G of golden module
-        // and R/G, B/G of current module
-	cmp_rg = 1.0 * rg_ratio / golden_rg;
-	cmp_bg = 1.0 * bg_ratio / golden_bg;
-
-	if ((cmp_rg<1) && (cmp_bg<1))
-	{
-		// R/G < R/G golden, B/G < B/G golden
-		ratio_g = 1;
-		ratio_r = 1 / cmp_rg;
-		ratio_b = 1 / cmp_bg;
-	}
-	else if (cmp_rg > cmp_bg)
-	{
-		// R/G >= R/G golden, B/G < B/G golden
-		// R/G >= R/G golden, B/G >= B/G golden
-		ratio_r = 1;
-		ratio_g = cmp_rg;
-		ratio_b = cmp_rg / cmp_bg;
-	}
-	else
-	{
-		// B/G >= B/G golden, R/G < R/G golden
-		// B/G >= B/G golden, R/G >= R/G golden
-		ratio_b = 1;
-		ratio_g = cmp_bg;
-		ratio_r = cmp_bg / cmp_rg;
-	}
-
-	// write sensor wb gain to registers
-	// 0x0400 = 1x gain
-	if (ratio_r != 1)
-	{
-		gain_r = (unsigned short)(GAIN_DEFAULT_VALUE * ratio_r);
-		OV8835MIPI_write_cmos_sensor(GAIN_RH_ADDR, gain_r >> 8);
-		OV8835MIPI_write_cmos_sensor(GAIN_RL_ADDR, gain_r & 0x00ff);
-	}
-
-	if (ratio_g != 1)
-	{
-		gain_g = (unsigned short)(GAIN_DEFAULT_VALUE * ratio_g);
-		OV8835MIPI_write_cmos_sensor(GAIN_GH_ADDR, gain_g >> 8);
-		OV8835MIPI_write_cmos_sensor(GAIN_GL_ADDR, gain_g & 0x00ff);
-	}
-
-	if (ratio_b != 1)
-	{
-		gain_b = (unsigned short)(GAIN_DEFAULT_VALUE * ratio_b);
-		OV8835MIPI_write_cmos_sensor(GAIN_BH_ADDR, gain_b >> 8);
-		OV8835MIPI_write_cmos_sensor(GAIN_BL_ADDR, gain_b & 0x00ff);
-	}
-
-	SENSORDB("cmp_rg=%f, cmp_bg=%f\n", cmp_rg, cmp_bg);
-	SENSORDB("ratio_r=%f, ratio_g=%f, ratio_b=%f\n", ratio_r, ratio_g, ratio_b);
-	SENSORDB("gain_r=0x%x, gain_g=0x%x, gain_b=0x%x\n", gain_r, gain_g, gain_b);
-	return 1;
-}
-
-#else //Use this if not support floating point values
-
-#define OTP_MULTIPLE_FAC	10000
-static bool otp_apply_wb(unsigned short golden_rg, unsigned short golden_bg)
-{
-	unsigned short gain_r = GAIN_DEFAULT_VALUE;
-	unsigned short gain_g = GAIN_DEFAULT_VALUE;
-	unsigned short gain_b = GAIN_DEFAULT_VALUE;
-
-	unsigned short ratio_r, ratio_g, ratio_b;
-	unsigned short cmp_rg, cmp_bg;
-
-	if (!golden_rg || !golden_bg)
-	{
-		SENSORDB("golden_rg / golden_bg can not be zero\n");
-		return 0;
-	}
-
-	// Calcualte R, G, B gain of current module from R/G, B/G of golden module
-    // and R/G, B/G of current module
-	cmp_rg = OTP_MULTIPLE_FAC * rg_ratio / golden_rg;
-	cmp_bg = OTP_MULTIPLE_FAC * bg_ratio / golden_bg;
-
-	if ((cmp_rg < 1 * OTP_MULTIPLE_FAC) && (cmp_bg < 1 * OTP_MULTIPLE_FAC))
-	{
-		// R/G < R/G golden, B/G < B/G golden
-		ratio_g = 1 * OTP_MULTIPLE_FAC;
-		ratio_r = 1 * OTP_MULTIPLE_FAC * OTP_MULTIPLE_FAC / cmp_rg;
-		ratio_b = 1 * OTP_MULTIPLE_FAC * OTP_MULTIPLE_FAC / cmp_bg;
-	}
-	else if (cmp_rg > cmp_bg)
-	{
-		// R/G >= R/G golden, B/G < B/G golden
-		// R/G >= R/G golden, B/G >= B/G golden
-		ratio_r = 1 * OTP_MULTIPLE_FAC;
-		ratio_g = cmp_rg;
-		ratio_b = OTP_MULTIPLE_FAC * cmp_rg / cmp_bg;
-	}
-	else
-	{
-		// B/G >= B/G golden, R/G < R/G golden
-		// B/G >= B/G golden, R/G >= R/G golden
-		ratio_b = 1 * OTP_MULTIPLE_FAC;
-		ratio_g = cmp_bg;
-		ratio_r = OTP_MULTIPLE_FAC * cmp_bg / cmp_rg;
-	}
-
-	// write sensor wb gain to registers
-	// 0x0400 = 1x gain
-	if (ratio_r != 1 * OTP_MULTIPLE_FAC)
-	{
-		gain_r = GAIN_DEFAULT_VALUE * ratio_r / OTP_MULTIPLE_FAC;
-		OV8835MIPI_write_cmos_sensor(GAIN_RH_ADDR, gain_r >> 8);
-		OV8835MIPI_write_cmos_sensor(GAIN_RL_ADDR, gain_r & 0x00ff);
-	}
-
-	if (ratio_g != 1 * OTP_MULTIPLE_FAC)
-	{
-		gain_g = GAIN_DEFAULT_VALUE * ratio_g / OTP_MULTIPLE_FAC;
-		OV8835MIPI_write_cmos_sensor(GAIN_GH_ADDR, gain_g >> 8);
-		OV8835MIPI_write_cmos_sensor(GAIN_GL_ADDR, gain_g & 0x00ff);
-	}
-
-	if (ratio_b != 1 * OTP_MULTIPLE_FAC)
-	{
-		gain_b = GAIN_DEFAULT_VALUE * ratio_b / OTP_MULTIPLE_FAC;
-		OV8835MIPI_write_cmos_sensor(GAIN_BH_ADDR, gain_b >> 8);
-		OV8835MIPI_write_cmos_sensor(GAIN_BL_ADDR, gain_b & 0x00ff);
-	}
-
-	SENSORDB("cmp_rg=%d, cmp_bg=%d\n", cmp_rg, cmp_bg);
-	SENSORDB("ratio_r=%d, ratio_g=%d, ratio_b=%d\n", ratio_r, ratio_g, ratio_b);
-	SENSORDB("gain_r=0x%x, gain_g=0x%x, gain_b=0x%x\n", gain_r, gain_g, gain_b);
-	return 1;
-}
-#endif /* SUPPORT_FLOATING */
-
-/*******************************************************************************
-* Function    :  otp_update_wb
-* Description :  Update white balance settings from OTP
-* Parameters  :  [in] golden_rg : R/G of golden camera module
-                 [in] golden_bg : B/G of golden camera module
-* Return      :  1, success; 0, fail
-*******************************************************************************/	
-static bool otp_update_wb(unsigned short golden_rg, unsigned short golden_bg) 
-{
-	SENSORDB("start wb update\n");
-
-	if (otp_read_wb_group(-1) != -1)
-	{
-		if (otp_apply_wb(golden_rg, golden_bg) == 1)
 		{
-			SENSORDB("wb update finished\n");
+
+				
+				//select bank 0
+				OV8835MIPI_write_cmos_sensor(0x3d84,0xc0);
+				//load otp to buffer
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x01);
+				msleep(10);
+				
+				//disable otp read
+				OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+                address = 0x3d0a;
+             //   otp->module_integrator_id = (OV8835MIPI_read_cmos_sensor(address)&0x7f);
+			//	otp->lens_id = OV8835MIPI_read_cmos_sensor(address+1);
+			//	otp->rg_ratio = OV8835MIPI_read_cmos_sensor(address+2);
+			//	otp->bg_ratio = OV8835MIPI_read_cmos_sensor(address+3);
+				otp->user_data[0] = OV8835MIPI_read_cmos_sensor(address);
+			//	otp->user_data[1] = OV8835MIPI_read_cmos_sensor(address+5);
+			//	otp->user_data[2] = OV8835MIPI_read_cmos_sensor(address+6);
+			//	otp->user_data[3] = OV8835MIPI_read_cmos_sensor(address+7);
+			//	otp->user_data[4] = OV8835MIPI_read_cmos_sensor(address+8);
+				
+		}
+
+	/*SENSORDB("[ov8835mipi_read_otp_wb]address[%x]module_integrator_id[%x]\n",address,otp->module_integrator_id);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]lens_id[%x]\n",address,otp->lens_id);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]rg_ratio[%x]\n",address,otp->rg_ratio);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]bg_ratio[%x]\n",address,otp->bg_ratio);*/
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[0][%x]\n",address,otp->user_data[0]);
+	/*SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[1][%x]\n",address,otp->user_data[1]);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[2][%x]\n",address,otp->user_data[2]);	
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[3][%x]\n",address,otp->user_data[3]);
+	SENSORDB("[ov8835mipi_read_otp_wb]address[%x]user_data[4][%x]\n",address,otp->user_data[4]);*/
+
+	//disable otp read
+	//OV8835MIPI_write_cmos_sensor(0x3d81,0x00);
+
+        return 0;
+	
+}
+
+
+//R_gain: red gain of sensor AWB, 0x400 = 1
+//G_gain: green gain of sensor AWB, 0x400 = 1
+//B_gain: blue gain of sensor AWB, 0x400 = 1
+//reutrn 0
+kal_uint16 ov8835mipi_update_wb_gain(kal_uint32 R_gain, kal_uint32 G_gain, kal_uint32 B_gain)
+{
+
+    SENSORDB("[ov8835mipi_update_wb_gain]R_gain[%x]G_gain[%x]B_gain[%x]\n",R_gain,G_gain,B_gain);
+
+	if(R_gain > 0x400)
+		{
+			OV8835MIPI_write_cmos_sensor(0x5186,R_gain >> 8);
+			OV8835MIPI_write_cmos_sensor(0x5187,(R_gain&0x00ff));
+		}
+	if(G_gain > 0x400)
+		{
+			OV8835MIPI_write_cmos_sensor(0x5188,G_gain >> 8);
+			OV8835MIPI_write_cmos_sensor(0x5189,(G_gain&0x00ff));
+		}
+	if(B_gain >0x400)
+		{
+			OV8835MIPI_write_cmos_sensor(0x518a,B_gain >> 8);
+			OV8835MIPI_write_cmos_sensor(0x518b,(B_gain&0x00ff));
+		}
+	return 0;
+}
+
+
+//return 0
+kal_uint16 ov8835mipi_update_lenc(struct ov8835mipi_otp_struct *otp)
+{
+        kal_uint16 i, temp;
+        //lenc g
+        for(i = 0; i < 62; i++)
+        {
+                OV8835MIPI_write_cmos_sensor(0x5800+i,otp->lenc[i]);
+
+                SENSORDB("[ov8835mipi_update_lenc]otp->lenc[%d][%x]\n",i,otp->lenc[i]);
+        }
+
+        return 0;
+}
+
+kal_uint16 ov8835mipi_update_blc(struct ov8835mipi_otp_struct *otp)
+{
+        kal_uint16 i, temp;
+        OV8835MIPI_write_cmos_sensor(0x4006,otp->user_data[0]);
+
+        SENSORDB("[ov8835mipi_update_Blc]otp->blc[%d][%x]\n",i,otp->user_data[0]);
+        return 0;
+}
+
+
+//R/G and B/G ratio of typical camera module is defined here
+
+kal_uint32 RG_Ratio_typical = RG_TYPICAL;
+kal_uint32 BG_Ratio_typical = BG_TYPICAL;
+
+//call this function after OV5650 initialization
+//return value:	0 update success
+//				1 no 	OTP
+
+kal_uint16 ov8835mipi_update_wb_register_from_otp(void)
+{
+	kal_uint16 temp, i, otp_index;
+	struct ov8835mipi_otp_struct current_otp;
+	kal_uint32 R_gain, B_gain, G_gain, G_gain_R,G_gain_B;
+
+	SENSORDB("ov8835mipi_update_wb_register_from_otp\n");
+
+
+	//check first wb OTP with valid OTP
+	for(i = 0; i < 3; i++)
+		{
+			temp = ov8835mipi_check_otp_wb(i);
+			if(temp == 2)
+				{
+					otp_index = i;
+					break;
+				}
+		}
+	if( 3 == i)
+		{
+		 	SENSORDB("[ov8835mipi_update_wb_register_from_otp]no valid wb OTP data!\r\n");
 			return 1;
 		}
-	}
+	ov8835mipi_read_otp_wb(otp_index,&current_otp);
 
-	SENSORDB("wb update failed\n");
+	//calculate gain
+	//0x400 = 1x gain
+	if(current_otp.bg_ratio < BG_Ratio_typical)
+		{
+			if(current_otp.rg_ratio < RG_Ratio_typical)
+				{
+					//current_opt.bg_ratio < BG_Ratio_typical &&
+					//cuttent_otp.rg < RG_Ratio_typical
+
+					G_gain = 0x400;
+					B_gain = 0x400 * BG_Ratio_typical / current_otp.bg_ratio;
+					R_gain = 0x400 * RG_Ratio_typical / current_otp.rg_ratio;
+				}
+			else
+				{
+					//current_otp.bg_ratio < BG_Ratio_typical &&
+			        //current_otp.rg_ratio >= RG_Ratio_typical
+			        R_gain = 0x400;
+					G_gain = 0x400 * current_otp.rg_ratio / RG_Ratio_typical;
+					B_gain = G_gain * BG_Ratio_typical / current_otp.bg_ratio;
+					
+			        
+				}
+		}
+	else
+		{
+			if(current_otp.rg_ratio < RG_Ratio_typical)
+				{
+					//current_otp.bg_ratio >= BG_Ratio_typical &&
+			        //current_otp.rg_ratio < RG_Ratio_typical
+			        B_gain = 0x400;
+					G_gain = 0x400 * current_otp.bg_ratio / BG_Ratio_typical;
+					R_gain = G_gain * RG_Ratio_typical / current_otp.rg_ratio;
+					
+				}
+			else
+				{
+					//current_otp.bg_ratio >= BG_Ratio_typical &&
+			        //current_otp.rg_ratio >= RG_Ratio_typical
+			        G_gain_B = 0x400*current_otp.bg_ratio / BG_Ratio_typical;
+				    G_gain_R = 0x400*current_otp.rg_ratio / RG_Ratio_typical;
+					
+					if(G_gain_B > G_gain_R)
+						{
+							B_gain = 0x400;
+							G_gain = G_gain_B;
+							R_gain = G_gain * RG_Ratio_typical / current_otp.rg_ratio;
+						}
+					else
+
+						{
+							R_gain = 0x400;
+							G_gain = G_gain_R;
+							B_gain = G_gain * BG_Ratio_typical / current_otp.bg_ratio;
+						}
+			        
+				}
+			
+		}
+	//write sensor wb gain to register
+	ov8835mipi_update_wb_gain(R_gain,G_gain,B_gain);
+
+	//success
 	return 0;
 }
 
-/*******************************************************************************
-* Function    :  otp_check_lenc_group
-* Description :  Check OTP Space Availability
-* Parameters  :  [in] BYTE index : index of otp group (0, 1, 2)
-* Return      :  0, group index is empty
-                 1, group index has invalid data
-                 2, group index has valid data
-                -1, group index error
-*******************************************************************************/	
-static signed char otp_check_lenc_group(BYTE index)
-{   
-	unsigned char  flag;
-	unsigned char  bank;
+//call this function after ov5650 initialization
+//return value:	0 update success
+//				1 no otp
 
-    if (index > 2)
+kal_uint16 ov8835mipi_update_lenc_register_from_otp(void)
+{
+	kal_uint16 temp,i,otp_index;
+    struct ov8835mipi_otp_struct current_otp;
+
+	for(i = 0; i < 3; i++)
+		{
+			temp = ov8835mipi_check_otp_lenc(i);
+			if(2 == temp)
+				{
+					otp_index = i;
+					break;
+				}
+		}
+	if(3 == i)
+		{
+		 	SENSORDB("[ov8835mipi_update_lenc_register_from_otp]no valid wb OTP data!\r\n");
+			return 1;
+		}
+	ov8835mipi_read_otp_lenc(otp_index,&current_otp);
+
+	ov8835mipi_update_lenc(&current_otp);
+
+	//success
+	return 0;
+}
+
+kal_uint16 ov8835mipi_update_blc_register_from_otp(void)
+{
+	kal_uint16 temp,i,otp_index;
+    struct ov8835mipi_otp_struct current_otp;
+
+	temp = ov8835mipi_check_otp_blc(i);
+
+	if(temp == 0)//not update
 	{
-	//	SENSORDB("OTP input lenc group index %d error\n", index);
-		return -1;
+	 	SENSORDB("[ov8835mipi_update_blc_register_from_otp]no valid blc OTP data!\r\n");
+		return 1;
 	}
-		
-	// select bank: index*4 + 4
-	bank = 0xc0 | (index*4 + 4);
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, bank);
-
-	otp_read(OTP_LENC_GROUP_ADDR, &flag);
-	otp_clear();
-
-	flag &= 0xc0;
-
-	// Check all bytes of a group. If all bytes are '0', then the group is empty. 
-	// Check from group 1 to group 2, then group 3.
-	if (!flag)
+	else//update
 	{
-	//	SENSORDB("lenc group %d is empty\n", index);
+		ov8835mipi_read_otp_blc(otp_index,&current_otp);
+		ov8835mipi_update_blc(&current_otp);
+	 	SENSORDB("[ov8835mipi_update_blc_register_from_otp] valid blc OTP data!\r\n");
 		return 0;
 	}
-	else if (flag == 0x40)
-	{
-	//	SENSORDB("lenc group %d has valid data\n", index);
-		return 2;
-	}
-	else
-	{
-	//	SENSORDB("lenc group %d has invalid data\n", index);
-		return 1;
-	}
 }
-
-/*******************************************************************************
-* Function    :  otp_read_lenc_group
-* Description :  Read group value and store it in OTP Struct 
-* Parameters  :  [in] int index : index of otp group (0, 1, 2)
-* Return      :  group index (0, 1, 2)
-                 -1, error
-*******************************************************************************/	
-static signed char otp_read_lenc_group(int index)
-{
-	unsigned short otp_addr;
-	unsigned char  bank;
-	unsigned char  i;
-
-	if (index == -1)
-	{
-		// Check first OTP with valid data
-		for (index=0; index<3; index++)
-		{
-			if (otp_check_lenc_group(index) == 2)
-			{
-				SENSORDB("read lenc from group %d\n", index);
-				break;
-			}
-		}
-
-		if (index > 2)
-		{
-			SENSORDB("no group has valid data\n");
-			return -1;
-		}
-	}
-	else
-	{
-		if (otp_check_lenc_group(index) != 2) 
-		{
-			SENSORDB("read lenc from group %d failed\n", index);
-			return -1;
-		}
-	}
-
-	// select bank: index*4 + 4
-	bank = 0xc0 | (index*4 + 4);
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, bank);
-
-	otp_addr = OTP_LENC_GROUP_ADDR+1;
-
-	otp_read_enable();
-	for (i=0; i<15; i++) 
-	{
-		otp_lenc_data[i] = OV8835MIPI_read_cmos_sensor(otp_addr);
-		otp_addr++;
-	}
-	otp_read_disable();
-	otp_clear();
-
-	// select next bank
-	bank++;
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, bank);
-
-	otp_addr = OTP_LENC_GROUP_ADDR;
-
-	otp_read_enable();
-	for (i=15; i<31; i++) 
-	{
-		otp_lenc_data[i] = OV8835MIPI_read_cmos_sensor(otp_addr);
-		otp_addr++;
-	}
-	otp_read_disable();
-	otp_clear();
-	
-	// select next bank
-	bank++;
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, bank);
-
-	otp_addr = OTP_LENC_GROUP_ADDR;
-
-	otp_read_enable();
-	for (i=31; i<47; i++) 
-	{
-		otp_lenc_data[i] = OV8835MIPI_read_cmos_sensor(otp_addr);
-		otp_addr++;
-	}
-	otp_read_disable();
-	otp_clear();
-	
-	// select next bank
-	bank++;
-	OV8835MIPI_write_cmos_sensor(OTP_BANK_ADDR, bank);
-
-	otp_addr = OTP_LENC_GROUP_ADDR;
-
-	otp_read_enable();
-	for (i=47; i<62; i++) 
-	{
-		otp_lenc_data[i] = OV8835MIPI_read_cmos_sensor(otp_addr);
-		otp_addr++;
-	}
-	otp_read_disable();
-	otp_clear();
-	
-	SENSORDB("read lenc finished\n");
-	return index;
-}
-
-/*******************************************************************************
-* Function    :  otp_apply_lenc
-* Description :  Apply lens correction setting to module
-* Parameters  :  none
-* Return      :  none
-*******************************************************************************/	
-static void otp_apply_lenc(void)
-{
-	// write lens correction setting to registers
-	SENSORDB("apply lenc setting\n");
-
-	unsigned char i;
-
-
-	for (i=0; i<LENC_REG_SIZE; i++)
-	{
-		OV8835MIPI_write_cmos_sensor(LENC_START_ADDR+i, otp_lenc_data[i]);
-		SENSORDB("0x%x, 0x%x\n", LENC_START_ADDR+i, otp_lenc_data[i]);
-	}
-	OV8835MIPI_write_cmos_sensor(0x5000, 0x86); //LENC on //LINE <> <DATE20130822> <ov8835 lenc on> wupingzhou
-}
-
-/*******************************************************************************
-* Function    :  otp_update_lenc
-* Description :  Get lens correction setting from otp, then apply to module
-* Parameters  :  none
-* Return      :  1, success; 0, fail
-*******************************************************************************/	
-static bool otp_update_lenc(void) 
-{
-	SENSORDB("start lenc update\n");
-
-	if (otp_read_lenc_group(-1) != -1)
-	{
-		otp_apply_lenc();
-		SENSORDB("lenc update finished\n");
-		return 1;
-	}
-
-	SENSORDB("lenc update failed\n");
-	return 0;
-}
-
-/*******************************************************************************
-* Function    :  otp_update_BLC
-* Description :  Get BLC value from otp, then apply to module
-* Parameters  :  none
-* Return      :  0, set to 0x20; 1, use data from 0x3D0A; 2,use data from 0x3D0B
-*******************************************************************************/
-static int otp_update_BLC(void) 
-{
-	unsigned char  k;
-	unsigned char  temp;
-	//select bank 31
-	OV8835MIPI_write_cmos_sensor(0x3d84, 0xdf);
-	otp_read(0x3d0b, &k);
-	if(k!=0)
-	{
-		if((k>=0x15) && (k<=0x40))
-		{
-			//auto load mode
-			temp = OV8835MIPI_read_cmos_sensor(0x4008);
-			temp &=0xfb;
-   			OV8835MIPI_write_cmos_sensor(0x4008, temp);
-   			mdelay(20); 
-    			temp = OV8835MIPI_read_cmos_sensor(0x4000);
-			temp &=0xf7;
-   			OV8835MIPI_write_cmos_sensor(0x4000, temp);
-   			mdelay(20); 
-   			SENSORDB("BLC value from 0x3d0b: %x\n",k);
-   			return 2;
-   		}
-	}
-	
-	otp_read(0x3d0a, &k);
-	
-	if((k>=0x10) && (k<=0x40))
-	{
-		//manual load mode
-		OV8835MIPI_write_cmos_sensor(0x4006, k);
-		temp = OV8835MIPI_read_cmos_sensor(0x4008);
-		temp &=0xfb;
-   		OV8835MIPI_write_cmos_sensor(0x4008, temp);
-   		mdelay(20); 
-    		temp = OV8835MIPI_read_cmos_sensor(0x4000);
-		temp |=0x08;
-   		OV8835MIPI_write_cmos_sensor(0x4000, temp);
-   		mdelay(20); 
-   		SENSORDB("BLC value from 0x3d0a:%x\n",k);
-   		return 1;	
-	}
-	else
-	{
-		//set to default
-		OV8835MIPI_write_cmos_sensor(0x4006, 0x20);
-		temp = OV8835MIPI_read_cmos_sensor(0x4008);
-		temp &=0xfb;
-   		OV8835MIPI_write_cmos_sensor(0x4008, temp);
-   		mdelay(20); 
-    		temp = OV8835MIPI_read_cmos_sensor(0x4000);
-		temp |=0x08;
-   		OV8835MIPI_write_cmos_sensor(0x4000, temp);
-   		mdelay(20); 
-   		SENSORDB("BLC value is set to 0x20\n");
-	}
-	
-	return 0; 	
-}
-
-
-
 
 #endif
-
 
 static void OV8835MIPI_Set_Dummy(const kal_uint16 iPixels, const kal_uint16 iLines)
 {
@@ -890,19 +961,6 @@ static void OV8835MIPI_Set_Dummy(const kal_uint16 iPixels, const kal_uint16 iLin
 	
 }   /*  OV8835MIPI_Set_Dummy    */
 
-UINT32 OV8835MIPISetTestPatternMode(kal_bool bEnable)
-{
-    SENSORDB("bEnable=%d\n", bEnable);
-	if(bEnable) 
-	{
-        OV8835MIPI_write_cmos_sensor(0x5E00,0x80);
-	}
-	else        
-	{
-		OV8835MIPI_write_cmos_sensor(0x5E00,0x00);	
-	}
-    return ERROR_NONE;
-}
 
 static UINT32 OV8835MIPISetMaxFrameRate(UINT16 u2FrameRate)
 {
@@ -913,13 +971,10 @@ static UINT32 OV8835MIPISetMaxFrameRate(UINT16 u2FrameRate)
 	SENSORDB("[soso][OV8835MIPISetMaxFrameRate]u2FrameRate=%d \n",u2FrameRate);
 
 	frame_length= (10*OV8835MIPI_sensor.pclk) / u2FrameRate / OV8835MIPI_sensor.line_length;
-
-    /*
 	if(KAL_FALSE == OV8835MIPI_sensor.pv_mode){
 		if(frame_length < OV8835MIPI_FULL_PERIOD_LINE_NUMS)
 			frame_length = OV8835MIPI_FULL_PERIOD_LINE_NUMS;		
 	}
-    */
 
 		spin_lock_irqsave(&ov8835mipi_drv_lock,flags);
 		OV8835MIPI_sensor.frame_length = frame_length;
@@ -1018,13 +1073,12 @@ unsigned long flags;
 				if((realtime_fp >= 297)&&(realtime_fp <= 303))
 				{
 					realtime_fp = 296;
-					OV8835MIPISetMaxFrameRate((UINT16)realtime_fp);
 				}
 				else if((realtime_fp >= 147)&&(realtime_fp <= 153))
 				{
 					realtime_fp = 146;
-					OV8835MIPISetMaxFrameRate((UINT16)realtime_fp);
 				}		
+				OV8835MIPISetMaxFrameRate((UINT16)realtime_fp);
 			}
 	}
 #endif
@@ -1507,7 +1561,7 @@ void OV8835MIPI_globle_setting(void)
 	OV8835MIPI_write_cmos_sensor(0x3015, 0x08);//
 	OV8835MIPI_write_cmos_sensor(0x301b, 0xb4);//
 	OV8835MIPI_write_cmos_sensor(0x301d, 0x02);//
-	OV8835MIPI_write_cmos_sensor(0x3021, 0x20);// LINE <> <DATE20130909> <truly ov8835 DVDD> Jiangde, 0x00-->0x20(0x00 = internal DVDD; 0x20 = external DVDD)
+	OV8835MIPI_write_cmos_sensor(0x3021, 0x00);//
 	OV8835MIPI_write_cmos_sensor(0x3022, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x3081, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x3083, 0x01);//
@@ -1733,26 +1787,6 @@ void OV8835MIPI_globle_setting(void)
 	OV8835MIPI_write_cmos_sensor(0x5a08, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x5e00, 0x00);//
 	OV8835MIPI_write_cmos_sensor(0x5e10, 0x0c);//
-
-#ifdef OV8835_BINNING_SUM
-//BEGIN <> <DATE20130826> <ov8835 truly update> wupingzhou
-	OV8835MIPI_write_cmos_sensor(0x5780, 0xfc);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5781, 0x13);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5782, 0x03);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5786, 0x20);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5787, 0x40);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5788, 0x08);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5789, 0x08);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578a, 0x02);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578b, 0x01);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578c, 0x01);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578d, 0x0c);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578e, 0x02);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578f, 0x01);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5790, 0x01);  
-//END <> <DATE20130826> <ov8835 truly update> wupingzhou
-#endif
-
 	OV8835MIPI_write_cmos_sensor(0x0100, 0x01);//
 
 
@@ -1801,12 +1835,12 @@ OV8835MIPI_1632_1224_2Lane_30fps_Mclk26M_setting(void)
 	OV8835MIPI_write_cmos_sensor(0x3a05, 0xc9);
 	OV8835MIPI_write_cmos_sensor(0x4004, 0x02);
 	OV8835MIPI_write_cmos_sensor(0x404f, 0xa0);
-    
 #ifdef OV8835_BINNING_SUM
-	OV8835MIPI_write_cmos_sensor(0x4512, 0x00);//nick binning sum//LINE <> <DATE20130826> <ov8835 truly update> wupingzhou
+	OV8835MIPI_write_cmos_sensor(0x4512, 0x00);
 #else
 	OV8835MIPI_write_cmos_sensor(0x4512, 0x01);
 #endif
+
 	
 	//OV8835MIPI_write_cmos_sensor(0x    , 0x  );
 	//OV8835MIPI_write_cmos_sensor(0x    , 0x  ); 										;PLL
@@ -1913,8 +1947,6 @@ void OV8835MIPI_4LANE_globle_setting(void)
 	//@@OV8835_init_Lisa_15fps
 	
 	OV8835MIPI_write_cmos_sensor(0x0103, 0x01);//
-	mdelay(5); // Jiangde ++
-	
 	OV8835MIPI_write_cmos_sensor(0x0100, 0x00);//
 	OV8835MIPI_write_cmos_sensor(0x0102, 0x01);//
 	OV8835MIPI_write_cmos_sensor(0x3001, 0x2a);//
@@ -1924,7 +1956,7 @@ void OV8835MIPI_4LANE_globle_setting(void)
 	OV8835MIPI_write_cmos_sensor(0x3015, 0x08);//
 	OV8835MIPI_write_cmos_sensor(0x301b, 0xb4);//
 	OV8835MIPI_write_cmos_sensor(0x301d, 0x02);//
-	OV8835MIPI_write_cmos_sensor(0x3021, 0x20);// LINE <> <DATE20130909> <truly ov8835 DVDD> Jiangde, 0x00-->0x20(0x00 = internal DVDD; 0x20 = external DVDD)
+	OV8835MIPI_write_cmos_sensor(0x3021, 0x00);//
 	OV8835MIPI_write_cmos_sensor(0x3022, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x3081, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x3083, 0x01);//
@@ -2145,36 +2177,11 @@ void OV8835MIPI_4LANE_globle_setting(void)
 	OV8835MIPI_write_cmos_sensor(0x5a08, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x5e00, 0x00);//
 	OV8835MIPI_write_cmos_sensor(0x5e10, 0x0c);//
-
-	OV8835MIPI_write_cmos_sensor(0x5780, 0xfc);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5781, 0x13);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5782, 0x03);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5786, 0x20);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5787, 0x40);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5788, 0x08);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5789, 0x08);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578a, 0x02);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578b, 0x01);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578c, 0x01);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578d, 0x0c);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578e, 0x02);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x578f, 0x01);                                                                                                          
-	OV8835MIPI_write_cmos_sensor(0x5790, 0x01);  
-	OV8835MIPI_write_cmos_sensor(0x5791, 0xff);//
-	OV8835MIPI_write_cmos_sensor(0x5a08, 0x02);//
-	OV8835MIPI_write_cmos_sensor(0x5e00, 0x00);//
-	OV8835MIPI_write_cmos_sensor(0x5e10, 0x0c);//
 	OV8835MIPI_write_cmos_sensor(0x0100, 0x01);//
 
-
-#ifdef OV8835MIPI_USE_OTP //LINE <> <DATE20130625> <truly ov8835 OTP> wupingzhou
-    otp_update_wb(0x120,0x105);
-    otp_update_lenc();
-    otp_update_BLC();
-#endif
 }
 
-void OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting(void) // Jiangde preview
+void OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting(void)
 {
 	//@@Ov8835_1632x1224_4lane_30fps_208MSclk_780Mbps
 	
@@ -2211,13 +2218,7 @@ void OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting(void) // Jiangde preview
 	OV8835MIPI_write_cmos_sensor(0x4004, 0x02);//
 	OV8835MIPI_write_cmos_sensor(0x4005, 0x18);//
 	OV8835MIPI_write_cmos_sensor(0x404F, 0xA0);//
-	
-#ifdef OV8835_BINNING_SUM
-	OV8835MIPI_write_cmos_sensor(0x4512, 0x00);// Jiangde preview; 00(sum),0x01(average) //nick binning sum//LINE <> <DATE20130826> <ov8835 truly update> wupingzhou
-#else
-    OV8835MIPI_write_cmos_sensor(0x4512, 0x01);// Jiangde preview; 00(sum),0x01(average) //nick binning sum//LINE <> <DATE20130826> <ov8835 truly update> wupingzhou
-#endif
-
+	OV8835MIPI_write_cmos_sensor(0x4512, 0x01);//;00
 	//OV8835MIPI_write_cmos_sensor(0x	 , 0x  );//
 	//OV8835MIPI_write_cmos_sensor(0x////, 0x//);/////;PLL
 	OV8835MIPI_write_cmos_sensor(0x3011, 0x41);// ; 4 Lane, MIPI enable
@@ -2258,23 +2259,8 @@ void OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting(void) // Jiangde preview
 	/////////////102 84 01
 
 }
-void OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting(void) // Jiangde capture
+void OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting(void)
 {
-    
-#ifdef OV8835_TEMPERATURE_TEST
-	kal_uint16 get_byte1 = 0;
-	kal_uint16 get_byte2 = 0;
-
-    OV8835MIPI_write_cmos_sensor(0x4d0b, 0x00);
-    mdelay(5);
-    get_byte1 = OV8835MIPI_read_cmos_sensor(0x4d0b);
-
-    OV8835MIPI_write_cmos_sensor(0x4d0b, 0x80);
-    mdelay(5);   
-    get_byte2 = OV8835MIPI_read_cmos_sensor(0x4d0b);
-    SENSORDB("HJDDbg, temperature reg, before=%x, 0x4d0b=%x \n", get_byte1, get_byte2);
-#endif
-
 	//@@Ov8835_3264x2448_4lane_30fps_273MSclk_780Mbps
 
 	OV8835MIPI_write_cmos_sensor(0x0100, 0x00);//
@@ -2357,107 +2343,7 @@ void OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting(void) // Jiangde capture
 	////////////102 84 01
 
 }
-
-void Ov8835_3264x2448_4lane_24fps_216MSclk_780Mbps(void) // Jiangde capture 24fps
-{
-    
-#ifdef OV8835_TEMPERATURE_TEST
-	kal_uint16 get_byte1 = 0;
-	kal_uint16 get_byte2 = 0;
-
-    OV8835MIPI_write_cmos_sensor(0x4d0b, 0x00);
-    mdelay(5);
-    get_byte1 = OV8835MIPI_read_cmos_sensor(0x4d0b);
-
-    OV8835MIPI_write_cmos_sensor(0x4d0b, 0x80);
-    mdelay(5);   
-    get_byte2 = OV8835MIPI_read_cmos_sensor(0x4d0b);
-    SENSORDB("HJDDbg, temperature reg, before=%x, 0x4d0b=%x \n", get_byte1, get_byte2);
-#endif
-
-    SENSORDB("HJDDbg, Capture, Ov8835_3264x2448_4lane_24fps_216MSclk_780Mbps \n");
-	OV8835MIPI_write_cmos_sensor(0x0100, 0x00);//
-	OV8835MIPI_write_cmos_sensor(0x3501, 0xA0);//
-	OV8835MIPI_write_cmos_sensor(0x3502, 0xC0);//
-	OV8835MIPI_write_cmos_sensor(0x3507, 0x10);//
-	OV8835MIPI_write_cmos_sensor(0x350b, 0x10);//
-	OV8835MIPI_write_cmos_sensor(0x3660, 0x80);//
-	OV8835MIPI_write_cmos_sensor(0x3708, 0xe3);//
-	OV8835MIPI_write_cmos_sensor(0x3709, 0x43);//
-	OV8835MIPI_write_cmos_sensor(0x3800, 0x00);//
-	OV8835MIPI_write_cmos_sensor(0x3801, 0x0c);//
-	OV8835MIPI_write_cmos_sensor(0x3802, 0x00);//
-	OV8835MIPI_write_cmos_sensor(0x3803, 0x0c);//
-	OV8835MIPI_write_cmos_sensor(0x3804, 0x0c);//
-	OV8835MIPI_write_cmos_sensor(0x3805, 0xd3);//
-	OV8835MIPI_write_cmos_sensor(0x3806, 0x09);//
-	OV8835MIPI_write_cmos_sensor(0x3807, 0xa3);//
-	OV8835MIPI_write_cmos_sensor(0x3808, 0x0c);//
-	OV8835MIPI_write_cmos_sensor(0x3809, 0xc0);//
-	OV8835MIPI_write_cmos_sensor(0x380a, 0x09);//
-	OV8835MIPI_write_cmos_sensor(0x380b, 0x90);//
-	OV8835MIPI_write_cmos_sensor(0x380c, 0x0e);//
-	OV8835MIPI_write_cmos_sensor(0x380d, 0x18);//
-	OV8835MIPI_write_cmos_sensor(0x380e, 0x09);// 
-	OV8835MIPI_write_cmos_sensor(0x380f, 0xc8);//	;for 24fps 
-	OV8835MIPI_write_cmos_sensor(0x3814, 0x11);//
-	OV8835MIPI_write_cmos_sensor(0x3815, 0x11);//
-	OV8835MIPI_write_cmos_sensor(0x3820, 0x10);//
-	OV8835MIPI_write_cmos_sensor(0x3821, 0x0e);//
-	OV8835MIPI_write_cmos_sensor(0x3a04, 0x09);//
-	OV8835MIPI_write_cmos_sensor(0x3a05, 0xa9);//
-	OV8835MIPI_write_cmos_sensor(0x4004, 0x08);//
-	OV8835MIPI_write_cmos_sensor(0x4005, 0x18);//
-	OV8835MIPI_write_cmos_sensor(0x404F, 0xA0);//
-	OV8835MIPI_write_cmos_sensor(0x4512, 0x01);//
-
-	OV8835MIPI_write_cmos_sensor(0x3011, 0x41);// ; 4 Lane, MIPI enable
-	OV8835MIPI_write_cmos_sensor(0x3015, 0x08);//; MIPI mode,
-	OV8835MIPI_write_cmos_sensor(0x3090, 0x03);// ; PLL
-	OV8835MIPI_write_cmos_sensor(0x3091, 0x19);// ; PLL//273M
-	OV8835MIPI_write_cmos_sensor(0x3092, 0x00);// ; PLL _SCLK_273M
-	OV8835MIPI_write_cmos_sensor(0x3093, 0x00);// ; PLL
-	OV8835MIPI_write_cmos_sensor(0x3094, 0x00);// ;
-	OV8835MIPI_write_cmos_sensor(0x3098, 0x02);// ; 
-	OV8835MIPI_write_cmos_sensor(0x3099, 0x13);// ;
-
-	OV8835MIPI_write_cmos_sensor(0x30b3, 0x5a);// ; PLL _PLL_MIPICLK_780MBps
-	OV8835MIPI_write_cmos_sensor(0x30b4, 0x03);// ; PLL
-	OV8835MIPI_write_cmos_sensor(0x30b5, 0x04);// ; PLL
-	OV8835MIPI_write_cmos_sensor(0x30b6, 0x01);// ; PLL
-	OV8835MIPI_write_cmos_sensor(0x4837, 0x0a);// ; MIPI pclk period
-
-	OV8835MIPI_write_cmos_sensor(0x364f, 0xcf);//
-	OV8835MIPI_write_cmos_sensor(0x3680, 0xe5);//
-	OV8835MIPI_write_cmos_sensor(0x3702, 0xbf);//
-	OV8835MIPI_write_cmos_sensor(0x3704, 0x78);//
-	OV8835MIPI_write_cmos_sensor(0x3739, 0x08);//
-	OV8835MIPI_write_cmos_sensor(0x373a, 0x51);//
-	OV8835MIPI_write_cmos_sensor(0x3781, 0x0c);//
-	OV8835MIPI_write_cmos_sensor(0x3785, 0x1e);//
-	OV8835MIPI_write_cmos_sensor(0x3796, 0x64);//
-	OV8835MIPI_write_cmos_sensor(0x4008, 0x20);//
-	OV8835MIPI_write_cmos_sensor(0x4100, 0x10);//
-	OV8835MIPI_write_cmos_sensor(0x4101, 0x12);//
-	OV8835MIPI_write_cmos_sensor(0x4102, 0x24);//
-	OV8835MIPI_write_cmos_sensor(0x4103, 0x00);//
-	OV8835MIPI_write_cmos_sensor(0x4104, 0x5b);//
-	OV8835MIPI_write_cmos_sensor(0x0100, 0x01);//
-
-    OV8835MIPI_write_cmos_sensor(0x3500, 0x01);//
-    OV8835MIPI_write_cmos_sensor(0x3501, 0x1b);//
-    OV8835MIPI_write_cmos_sensor(0x3502, 0xe0);//
-    
-    OV8835MIPI_write_cmos_sensor(0x350b, 0xc0);//
-    OV8835MIPI_write_cmos_sensor(0x380e, 0x11);//
-    OV8835MIPI_write_cmos_sensor(0x380f, 0xcc);//
-    
-	////////////100 99 3264 2448
-	////////////100 98 1 0
-	////////////102 84 01
-}
-
-void OV8835MIPI_3264_1836_4LANE_30fps_Mclk26M_setting(void) // Jiangde Video, change to 1080p
+void OV8835MIPI_3264_1836_4LANE_30fps_Mclk26M_setting(void)
 {
 	//@@Ov8835_3264x1836_4lane_30fps_273MSclk_780Mbps
 	
@@ -2477,26 +2363,10 @@ void OV8835MIPI_3264_1836_4LANE_30fps_Mclk26M_setting(void) // Jiangde Video, ch
 	OV8835MIPI_write_cmos_sensor(0x3805, 0xd3);//
 	OV8835MIPI_write_cmos_sensor(0x3806, 0x08);//
 	OV8835MIPI_write_cmos_sensor(0x3807, 0x73);//
-
-    // BEGIN <><20130911><3264x1836-->1080P> Jiangde
-#ifdef USE_1080P_VIDEO	
-	//OV8835MIPI_write_cmos_sensor(0x3808, 0x07);// 0x780=1920
-	//OV8835MIPI_write_cmos_sensor(0x3809, 0x80);//
-	//OV8835MIPI_write_cmos_sensor(0x380a, 0x04);// 0x438=1080
-	//OV8835MIPI_write_cmos_sensor(0x380b, 0x38);//
-
-	OV8835MIPI_write_cmos_sensor(0x3808, 0x05);// 0x500=1280
-	OV8835MIPI_write_cmos_sensor(0x3809, 0x00);//
-	OV8835MIPI_write_cmos_sensor(0x380a, 0x02);// 0x2d0=720
-	OV8835MIPI_write_cmos_sensor(0x380b, 0xd0);//
-#else
 	OV8835MIPI_write_cmos_sensor(0x3808, 0x0c);//
 	OV8835MIPI_write_cmos_sensor(0x3809, 0xc0);//
 	OV8835MIPI_write_cmos_sensor(0x380a, 0x07);//
 	OV8835MIPI_write_cmos_sensor(0x380b, 0x2c);//
-#endif
-    // END <><20130911><3264x1836-->1080P> Jiangde
-    
 	OV8835MIPI_write_cmos_sensor(0x380c, 0x0e);//
 	OV8835MIPI_write_cmos_sensor(0x380d, 0x18);//
 	OV8835MIPI_write_cmos_sensor(0x380e, 0x09);// 
@@ -2610,7 +2480,6 @@ UINT32 OV8835MIPIOpen(void)
 	OV8835MIPI_globle_setting();
 #else
 	OV8835MIPI_4LANE_globle_setting();
-	mdelay(50); // Jiangde ++
 #endif
 	
 	spin_lock(&ov8835mipi_drv_lock);
@@ -2642,43 +2511,42 @@ UINT32 OV8835MIPIOpen(void)
 UINT32 OV8835MIPIGetSensorID(UINT32 *sensorID) 
 {
   //added by mandrave
-    int i;
-    const kal_uint16 sccb_writeid[] = { OV8835MIPI_SLAVE_WRITE_ID_1, OV8835MIPI_SLAVE_WRITE_ID_2,
-                                        OV8835MIPI_SLAVE_WRITE_ID_1, OV8835MIPI_SLAVE_WRITE_ID_2,
-                                        OV8835MIPI_SLAVE_WRITE_ID_1, OV8835MIPI_SLAVE_WRITE_ID_2}; // Jiangde, try more
+   int i;
+   const kal_uint16 sccb_writeid[] = {OV8835MIPI_SLAVE_WRITE_ID_1,OV8835MIPI_SLAVE_WRITE_ID_2};
  
+#ifdef OV8835MIPI_DRIVER_TRACE
+        SENSORDB("[OV8835MIPI]enter OV8835MIPIGetSensorID function\n");
+#endif
 
-    for(i = 0; i <(sizeof(sccb_writeid)/sizeof(sccb_writeid[0])); i++)
+  for(i = 0; i <(sizeof(sccb_writeid)/sizeof(sccb_writeid[0])); i++)
   	{
   		spin_lock(&ov8835mipi_drv_lock);
-  	    OV8835MIPI_sensor.write_id = sccb_writeid[i];
-	    OV8835MIPI_sensor.read_id = (sccb_writeid[i]|0x01);
-	    spin_unlock(&ov8835mipi_drv_lock);
+  	   OV8835MIPI_sensor.write_id = sccb_writeid[i];
+	   OV8835MIPI_sensor.read_id = (sccb_writeid[i]|0x01);
+	   spin_unlock(&ov8835mipi_drv_lock);
 
-	    *sensorID=((OV8835MIPI_read_cmos_sensor(0x300A) << 8) | OV8835MIPI_read_cmos_sensor(0x300B));	
+	   *sensorID=((OV8835MIPI_read_cmos_sensor(0x300A) << 8) | OV8835MIPI_read_cmos_sensor(0x300B));	
 	   
 #ifdef OV8835MIPI_DRIVER_TRACE
-		SENSORDB("HJDDBG, OV8835MIPIOpen, sensor_id:%x \n",*sensorID);
+		SENSORDB("OV8835MIPIOpen, sensor_id:%x \n",*sensorID);
 #endif
 		if(OV8835MIPI_SENSOR_ID == *sensorID)
-		{
-			SENSORDB("HJDDBG, it's OV8835, slave write id:%x \n",OV8835MIPI_sensor.write_id);
-			break;
-		}
-
-        if (1 == i % 2 && (sizeof(sccb_writeid) / sizeof(sccb_writeid[0]) - 1) != i)
-        {
-            SENSORDB("HJDDBG, Retry, i = %x \n", i);
-            mdelay(2); // Jiangde, retry after a while
-        }
+			{
+				SENSORDB("OV8835MIPI slave write id:%x \n",OV8835MIPI_sensor.write_id);
+				break;
+			}
   	}
   
 	// check if sensor ID correct		
 	if (*sensorID != OV8835MIPI_SENSOR_ID) 
-	{	
-		*sensorID = 0xFFFFFFFF;
-		return ERROR_SENSOR_CONNECT_FAIL;
-	}
+		{	
+			*sensorID = 0xFFFFFFFF;
+			return ERROR_SENSOR_CONNECT_FAIL;
+		}
+
+#ifdef OV8835MIPI_DRIVER_TRACE
+        SENSORDB("[OV8835MIPI]exit OV8835MIPIGetSensorID function\n");
+#endif
 	
    return ERROR_NONE;
 }
@@ -2708,38 +2576,6 @@ UINT32 OV8835MIPIClose(void)
 //	DRV_I2CClose(OV8835MIPIhDrvI2C);
 	return ERROR_NONE;
 }   /* OV8835MIPIClose */
-
-
-
-//begin add by lishengli 20130516
-void OV8835MIPISetFlipMirror(kal_int32 imgMirror)
-{
-	kal_int16 mirror=0,flip=0;
-	flip = OV8835MIPI_read_cmos_sensor(0x3820);
-	mirror  = OV8835MIPI_read_cmos_sensor(0x3821);
-    switch (imgMirror)
-    {
-        case IMAGE_H_MIRROR://IMAGE_NORMAL:
-            OV8835MIPI_write_cmos_sensor(0x3820, (flip & (0xBD)));//Set normal
-            OV8835MIPI_write_cmos_sensor(0x3821, (mirror & (0xF9)));	//Set normal
-            break;
-        case IMAGE_NORMAL://IMAGE_V_MIRROR:
-            OV8835MIPI_write_cmos_sensor(0x3820, (flip & (0xBD)));//Set flip
-            OV8835MIPI_write_cmos_sensor(0x3821, (mirror | (0x06)));	//Set flip
-            break;
-        case IMAGE_HV_MIRROR://IMAGE_H_MIRROR:
-            OV8835MIPI_write_cmos_sensor(0x3820, (flip |(0x42)));	//Set mirror
-            OV8835MIPI_write_cmos_sensor(0x3821, (mirror & (0xF9)));	//Set mirror
-            break;
-        case IMAGE_V_MIRROR://IMAGE_HV_MIRROR:
-            OV8835MIPI_write_cmos_sensor(0x3820, (flip |(0x42)));	//Set mirror & flip
-            OV8835MIPI_write_cmos_sensor(0x3821, (mirror |(0x06)));	//Set mirror & flip
-            break;
-    }
-}
-//end add by lishengli 20130516
-
-
 
 /*************************************************************************
 * FUNCTION
@@ -2777,10 +2613,41 @@ UINT32 OV8835MIPIPreview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	#ifndef OV8835MIPI_4LANE
 	OV8835MIPI_1632_1224_2Lane_30fps_Mclk26M_setting();
 	#else
-	// OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting();
-	OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting(); // Jiangde preview
+	//OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting();
+	OV8835MIPI_1632_1224_4LANE_30fps_Mclk26M_setting();
 	#endif
 	
+    //#ifdef OV8835MIPI_USE_OTP
+	#if 0		   
+		ret = ov8835mipi_update_wb_register_from_otp();
+				if(1 == ret)
+					{
+				         SENSORDB("ov8835mipi_update_wb_register_from_otp invalid\n");
+					}
+				else if(0 == ret)
+					{
+						 SENSORDB("ov8835mipi_update_wb_register_from_otp success\n");
+					}
+			   
+		ret = ov8835mipi_update_lenc_register_from_otp();
+				 if(1 == ret)
+					{
+						 SENSORDB("ov8835mipi_update_lenc_register_from_otp invalid\n");
+					}
+				 else if(0 == ret)
+					{
+						 SENSORDB("ov8835mipi_update_lenc_register_from_otp success\n");
+					}
+		ret = ov8835mipi_update_blc_register_from_otp();
+				 if(1 == ret)
+					{
+						 SENSORDB("ov8835mipi_update_blc_register_from_otp invalid\n");
+					}
+				 else if(0 == ret)
+					{
+						 SENSORDB("ov8835mipi_update_blc_register_from_otp success\n");
+					}
+	#endif
     //msleep(30);
 	
 	//OV8835MIPI_set_mirror(sensor_config_data->SensorImageMirror);
@@ -2818,10 +2685,8 @@ UINT32 OV8835MIPIPreview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	
     OV8835MIPI_Write_Shutter(OV8835MIPI_sensor.shutter);
 	OV8835MIPI_Set_Dummy(OV8835MIPI_sensor.dummy_pixels, OV8835MIPI_sensor.dummy_lines); /* modify dummy_pixel must gen AE table again */
-
-	OV8835MIPISetFlipMirror(IMAGE_HV_MIRROR);	//add by lishengli 20130516
 	
-	mdelay(50); // Jiangde, 40-->50
+	mdelay(40);
 	return ERROR_NONE;
 	
 }   /*  OV8835MIPIPreview   */
@@ -2856,8 +2721,6 @@ UINT32 OV8835MIPICapture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 #endif
 	//if((OV8835MIPI_sensor.pv_mode == KAL_TRUE)||(OV8835MIPI_sensor.is_zsd == KAL_TRUE))
 	//if(OV8835MIPI_sensor.pv_mode == KAL_TRUE)
-		if(OV8835MIPI_sensor.sensorMode == OV8835MIPI_SENSOR_MODE_CAPTURE)
-			return ERROR_NONE;
 	{
 		// 
 		spin_lock(&ov8835mipi_drv_lock);
@@ -2878,14 +2741,8 @@ UINT32 OV8835MIPICapture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 				OV8835MIPI_3264_2448_2Lane_15fps_Mclk26M_setting();
 				SENSORDB("OV8835MIPI_FPS 15 \n");
 				#else
-
-                #ifdef USE_24FPS_SETTING
-    				SENSORDB("HJDDbg, Capture1, OV8835MIPI_FPS 24fps \n");
-                    Ov8835_3264x2448_4lane_24fps_216MSclk_780Mbps(); // Jiangde 24fps
-                #else
-    				OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting(); // Jiangde Capture
-    				SENSORDB("OV8835MIPI_FPS 30 \n");
-                #endif
+				OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting();
+				SENSORDB("OV8835MIPI_FPS 30 \n");
 				
 				#endif
 
@@ -2934,15 +2791,8 @@ UINT32 OV8835MIPICapture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 				OV8835MIPI_3264_2448_2Lane_15fps_Mclk26M_setting();
 				SENSORDB("OV8835MIPI_FPS 15 \n");
 				#else
-                
-                #ifdef USE_24FPS_SETTING
-    				SENSORDB("HJDDbg, Capture2, OV8835MIPI_FPS 24fps \n");
-                    Ov8835_3264x2448_4lane_24fps_216MSclk_780Mbps(); // Jiangde 24fps
-                #else
-    				OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting(); // Jiangde capture
-    				SENSORDB("OV8835MIPI_FPS 30 \n");
-                #endif
-                
+				OV8835MIPI_3264_2448_4LANE_30fps_Mclk26M_setting();
+				SENSORDB("OV8835MIPI_FPS 30 \n");
 				#endif
 				
 				spin_lock(&ov8835mipi_drv_lock);
@@ -2999,8 +2849,6 @@ UINT32 OV8835MIPICapture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 			
 		//mdelay(80);
 	}
-
-	OV8835MIPISetFlipMirror(IMAGE_HV_MIRROR);	//add by lishengli 20130516
 	mdelay(50);
 
 #ifdef OV8835MIPI_DRIVER_TRACE
@@ -3056,7 +2904,7 @@ UINT32 OV8835MIPIVideo(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 				OV8835MIPI_1632_1224_2Lane_30fps_Mclk26M_setting();
 				SENSORDB("OV8835MIPI_FPS 30 \n");
 				#else
-				OV8835MIPI_3264_1836_4LANE_30fps_Mclk26M_setting(); // Jiangde Video, change to 1080p
+				OV8835MIPI_3264_1836_4LANE_30fps_Mclk26M_setting();
 				SENSORDB("OV8835MIPI_FPS 30 \n");
 				#endif
 				
@@ -3075,7 +2923,6 @@ UINT32 OV8835MIPIVideo(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 				OV8835MIPI_Set_Dummy(OV8835MIPI_sensor.dummy_pixels, OV8835MIPI_sensor.dummy_lines);
 			}
 	}
-	OV8835MIPISetFlipMirror(IMAGE_HV_MIRROR);	//add by lishengli 20130516
 	mdelay(50);
 
 #ifdef OV8835MIPI_DRIVER_TRACE
@@ -3744,18 +3591,11 @@ UINT32 OV8835MIPIFeatureControl(MSDK_SENSOR_FEATURE_ENUM FeatureId,
 		case SENSOR_FEATURE_SET_AUTO_FLICKER_MODE:
 			OV8835MIPISetAutoFlickerMode((BOOL)*pFeatureData16,*(pFeatureData16+1));
 			break;
-        case SENSOR_FEATURE_SET_TEST_PATTERN:
-            OV8835MIPISetTestPatternMode((BOOL)*pFeatureData16);
-            break;
 		case SENSOR_FEATURE_SET_MAX_FRAME_RATE_BY_SCENARIO:
 			OV8835MIPISetMaxFramerateByScenario((MSDK_SCENARIO_ID_ENUM)*pFeatureData32, *(pFeatureData32+1));
 			break;
 		case SENSOR_FEATURE_GET_DEFAULT_FRAME_RATE_BY_SCENARIO:
 			OV8835MIPIGetDefaultFramerateByScenario((MSDK_SCENARIO_ID_ENUM)*pFeatureData32, (MUINT32 *)(*(pFeatureData32+1)));
-			break;
-		case SENSOR_FEATURE_GET_TEST_PATTERN_CHECKSUM_VALUE://for factory mode auto testing 			
-            *pFeatureReturnPara32= OV8835MIPI_TEST_PATTERN_CHECKSUM;
-			*pFeatureParaLen=4; 							
 			break;
 		default:
 			break;

@@ -314,7 +314,7 @@ static long AKECS_SetMode_SelfTest(void)
 	
 	/* Set measure mode */
 	buffer[0] = AK8963_REG_CNTL1;
-	buffer[1] = AK8963_MODE_SELF_TEST|1<<4;  //16 bit mode;
+	buffer[1] = AK8963_MODE_SELF_TEST;
 	/* Set data */
 	return AKI2C_TxData(buffer, 2);
 }
@@ -519,7 +519,7 @@ static int AKECS_GetRawData(char *rbuf, int size)
 {
 	char strbuf[SENSOR_DATA_SIZE];
 	s16 data[3];
-	if((atomic_read(&open_flag) == 0) || (factory_mode == 1))
+	if(atomic_read(&open_flag) == 0)
 	{
 		AKECS_SetMode_SngMeasure();
 		msleep(10);
@@ -644,12 +644,10 @@ static int FctShipmntTestProcess_Body(void)
 	//***********************************************
 	
 	// Set to PowerDown mode 
-	//if (AKECS_SetMode(AK8963_MODE_POWERDOWN) < 0) {
-	//	AKMDBG("%s:%d Error.\n", __FUNCTION__, __LINE__);
-	//	return 0;
-	//}
-	AKECS_Reset(0);
-	msleep(1);
+	if (AKECS_SetMode(AK8963_MODE_POWERDOWN) < 0) {
+		AKMDBG("%s:%d Error.\n", __FUNCTION__, __LINE__);
+		return 0;
+	}
 	
 	// When the serial interface is SPI,
 	// write "00011011" to I2CDIS register(to disable I2C,).
@@ -752,7 +750,7 @@ static int FctShipmntTestProcess_Body(void)
 	//***********************************************
 	
 	// Set to SNG measurement pattern (Set CNTL register) 
-	if (AKECS_SetMode(AK8963_MODE_SNG_MEASURE|1<<4) < 0) {
+	if (AKECS_SetMode(AK8963_MODE_SNG_MEASURE) < 0) {
 		AKMDBG("%s:%d Error.\n", __FUNCTION__, __LINE__);
 		return 0;
 	}
@@ -790,7 +788,7 @@ static int FctShipmntTestProcess_Body(void)
 	}
 	
 	// Set to Self-test mode (Set CNTL register)
-	if (AKECS_SetMode(AK8963_MODE_SELF_TEST|1<<4) < 0) {
+	if (AKECS_SetMode(AK8963_MODE_SELF_TEST) < 0) {
 		AKMDBG("%s:%d Error.\n", __FUNCTION__, __LINE__);
 		return 0;
 	}
@@ -1178,7 +1176,7 @@ static long akm8963_unlocked_ioctl(struct file *file, unsigned int cmd,unsigned 
 	hwm_sensor_data* osensor_data;
 	uint32_t enable;
 
-  	//printk(KERN_ERR"akm8963 cmd:0x%x\n", cmd);	
+  printk(KERN_ERR"akm8963 cmd:0x%x\n", cmd);	
 	switch (cmd)
 	{
 		case ECS_IOCTL_WRITE:
@@ -1491,9 +1489,7 @@ int akm8963_operate(void* self, uint32_t command, void* buff_in, int size_in,
 				{
 					akmd_delay = 20;
 				}
-				else{
 				akmd_delay = value;
-				}
 			}	
 			break;
 
@@ -1598,9 +1594,7 @@ int akm8963_orientation_operate(void* self, uint32_t command, void* buff_in, int
 				{
 					akmd_delay = 20;
 				}
-				else{
 				akmd_delay = value;
-				}
 			}	
 			break;
 

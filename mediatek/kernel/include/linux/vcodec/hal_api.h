@@ -1,6 +1,6 @@
 #ifndef _HAL_API_H_
 #define _HAL_API_H_
-#include "val_types_private.h"
+#include "val_types.h"
 
 #define DumpReg__
 #ifdef DumpReg__
@@ -96,9 +96,7 @@ typedef struct _HAL_HANDLE_T_
     VAL_UINT32_T    u4FrameCount;
 #ifdef DumpReg__
     FILE *pf_out;
-#endif
-    VAL_BOOL_T      bProfHWTime;
-    VAL_UINT64_T    u8HWTime[2];
+#endif    
 } HAL_HANDLE_T;
 
 

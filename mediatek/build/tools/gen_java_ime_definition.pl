@@ -54,14 +54,12 @@ my @Android_support_locales = (
 
 
 my @locales_original;
-my @locales_original_aapt;
 my @locales_filtered;
 my @latin_ime;
 
 
 ## Reading locale setting directly from MTK_PRODUCT_LOCALES
 @locales_original = split(/ /, $ENV{MTK_PRODUCT_LOCALES});
-@locales_original_aapt =split(/ /, $ENV{MTK_PRODUCT_AAPT_CONFIG});
 ## Reading default latin ime setting directly from DEFAULT_LATIN_IME_LANGUAGES
 @latin_ime = split(/ /, $ENV{DEFAULT_LATIN_IME_LANGUAGES});
 
@@ -72,13 +70,6 @@ foreach (@locales_original) {
 			push @locales_filtered, $1;
 		}
 	} 
-}
-foreach (@locales_original_aapt) {
-        if (! m/\s*\wdpi\s*/){
-                if (m/\s*(\w+)\s*/) {
-                        push @locales_filtered, $1;
-                }
-        }
 }
 
 my $filedir = "mediatek/frameworks/common/src/com/mediatek/common/featureoption";

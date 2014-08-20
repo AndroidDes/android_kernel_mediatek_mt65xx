@@ -44,7 +44,6 @@
 #include <linux/rculist.h>
 
 #include <linux/mt_sched_mon.h>
-#include <linux/preempt.h>
 #include <linux/aee.h>
 #include <asm/uaccess.h>
 
@@ -73,8 +72,6 @@ static int printk_prefix = 1;
 static int console_log_max = 400000;
 
 static bool printk_disable_uart = 0;
-
-static bool log_in_resume = 0;
 
 /* printk's without a loglevel use this.. */
 #define DEFAULT_MESSAGE_LOGLEVEL CONFIG_DEFAULT_MESSAGE_LOGLEVEL
@@ -1293,6 +1290,9 @@ EXPORT_SYMBOL_GPL(suspend_console);
 
 void resume_console(void)
 {
+    unsigned long long t1, t2;
+    char aee_str[40];
+    int org_loglevel;
 	if (!console_suspend_enabled)
 		return;
 	down(&console_sem);
@@ -1300,13 +1300,25 @@ void resume_console(void)
 
     /* Prepare monitor: do not monitor it */
     /* May occurr ISR/Softirq during this chaos duration */
+    org_loglevel = console_loglevel;
+    console_loglevel = 4;
     __raw_get_cpu_var(MT_trace_in_resume_console) = 1;
-    log_in_resume = 1;
+    t1 = sched_clock();
     console_unlock();
-    log_in_resume = 0;
+
+    t2 = sched_clock();
     __raw_get_cpu_var(MT_trace_in_resume_console) = 0;
+    console_loglevel = org_loglevel;
 
     //in_resume_console = 0;
+    if(t2-t1 > 100000000){//>100ms
+        printk("[RESUME CONSOLE too long:%llu ns > 100 ms] s:%llu ns, e:%llu ns\n", t2 - t1, t1, t2);
+        sprintf( aee_str, "PW Resume log too much");
+        aee_kernel_warning(aee_str,"Need to shrink kernel log");
+    }else{
+        printk("[RESUME CONSOLE:%llu ns] s:%llu ns, e:%llu ns\n", t2 - t1, t1, t2);
+    }
+        
 }
 EXPORT_SYMBOL_GPL(resume_console);
 
@@ -1465,16 +1477,7 @@ void console_unlock(void)
 	unsigned _con_start, _log_end;
 	unsigned wake_klogd = 0, retry = 0;
     unsigned long total_log_size = 0;
-    unsigned long long t1, t2;
-    char aee_str[512];
-    int org_loglevel;
-    bool should_break = false;
-	int this_cpu;
 
-    preempt_disable();
-	this_cpu = smp_processor_id();
-    preempt_enable();
-    
 	if (console_suspended) {
 		up(&console_sem);
 		return;
@@ -1485,11 +1488,8 @@ void console_unlock(void)
 again:
 	for ( ; ; ) {
 		raw_spin_lock_irqsave(&logbuf_lock, flags);
-        if (log_in_resume) {
-            t1 = sched_clock();
-        }  
 		wake_klogd |= log_start - log_end;
-		if (should_break || con_start == log_end) 
+		if (con_start == log_end)
 			break;			/* Nothing to print */
 		_con_start = con_start;
 		_log_end = log_end;
@@ -1502,14 +1502,11 @@ again:
             400,000 chars = need to wait 4.0 sec
                 normal case: 4sec
         */
-        if (log_in_resume) {
-            org_loglevel = console_loglevel;
-            console_loglevel = 4;
-        }
         total_log_size += _log_end - _con_start;
         if(total_log_size < console_log_max)
             call_console_drivers(_con_start, _log_end);
         else if(!already_skip_log){
+            char aee_str[40];
             sprintf( aee_str, "PRINTK too much:%lu", total_log_size );
             aee_kernel_warning(aee_str,"Need to shrink kernel log");
             already_skip_log = 1;
@@ -1517,18 +1514,7 @@ again:
         /**/
 
 		start_critical_timings();
-        if (log_in_resume) {
-            t2 = sched_clock();
-            console_loglevel = org_loglevel;
-            if (t2 - t1 > 100000000) {
-                sprintf( aee_str, "[RESUME CONSOLE too long:%lluns>100ms] s:%lluns e:%lluns", t2 - t1, t1, t2);
-                aee_kernel_warning(aee_str,"Need to shrink kernel log");
-            }
-        }
 		local_irq_restore(flags);
-        
-        if (this_cpu == 0) 
-            should_break = true;
 	}
 	console_locked = 0;
 
@@ -1551,7 +1537,7 @@ again:
 		retry = 1;
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
-	if (!should_break && retry && console_trylock())
+	if (retry && console_trylock())
 		goto again;
 
 	if (wake_klogd)

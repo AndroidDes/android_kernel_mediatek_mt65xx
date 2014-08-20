@@ -667,56 +667,6 @@ fail:
 	return -1;
 }
 
-
-//ALPS00606302
-static int mtp_send_devicereset_event(struct mtp_dev *dev)
-{
-	struct usb_request *req = NULL;
-	int ret;
-	int length = 12;
-    unsigned long flags;
-
-    char buffer[12]={0x0C, 0x0, 0x0, 0x0, 0x4, 0x0, 0xb, 0x40, 0x0, 0x0, 0x0, 0x0};   //length 12, 0x00000010, type EVENT: 0x0004, event code 0x400b 
-
-	DBG(dev->cdev, "%s, line %d: dev->dev_disconnected = %d\n", __func__, __LINE__, dev->dev_disconnected);
-
-	if (length < 0 || length > INTR_BUFFER_SIZE)
-		return -EINVAL;
-	if (dev->state == STATE_OFFLINE)
-		return -ENODEV;
-
-    spin_lock_irqsave(&dev->lock, flags);
-    DBG(dev->cdev, "%s, line %d: _mtp_dev->dev_disconnected = %d, dev->state = %d \n", __func__, __LINE__, dev->dev_disconnected, dev->state);
-    if(!dev->dev_disconnected || dev->state != STATE_OFFLINE)
-    {
-        spin_unlock_irqrestore(&dev->lock, flags);
-        ret = wait_event_interruptible_timeout(dev->intr_wq,
-			(req = mtp_req_get(dev, &dev->intr_idle)),
-			msecs_to_jiffies(1000));
-    	if (!req)
-    		return -ETIME;
-
-        memcpy(req->buf, buffer, length);
-    	req->length = length;
-
-    	ret = usb_ep_queue(dev->ep_intr, req, GFP_KERNEL);
-        DBG(dev->cdev, "%s, line %d: ret = %d\n", __func__, __LINE__, ret);
-
-        if (ret)
-    		mtp_req_put(dev, &dev->intr_idle, req);
-    }
-    else
-    {
-        spin_unlock_irqrestore(&dev->lock, flags);
-        DBG(dev->cdev, "%s, line %d: usb function has been unbind!! do nothing!!\n", __func__, __LINE__);
-        ret = 0;
-    }
-
-    DBG(dev->cdev, "%s, line %d: _mtp_dev->dev_disconnected = %d, dev->state = %d, return!! \n", __func__, __LINE__, dev->dev_disconnected, dev->state);
-    return ret;
-}
-//ALPS00606302
-
 static ssize_t mtp_read(struct file *fp, char __user *buf,
 	size_t count, loff_t *pos)
 {
@@ -1280,8 +1230,8 @@ static void receive_file_work(struct work_struct *data)
 
 		//Modification for ALPS00434059 begin
 		#if defined(MTK_SHARED_SDCARD)
-			total_size += read_req->actual;
-			DBG(cdev, "%s, line %d: count = %lld, total_size = %lld, read_req->actual = %d, read_req->length= %d\n", __func__, __LINE__, count, total_size, read_req->actual, read_req->length);
+			total_size +=read_req->actual;
+			DBG(cdev, "%s, line %d: count = %d, total_size = %d, read_req->actual = %d, read_req->length= %d\n", __func__, __LINE__, count, total_size, read_req->actual, read_req->length);
 		#endif
 		//Modification for ALPS00434059 begin
 
@@ -1333,9 +1283,6 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 	struct usb_request *req = NULL;
 	int ret;
 	int length = event->length;
-    //ALPS00606302
-	int eventIndex = 6;
-    //ALPS00606302
 
 	DBG(dev->cdev, "mtp_send_event(%d)\n", event->length);
 
@@ -1355,10 +1302,6 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 		return -EFAULT;
 	}
 	req->length = length;
-
-    //ALPS00606302
-    DBG(dev->cdev, "mtp_send_event: EventCode: req->buf[7] = 0x%x, req->buf[6] = 0x%x\n", ((char*)req->buf)[eventIndex+1], ((char*)req->buf)[eventIndex]);
-    //ALPS00606302
 	ret = usb_ep_queue(dev->ep_intr, req, GFP_KERNEL);
 	if (ret)
 		mtp_req_put(dev, &dev->intr_idle, req);
@@ -1525,23 +1468,7 @@ static int mtp_open(struct inode *ip, struct file *fp)
 
 static int mtp_release(struct inode *ip, struct file *fp)
 {
-    //ALPS00606302
-	unsigned long flags;
-    //ALPS00606302
 	printk(KERN_INFO "mtp_release\n");
-
-    //ALPS00606302
-    spin_lock_irqsave(&_mtp_dev->lock, flags);
-	printk(KERN_INFO "%s, line %d: _mtp_dev->dev_disconnected = %d\n", __func__, __LINE__, _mtp_dev->dev_disconnected);
-
-    if(!_mtp_dev->dev_disconnected)
-    {
-        spin_unlock_irqrestore(&_mtp_dev->lock, flags);
-        mtp_send_devicereset_event(_mtp_dev);
-    }
-    else
-        spin_unlock_irqrestore(&_mtp_dev->lock, flags);
-    //ALPS00606302
 
 	mtp_unlock(&_mtp_dev->open_excl);
 	return 0;

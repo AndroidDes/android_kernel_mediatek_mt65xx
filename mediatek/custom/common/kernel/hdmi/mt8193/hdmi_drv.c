@@ -43,11 +43,18 @@
 #include "mach/eint.h"
 #include "mach/irqs.h"
 
+#ifdef MT6575
+#include <mach/mt6575_devs.h>
+#include <mach/mt6575_typedefs.h>
+#include <mach/mt6575_gpio.h>
+#include <mach/mt6575_pm_ldo.h>
+#endif
+#ifdef MT6589
 #include <mach/devs.h>
 #include <mach/mt_typedefs.h>
 #include <mach/mt_gpio.h>
 #include <mach/mt_pm_ldo.h>
-
+#endif
 
 #include "mt8193_iic.h"
 #include "mt8193avd.h"
@@ -612,7 +619,7 @@ void hdmi_timer_impl(void)
   }
 
   if(mt8193_hotinit!=1)
-   mt8193_hdmiinit++;
+  mt8193_hdmiinit++;
   
   if(((mt8193_hdmiinit>50)||(mt8193_hotinit==0))&&(mt8193_hotinit!=1))
   {

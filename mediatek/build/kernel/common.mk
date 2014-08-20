@@ -63,7 +63,7 @@ $(eval file := $(subst $(object)/,,$(call wildcard2,$(addsuffix /*.c,\
               $(patsubst %/,%,$(dir)),$(_))))))) \
 $(eval obj-y := $(dir) $(patsubst %.c,%.o,$(file))) \
 $(eval dir_create := $(dir $(addprefix $(1)/,$(obj-y)))) \
-$(shell mkdir -p $(dir_create))
+$(shell [ -d $(dir_create) ] || mkdir -p $(dir_create))
 endef
 
 define my-dir

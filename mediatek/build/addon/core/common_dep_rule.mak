@@ -64,6 +64,47 @@ ifeq (MT6573,$(strip $(MTK_PLATFORM)))
 endif
 
 ##############################################################
+# for video player check
+## The rule is as follow
+## for MT6573, OP01 projects must build VideoPlayer and must not build VideoPlayer2
+## for MT6573, non OP01 projects must build VideoPlayer2
+## for MT6575 MT6577, same rule as MT6573
+## for non MT6573 (MT8320 MT6575 MT6577), all projects should build VideoPlayer
+
+ifneq ($(findstring MT6573 MT6575 MT6577,$(MTK_PLATFORM)),)
+  ifneq ($(findstring OP01,$(OPTR_SPEC_SEG_DEF)),)
+    ifeq (yes,$(strip $(MTK_VIDEOPLAYER2_APP)))
+      $(call dep-err-seta-or-offb, OPTR_SPEC_SEG_DEF, none OP01, MTK_VIDEOPLAYER2_APP)
+    endif
+    ifdef MTK_VIDEOPLAYER_APP
+      ifneq (yes,$(strip $(MTK_VIDEOPLAYER_APP)))
+        $(call dep-err-seta-or-onb, OPTR_SPEC_SEG_DEF, none OP01, MTK_VIDEOPLAYER_APP)
+      endif
+    endif
+  else
+    ifeq (yes,$(strip $(MTK_VIDEOPLAYER_APP)))
+      $(call dep-err-seta-or-offb, OPTR_SPEC_SEG_DEF, none OP01, MTK_VIDEOPLAYER_APP)
+    endif
+    ifdef MTK_VIDEOPLAYER2_APP
+      ifneq (yes,$(strip $(MTK_VIDEOPLAYER2_APP)))
+        $(call dep-err-seta-or-onb, OPTR_SPEC_SEG_DEF, none OP01, MTK_VIDEOPLAYER2_APP)
+      endif
+    endif
+  endif
+else
+  ifneq ($(findstring MT8320,$(MTK_PLATFORM)),)
+    ifdef MTK_VIDEOPLAYER_APP
+      ifneq (yes,$(strip $(MTK_VIDEOPLAYER_APP)))
+        $(call dep-err-common, please turn on MTK_VIDEOPLAYER_APP on platform MT8320)
+      endif
+    endif
+    ifeq (yes,$(strip $(MTK_VIDEOPLAYER2_APP)))
+      $(call dep-err-common, please turn off MTK_VIDEOPLAYER2_APP on platform MT8320)
+    endif
+  endif
+endif
+
+##############################################################
 # for MTK_GEMINI_3G_SWITCH
 # Rule: When GEMINI = no, then MTK_GEMINI_3G_SWITCH = no.
 # Rule: When EVB = yes, then MTK_GEMINI_3G_SWITCH = no.
@@ -79,6 +120,12 @@ endif
 ifeq (yes,$(strip $(EVB)))
   ifeq (yes,$(strip $(MTK_GEMINI_3G_SWITCH)))
     $(call dep-err-common, please turn off MTK_GEMINI_3G_SWITCH when EVB=yes)
+  endif
+endif
+
+ifeq ($(findstring modem_3g,$(MTK_MODEM_SUPPORT)),)
+  ifeq (yes,$(strip $(MTK_GEMINI_3G_SWITCH)))
+    $(call dep-err-common, please turn off MTK_GEMINI_3G_SWITCH when MTK_MODEM_SUPPORT is not 3g)
   endif
 endif
 

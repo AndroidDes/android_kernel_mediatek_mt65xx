@@ -5,4 +5,3 @@
 #include "../cfgdefault/CFG_BWCS_Default.h"
 #include "../cfgdefault/CFG_Audio_Default.h"
 #include "../cfgdefault/CFG_OMADMUSB_Default.h"
-#include "../cfgdefault/CFG_MDTYPE_Default.h"

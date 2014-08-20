@@ -7,13 +7,8 @@
 
 #include <mach/mt_typedefs.h>
 
-#if defined(MTK_INTERNAL_HDMI_SUPPORT)
-#include "internal_hdmi_drv.h"
-#elif defined(MTK_INTERNAL_MHL_SUPPORT)
-#include "inter_mhl_drv.h"
-#else
+
 #include "hdmi_drv.h"
-#endif
 #include "hdmitx.h"
 
 
@@ -117,7 +112,7 @@ static void process_dbg_opt(const char *opt)
 						if (0 == strncmp(opt + 8, "on", 2)) {
 								wfd_force_pattern_output(1);
 						} else if (0 == strncmp(opt + 8, "off", 3)) {
-								wfd_force_pattern_output(2);
+								wfd_force_pattern_output(0);
 						} else {
 								goto Error;
 						}

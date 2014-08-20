@@ -39,11 +39,20 @@
 #include <mach/mt_pm_ldo.h>
 
 
-#if 0//def MT6516
+#ifdef MT6516
 #define POWER_NONE_MACRO MT6516_POWER_NONE
 #endif
 
+#ifdef MT6573
 #define POWER_NONE_MACRO MT65XX_POWER_NONE
+#endif
+
+#ifdef MT6575
+#define POWER_NONE_MACRO MT65XX_POWER_NONE
+#endif
+#ifdef MT6577
+#define POWER_NONE_MACRO MT65XX_POWER_NONE
+#endif
 
 #define STK_ACC_POLLING_MODE	1
 

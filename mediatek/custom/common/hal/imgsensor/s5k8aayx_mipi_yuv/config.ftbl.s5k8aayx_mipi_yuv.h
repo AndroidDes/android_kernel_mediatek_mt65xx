@@ -257,7 +257,7 @@ FTABLE_SCENE_DEP()
         SCENE_AS_DEFAULT_SCENE(
             ITEM_AS_DEFAULT_(MtkCameraParameters::WHITE_BALANCE_AUTO), 
             ITEM_AS_VALUES_(
-                MtkCameraParameters::WHITE_BALANCE_AUTO,           /* MtkCameraParameters::WHITE_BALANCE_INCANDESCENT, */
+                MtkCameraParameters::WHITE_BALANCE_AUTO,            MtkCameraParameters::WHITE_BALANCE_INCANDESCENT, 
                 MtkCameraParameters::WHITE_BALANCE_DAYLIGHT,        MtkCameraParameters::WHITE_BALANCE_CLOUDY_DAYLIGHT, 
                 MtkCameraParameters::WHITE_BALANCE_FLUORESCENT,     MtkCameraParameters::WHITE_BALANCE_TUNGSTEN, 
             )

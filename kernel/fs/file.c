@@ -460,9 +460,8 @@ long get_file_name_from_fd(struct files_struct *files, int fd, int procid, struc
         spin_unlock(&files->file_lock);     
         return (long)NULL;
 	}  
-	path_get(&file->f_path);
-	path = file->f_path;
-	fput(file);
+	memcpy(&path, &file->f_path, sizeof(struct path)); 
+	path_get(&file->f_path); 
 	spin_unlock(&files->file_lock);  
 	tmp = (char *)__get_free_page(GFP_TEMPORARY);  
 	if (!tmp) {     

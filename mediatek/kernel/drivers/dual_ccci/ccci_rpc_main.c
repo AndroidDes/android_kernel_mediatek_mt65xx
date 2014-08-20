@@ -33,6 +33,7 @@
 #include <linux/semaphore.h>
 #include <linux/version.h>
 #include <ccci.h>
+#include <ccci_common.h>
 
 typedef struct test
 {

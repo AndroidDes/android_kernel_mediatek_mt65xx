@@ -6,6 +6,15 @@
 
 #define MT_LBPROF_VERSION 4
 
+static int mt_lbprof_start = 0;
+unsigned long long start;
+unsigned int start_output = 0;
+unsigned long long last_update;
+static DEFINE_PER_CPU(unsigned long long, start_idle_time);
+
+DEFINE_SPINLOCK(mt_lbprof_check_cpu_idle_spinlock);
+EXPORT_SYMBOL(mt_lbprof_check_cpu_idle_spinlock);
+
 /*
  * Ease the printing of nsec fields:
  */
@@ -54,76 +63,35 @@ static unsigned long long mtprof_get_cpu_idle(int cpu)
 	return idle_time;	 
 }
 /* ---------------------------------------------------------- */
-DEFINE_SPINLOCK(mt_lbprof_check_cpu_idle_spinlock);
-EXPORT_SYMBOL(mt_lbprof_check_cpu_idle_spinlock);
-
-static int mt_lbprof_start = 0;
-unsigned int start_output;
-unsigned long long last_update;
-unsigned long long start;
-static DEFINE_PER_CPU(unsigned long long, start_idle_time);
-static DEFINE_PER_CPU(int, lb_state);
-
-static unsigned long time_slice_ns[2][3]={{0,0,0},{0,0,0}};
-static unsigned long unbalance_slice_ns;
-static unsigned long long period_time;
-/* --------------------------------------------------------- */
-int mt_lbprof_enable(void)
+int __init mt_lbprof_proc_init(void)
 {
-	int i, j;
 	int cpu;
 	unsigned long irq_flags;
-	char strings[128]="";
 
 	spin_lock_irqsave(&mt_lbprof_check_cpu_idle_spinlock, irq_flags);
-	mt_lbprof_start = 1;	
-	start_output = 0;
-	
-	last_update = local_clock();
-	start = last_update;
-
 	for_each_present_cpu (cpu) {
 		per_cpu(start_idle_time, cpu) = mtprof_get_cpu_idle(cpu);
-		per_cpu(lb_state, cpu) = 0;
 	}
-	
-	for(i = 0; i < 2; i++){
-		for(j = 0 ; j < 3 ; j++){
-			time_slice_ns[i][j] = 0;
-		}
-	}
-	
-	unbalance_slice_ns = 0;
-	period_time = 0 ;
-	
+
+	last_update = local_clock();
+	start = last_update;
+	mt_lbprof_start = 1;
 	spin_unlock_irqrestore(&mt_lbprof_check_cpu_idle_spinlock, irq_flags);
 
-	snprintf(strings, 128, "enable mtk load balance profiler");
-	trace_sched_lbprof_update(strings);
-	
 	return 0;
 }
-late_initcall(mt_lbprof_enable);
+late_initcall(mt_lbprof_proc_init);
 
-int mt_lbprof_disable()
-{
-	unsigned long irq_flags;
-	char strings[128]="";
-
-	spin_lock_irqsave(&mt_lbprof_check_cpu_idle_spinlock, irq_flags);
-	mt_lbprof_start = 0;
-	spin_unlock_irqrestore(&mt_lbprof_check_cpu_idle_spinlock, irq_flags);
-
-	snprintf(strings, 128, "disable mtk load balance profiler");
-	trace_sched_lbprof_update(strings);
-	
-	return 0;	
-}
 /* ---------------------------------------------------------- */
 #ifndef arch_idle_time
 #define arch_idle_time(cpu) 0
 #endif
 
+static DEFINE_PER_CPU(int, lb_state);
+
+static unsigned long time_slice_ns[2][3]={{0,0,0},{0,0,0}};
+static unsigned long unbalance_slice_ns;
+static unsigned long long period_time;
 void mt_lbprof_update_state_has_lock(int cpu, int rq_cnt)
 {
 	int unbalance = 0;
@@ -177,27 +145,19 @@ void mt_lbprof_update_state_has_lock(int cpu, int rq_cnt)
 		period_time += delta;
 	}
 
+	if(rq_cnt != MT_LBPROF_UPDATE_STATE){
+		per_cpu(lb_state, cpu) = rq_cnt;
+	}
+
 	for_each_cpu(tmp_cpu, cpu_possible_mask){
-		snprintf(tmp_state, 5, "%d ", per_cpu(lb_state, tmp_cpu));
+		sprintf(tmp_state, "%d ", per_cpu(lb_state, tmp_cpu));
 		strncat(pre_state, tmp_state, 3);
-		if ( tmp_cpu == cpu && rq_cnt != MT_LBPROF_UPDATE_STATE ){
-			if((per_cpu(lb_state, cpu) == MT_LBPROF_ALLOW_UNBLANCE_STATE)  && 
-		    		((rq_cnt == MT_LBPROF_IDLE_STATE ) || (rq_cnt == MT_LBPROF_NO_TASK_STATE) ) ){
-				continue;
-			}else{
-				per_cpu(lb_state, tmp_cpu) = rq_cnt;
-			}
-		
-			continue;
-		}
-
-		if ( (tmp_cpu!= cpu) && (per_cpu(lb_state, tmp_cpu) == MT_LBPROF_ALLOW_UNBLANCE_STATE))
+		if ( tmp_cpu == cpu && rq_cnt != MT_LBPROF_UPDATE_STATE )
 			continue;
 
-		if( 0 == cpu_online(tmp_cpu)){
-			per_cpu(lb_state, tmp_cpu) = MT_LBPROF_HOTPLUG_STATE;
-		}
-		
+                if ( (tmp_cpu!= cpu) && (per_cpu(lb_state, tmp_cpu) == MT_LBPROF_ALLOW_UNBLANCE_STATE))
+                        continue;
+
 		switch(cpu_rq(tmp_cpu)->nr_running){
 			case 1:
 				per_cpu(lb_state, tmp_cpu) = MT_LBPROF_ONE_TASK_STATE;
@@ -221,16 +181,16 @@ void mt_lbprof_update_state_has_lock(int cpu, int rq_cnt)
 		char strings[128]="";
 
 		if(0 == start_output){
-			snprintf(strings, 128, "%llu.%06lu 0 %s", SPLIT_NS(start), pre_state);
+			sprintf(strings, "%llu.%06lu 0 %s", SPLIT_NS(start), pre_state);
 			trace_sched_lbprof_update(strings);
 		}
 
 		for_each_cpu(tmp_cpu, cpu_possible_mask){
-			snprintf(tmp_state, 5, "%d ", per_cpu(lb_state, tmp_cpu));
+			sprintf(tmp_state, "%d ", per_cpu(lb_state, tmp_cpu));
 			strncat(post_state, tmp_state, 3);
 		}
 
-		snprintf(strings, 128, "%llu.%06lu %llu %s%lu %d %d ", SPLIT_NS(now), delta, post_state, unbalance_slice_ns, cpu, rq_cnt);
+		sprintf(strings, "%llu.%06lu %llu %s%lu %d %d ", SPLIT_NS(now), delta, post_state, unbalance_slice_ns, cpu, rq_cnt);
 		mt_lbprof_rqinfo(strings);
 		trace_sched_lbprof_update(strings);
 		start_output = 1;
@@ -300,7 +260,7 @@ void mt_lbprof_update_status(void)
 	period_time_32/=10;
 	{
 	char strings[128]="";
-	snprintf(strings, 128, "%3lu.%02lu %s%3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %lu ",
+	sprintf(strings, "%3lu.%02lu %s%3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %3lu.%02lu %lu ",
 		SPLIT_PERCENT(10000 - (unbalance_slice_ns ) / period_time_32 ),
 		cpu_load_info,
 		SPLIT_PERCENT(unbalance_slice_ns / period_time_32),
@@ -315,7 +275,7 @@ void mt_lbprof_update_status(void)
 	}
 	for(i = 0; i < 2; i++){
 		for(j = 0 ; j < 3 ; j++){
-			time_slice_ns[i][j] = 0;
+			time_slice_ns[i][j]=0;
 		}
 	}
 	unbalance_slice_ns = 0;
@@ -324,15 +284,6 @@ void mt_lbprof_update_status(void)
 }
 
 #else /* CONFIG_MT_LOAD_BALANCE_PROFILER */
-int mt_lbprof_enable(void)
-{
-	return 0;
-}
-
-int mt_lbprof_disable(void)
-{
-	return 0;
-}
 
 void mt_lbprof_update_status(void)
 {

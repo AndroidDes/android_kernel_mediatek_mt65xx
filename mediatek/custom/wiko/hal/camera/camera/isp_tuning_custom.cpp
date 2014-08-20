@@ -79,8 +79,6 @@ TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE, OR REFUND ANY SOFTWARE LICE
 #include <isp_tuning_custom.h>
 #include <isp_tuning_custom_instance.h>
 
-#include "kd_imgsensor.h"//LINE <> <DATE20130917> <OV5648 tuning> wupingzhou
-
 using namespace NSIspTuning;
 
 
@@ -135,9 +133,9 @@ using namespace NSIspTuning;
 *
 *           eCCTIndex_CCM:
 *               Correlated color temperature index for CCM
-*                   eIDX_CCM_TL84
-*                   eIDX_CCM_CWF
-*                   eIDX_CCM_D65
+*                   eIDX_CCM_CCT_TL84
+*                   eIDX_CCM_CCT_CWF
+*                   eIDX_CCM_CCT_D65
 *
 *           u4ZoomRatio_x100:
 *               zoom ratio (x100)
@@ -181,6 +179,8 @@ evaluate_nvram_index(RAWIspCamInfo const& rCamInfo, IndexMgr& rIdxMgr)
     fgRet = rIdxMgr.setIdx_ANR(XXX);
     fgRet = rIdxMgr.setIdx_CCR(XXX);
     fgRet = rIdxMgr.setIdx_EE(XXX);
+    fgRet = rIdxMgr.setIdx_NR3D(XXX);
+    fgRet = rIdxMgr.setIdx_MFB(XXX);
 #endif
 //..............................................................................
     //  (3) Finally, dump info. after modifying.
@@ -234,7 +234,10 @@ refine_BPC(RAWIspCamInfo const& rCamInfo, IspNvramRegMgr const& rIspRegMgr, ISP_
     MY_LOG("rBPC.cd2_2 = 0x%8x", rBPC.cd2_2);
     MY_LOG("rBPC.cd2_3 = 0x%8x", rBPC.cd2_3);
     MY_LOG("rBPC.cd0 = 0x%8x", rBPC.cd0);
+    MY_LOG("rBPC.det = 0x%8x", rBPC.det);
     MY_LOG("rBPC.cor = 0x%8x", rBPC.cor);
+    MY_LOG("rBPC.tbli1 = 0x%8x", rBPC.tbli1);
+    MY_LOG("rBPC.tbli2 = 0x%8x", rBPC.tbli2);
     #endif
 
 }
@@ -252,24 +255,6 @@ refine_NR1(RAWIspCamInfo const& rCamInfo, IspNvramRegMgr const& rIspRegMgr, ISP_
 
     MY_LOG("rNR1.con = 0x%8x", rNR1.con);
     MY_LOG("rNR1.ct_con = 0x%8x", rNR1.ct_con);
-    #endif
-}
-
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-MVOID
-IspTuningCustom::
-refine_SL2(RAWIspCamInfo const& rCamInfo, IspNvramRegMgr const& rIspRegMgr, ISP_NVRAM_SL2_T& rSL2)
-{
-    #if 0
-    MY_LOG("%s()\n", __FUNCTION__);
-    // TODO: Add your code below...
-
-    MY_LOG("rSL2.cen = 0x%8x", rSL2.cen);
-    MY_LOG("rSL2.max0_rr = 0x%8x", rSL2.max0_rr);
-    MY_LOG("rSL2.max1_rr = 0x%8x", rSL2.max1_rr);
-    MY_LOG("rSL2.max2_rr = 0x%8x", rSL2.max2_rr);
     #endif
 }
 
@@ -446,107 +431,46 @@ refine_EE(RAWIspCamInfo const& rCamInfo, IspNvramRegMgr const& rIspRegMgr, ISP_N
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-EIndex_CCM_T
+MVOID
 IspTuningCustom::
-evaluate_CCM_index(RAWIspCamInfo const& rCamInfo)
+refine_NR3D(RAWIspCamInfo const& rCamInfo, IspNvramRegMgr const& rIspRegMgr, ISP_NVRAM_NR3D_T& rNR3D)
 {
+    #if 0
     MY_LOG("%s()\n", __FUNCTION__);
-    
-    MY_LOG(
-        "[+evaluate_CCM_index]"
-        "(eIdx_CCM, i4CCT, i4FluorescentIndex)=(%d, %d, %d)"
-        , rCamInfo.eIdx_CCM
-        , rCamInfo.rAWBInfo.i4CCT
-        , rCamInfo.rAWBInfo.i4FluorescentIndex);
+    // TODO: Add your code below...
 
-    EIndex_CCM_T eIdx_CCM_new = rCamInfo.eIdx_CCM;
-
-//    -----------------|---|---|--------------|---|---|------------------
-//                                THA TH1 THB              THC TH2  THD
-
-    MINT32 const THA = 3318;
-    MINT32 const TH1 = 3484;
-    MINT32 const THB = 3667;
-    MINT32 const THC = 4810;
-    MINT32 const TH2 = 5050;
-    MINT32 const THD = 5316;
-    MINT32 const F_IDX_TH1 = 25;
-    MINT32 const F_IDX_TH2 = -25;
-
-    switch  (rCamInfo.eIdx_CCM)
-    {
-    case eIDX_CCM_TL84:
-        if  ( rCamInfo.rAWBInfo.i4CCT < THB )
-        {
-            eIdx_CCM_new = eIDX_CCM_TL84;
-        }
-        else if ( rCamInfo.rAWBInfo.i4CCT < THD )
-        {
-            if  ( rCamInfo.rAWBInfo.i4FluorescentIndex < F_IDX_TH2 )
-                eIdx_CCM_new = eIDX_CCM_CWF;
-            else 
-                eIdx_CCM_new = eIDX_CCM_TL84;
-        }
-        else
-        {
-            eIdx_CCM_new = eIDX_CCM_D65;
-        }
-        break;
-    case eIDX_CCM_CWF:
-        if  ( rCamInfo.rAWBInfo.i4CCT < THA )
-        {
-            eIdx_CCM_new = eIDX_CCM_TL84;
-        }
-        else if ( rCamInfo.rAWBInfo.i4CCT < THD )
-        {
-            if  ( rCamInfo.rAWBInfo.i4FluorescentIndex > F_IDX_TH1 )
-                eIdx_CCM_new = eIDX_CCM_TL84;
-            else 
-                eIdx_CCM_new = eIDX_CCM_CWF;
-        }
-        else 
-        {
-            eIdx_CCM_new = eIDX_CCM_D65;
-        }
-        break;
-    case eIDX_CCM_D65:
-        if  ( rCamInfo.rAWBInfo.i4CCT > THC )
-        {
-	        eIdx_CCM_new = eIDX_CCM_D65;
-        } 
-        else if ( rCamInfo.rAWBInfo.i4CCT > TH1 )
-        {
-            if(rCamInfo.rAWBInfo.i4FluorescentIndex > F_IDX_TH2)
-                eIdx_CCM_new = eIDX_CCM_TL84;
-            else 
-                eIdx_CCM_new = eIDX_CCM_CWF;
-        }
-        else 
-        {
-            eIdx_CCM_new = eIDX_CCM_TL84;
-        }
-        break;
-    }
-
-    if  ( rCamInfo.eIdx_CCM != eIdx_CCM_new )
-    {
-        MY_LOG(
-            "[-evaluate_CCM_index] CCM Idx(old,new)=(%d,%d)"
-            , rCamInfo.eIdx_CCM, eIdx_CCM_new
-        );
-    }
-
-    return  eIdx_CCM_new;
+    MY_LOG("rNR3D.blend = 0x%8x", rNR3D.blend);
+    MY_LOG("rNR3D.skip_key = 0x%8x", rNR3D.skip_key);
+    MY_LOG("rNR3D.fbcnt_off = 0x%8x", rNR3D.fbcnt_off);
+    MY_LOG("rNR3D.fbcnt_siz = 0x%8x", rNR3D.fbcnt_siz);
+    MY_LOG("rNR3D.fb_count = 0x%8x", rNR3D.fb_count);
+    MY_LOG("rNR3D.limit_cpx = 0x%8x", rNR3D.limit_cpx);
+    MY_LOG("rNR3D.limit_y_con1 = 0x%8x", rNR3D.limit_y_con1);
+    MY_LOG("rNR3D.limit_y_con2 = 0x%8x", rNR3D.limit_y_con2);
+    MY_LOG("rNR3D.limit_y_con3 = 0x%8x", rNR3D.limit_y_con3);
+    MY_LOG("rNR3D.limit_u_con1 = 0x%8x", rNR3D.limit_u_con1);
+    MY_LOG("rNR3D.limit_u_con2 = 0x%8x", rNR3D.limit_u_con2);
+    MY_LOG("rNR3D.limit_u_con3 = 0x%8x", rNR3D.limit_u_con3);
+    MY_LOG("rNR3D.limit_v_con1 = 0x%8x", rNR3D.limit_v_con1);
+    MY_LOG("rNR3D.limit_v_con2 = 0x%8x", rNR3D.limit_v_con2);
+    MY_LOG("rNR3D.limit_v_con3 = 0x%8x", rNR3D.limit_v_con3);
+#endif    
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-MBOOL
+MVOID
 IspTuningCustom::
-is_to_invoke_dynamic_ccm(RAWIspCamInfo const& rCamInfo)
+refine_MFB(RAWIspCamInfo const& rCamInfo, IspNvramRegMgr const& rIspRegMgr, ISP_NVRAM_MFB_T& rMFB)
 {
-    return MTRUE;
+    #if 0   
+    MY_LOG("%s()\n", __FUNCTION__);
+    // TODO: Add your code below...
+
+    MY_LOG("rMFB.con = 0x%8x", rMFB.con);
+    MY_LOG("rMFB.ll = 0x%8x", rMFB.ll);
+    #endif
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -659,61 +583,96 @@ evaluate_Shading_CCT_index  (
         RAWIspCamInfo const& rCamInfo
 )   const
 {
-    UINT32 i4CCT = rCamInfo.rAWBInfo.i4CCT;
-
-	MINT32 i4FIDX	= rCamInfo.rAWBInfo.i4FluorescentIndex;//LINE <> <DATE20130923> <camera shading tuning> wupingzhou
-	MINT32 i4DFIDX	= rCamInfo.rAWBInfo.i4DaylightFluorescentIndex;//LINE <> <DATE20130923> <camera shading tuning> wupingzhou
-	MINT32 i4SceneLV = rCamInfo.rAWBInfo.i4SceneLV;//LINE <> <DATE20130923> <camera shading tuning> wupingzhou
+    UINT32 i4CCT	= rCamInfo.rAWBInfo.i4CCT;
+	MINT32 i4PT		= rCamInfo.rAWBInfo.rProb.i4P[AWB_LIGHT_TUNGSTEN];//20130103 Jouny
+	MINT32 i4PW		= rCamInfo.rAWBInfo.rProb.i4P[AWB_LIGHT_WARM_FLUORESCENT];//20130103 Jouny
+	MINT32 i4DFIDX	= rCamInfo.rAWBInfo.i4DaylightFluorescentIndex;//20130103 Jouny
+	MINT32 i4SceneLV =rCamInfo.rAWBInfo.i4SceneLV;
+	
 
     EIndex_Shading_CCT_T eIdx_Shading_CCT_new = rCamInfo.eIdx_Shading_CCT;
 
 //    -----------------|----|----|--------------|----|----|------------------
 //                   THH2  TH2  THL2                   THH1  TH1  THL1
 
-	UINT32 sensorID;//LINE <> <DATE20130917> <OV5648 tuning> wupingzhou
-    sensorID = getSensorID();//LINE <> <DATE20130917> <OV5648 tuning> wupingzhou
-
-	MINT32 THL1 = 3100;//3257;
-	MINT32 THH1 = 3400;//3484;
+    int SensorID = getSensorID();
+    MINT32 /*const*/ THL1	= 3500;
+    MINT32 /*const*/ THH1	= 3684;
+    if((0x5647 == SensorID)||(0x5646 == SensorID)){
+        LOGD("Test 1, SensorID == 0x%x\n",SensorID);
+        THL1	= 2850;
+        THH1	= 3484;
+    }
+    MINT32 const TH1	= (THL1+THH1)/2; //(THL1 +THH1)/2
+    MINT32 const THL2	= 4673;
+    MINT32 /*const*/ THH2	= 5000;
+    if((0x5647 == SensorID)||(0x5646 == SensorID)){
+        LOGD("Test 2, SensorID == 0x%x\n",SensorID);
+        THH2	= 5155;
+    }
+    MINT32 const TH2	= (THL2+THH2)/2;//(THL2 +THH2)/2
+    MINT32  TH4			= 100;	//20130103 Jouny    
+    MINT32  TH3			= -30;	//20130103 Jouny
+    if((0x5647 == SensorID)||(0x5646 == SensorID)){
+        LOGD("Test 3, SensorID == 0x%x\n",SensorID);
+        TH3	= -20;
+    }
+	MY_LOG("[8 evaluate_Shading_CCT_index] CCT:%d DF_IDX:%d i4PT:%d i4PW:%d\n",i4CCT,i4DFIDX,i4PT,i4PW);  
 	
-	if (sensorID == OV5648MIPI_SENSOR_ID)//LINE <> <DATE20130917> <OV5648 tuning> wupingzhou
-	{
-		THL1 = 3500;
-		THH1 = 3800;//3484;
-	}
-	else
-	{
-		THL1 = 3100;//3257;
-		THH1 = 3400;//3484;
-	}
-    MINT32 const TH1 = (THL1+THH1)/2; //(THL1 +THH1)/2
-    MINT32 const THL2 = 4673;
-    MINT32 const THH2 = 4900;
-    MINT32 const TH2 = (THL2+THH2)/2;//(THL2 +THH2)/2
-
-	LOGD("[-evaluate_Shading_CCT_index] i4CCT :%d, i4FIDX:%d,i4DFIDX:%d, i4SceneLV : %d\n"
-            ,i4CCT, i4FIDX, i4DFIDX,i4SceneLV);
-
     switch  (rCamInfo.eIdx_Shading_CCT)
     {
     case eIDX_Shading_CCT_ALight:
-        if  ( i4CCT < THH1 )
+        if  ( i4CCT < THH1 ) 
         {
-            eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+        	//20130103 Jouny
+#if 0
+        	if(i4PT > TH4 || i4PW > TH4)
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+        	}
+			else
+			{
+				eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+			} 
+#else
+			eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+#endif
+			
         }
         else if ( i4CCT <  TH2)
         {
-            eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+        	eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
         }
         else
         {
-            eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+        	//20130103 Jouny
+        	if(i4DFIDX < TH3)
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+        	}
+        	else
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+        	}
         }
         break;
     case eIDX_Shading_CCT_CWF:
         if  ( i4CCT < THL1 )
         {
-            eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+        	//20130103 Jouny
+#if 0
+        	if(i4PT > TH4 || i4PW > TH4)
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+        	}
+			else
+			{
+				eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+			} 
+#else
+			eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+#endif
+
         }
         else if ( i4CCT < THH2 )
         {
@@ -721,36 +680,35 @@ evaluate_Shading_CCT_index  (
         }
         else
         {
-			if (sensorID == IMX111_SENSOR_ID)//LINE <> <DATE20130923> <camera shading tuning> wupingzhou
-			{
-				if(i4SceneLV < 73 && i4FIDX < 75)
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
-				}
-				else
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
-				}
-			}
-			else if (sensorID == OV5648MIPI_SENSOR_ID)//LINE <> <DATE20131104> <camera shading tuning> wupingzhou
-			{
-				if(i4SceneLV < 93 && i4FIDX < 53)
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
-				}
-				else
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
-				}
-			}
+        	//20130103 Jouny
+        	if(i4DFIDX < TH3)
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+        	}
 			else
+			{
             	eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+			}
+
         }
         break;
     case eIDX_Shading_CCT_D65:
         if  ( i4CCT < TH1 )
         {
-         eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+        	//20130103 Jouny
+#if 0
+        	if(i4PT > TH4 || i4PW > TH4)
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+        	}
+			else
+			{
+				eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+			} 
+#else
+			eIdx_Shading_CCT_new = eIDX_Shading_CCT_ALight;
+#endif
+
         }
         else if ( i4CCT < THL2 )
         {
@@ -758,30 +716,30 @@ evaluate_Shading_CCT_index  (
         }
         else
         {
-			if (sensorID == IMX111_SENSOR_ID)//LINE <> <DATE20130923> <camera shading tuning> wupingzhou
-			{
-				if(i4SceneLV < 71 && i4FIDX < 75)
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
-				}
-				else
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
-				}
-			}
-			else if (sensorID == OV5648MIPI_SENSOR_ID)//LINE <> <DATE20131104> <camera shading tuning> wupingzhou
-			{
-				if(i4SceneLV < 93 && i4FIDX < 53)
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
-				}
-				else
-				{
-					eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
-				}
-			}
-			else
-            	eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+        	//20130103 Jouny
+        	if(i4DFIDX < TH3)
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_CWF;
+        	}
+        	else
+        	{
+        		eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+        	}
+
+        	if(0x0135 == SensorID){
+        		LOGD("Test 4, SensorID == 0x%x\n",SensorID);
+        		if(eIdx_Shading_CCT_new ==eIDX_Shading_CCT_CWF)
+        		{
+        			if(i4SceneLV > 78)
+        			{
+        				eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+        			}
+        			else if(i4CCT>5400)
+        			{
+        				eIdx_Shading_CCT_new = eIDX_Shading_CCT_D65;
+        			}
+        		}
+        	}
         }
         break;
     }
@@ -794,8 +752,9 @@ evaluate_Shading_CCT_index  (
         );
     }
 //#endif
-		//2013/6/11 ¤U¤È 09:37:17eIdx_Shading_CCT_new	= eIDX_Shading_CCT_ALight;
-		MY_LOG("Set Shading Index :%d\n", eIdx_Shading_CCT_new);
+	MY_LOG("[evaluate_Shading_CCT_index] eIdx_Shading_CCT_new:%d\n",eIdx_Shading_CCT_new);  
+	
+		
     return  eIdx_Shading_CCT_new;
 }
 EIndex_ISO_T
@@ -847,5 +806,224 @@ refineLightSourceAWBGainforMultiCCM(AWB_GAIN_T& rD65, AWB_GAIN_T& rTL84, AWB_GAI
     MY_LOG("CWF AWB Gain = (%d, %d, %d)\n", rCWF.i4R, rCWF.i4G, rCWF.i4B);
     MY_LOG("A AWB Gain = (%d, %d, %d)\n", rA.i4R, rA.i4G, rA.i4B);
 }
+
+
+#if 0
+
+
+
+
+
+/*******************************************************************************
+*
+* eIdx_CCM_CCT_old:
+*   [in] the previous color temperature index
+*           eIDX_CCM_CCT_TL84
+*           eIDX_CCM_CCT_CWF
+*           eIDX_CCM_CCT_D65
+*
+* i4CCT:
+*   [in] the current color temperature from 3A.
+*
+* i4FluorescentIndex:
+*   [in] the current fluorescent index
+*
+* return:
+*   [out] the current color temperature index
+*           eIDX_CCM_CCT_TL84
+*           eIDX_CCM_CCT_CWF
+*           eIDX_CCM_CCT_D65
+*
+*******************************************************************************/
+EIndex_CCM_CCT_T
+IspTuningCustom::
+evaluate_CCM_CCT_index  (
+    EIndex_CCM_CCT_T const eIdx_CCM_CCT_old,
+    MINT32 const i4CCT,
+    MINT32 const i4FluorescentIndex
+)   const
+{
+    MY_LOG(
+        "[+evaluate_CCM_CCT_index]"
+        "(eIdx_CCM_CCT_old, i4CCT, i4FluorescentIndex)=(%d, %d, %d)"
+        , eIdx_CCM_CCT_old, i4CCT, i4FluorescentIndex
+    );
+
+    EIndex_CCM_CCT_T eIdx_CCM_CCT_new = eIdx_CCM_CCT_old;
+
+//    -----------------|---|---|--------------|---|---|------------------
+//                                THA TH1 THB              THC TH2  THD
+
+    MINT32 const THA = 3318;
+    MINT32 const TH1 = 3484;
+    MINT32 const THB = 3667;
+    MINT32 const THC = 4810;
+    MINT32 const TH2 = 5050;
+    MINT32 const THD = 5316;
+    MINT32 const F_IDX_TH1 = 25;
+    MINT32 const F_IDX_TH2 = -25;
+
+    switch  (eIdx_CCM_CCT_old)
+    {
+    case eIDX_CCM_CCT_TL84:
+        if  ( i4CCT < THB )
+        {
+            eIdx_CCM_CCT_new = eIDX_CCM_CCT_TL84;
+        }
+        else if ( i4CCT < THD )
+        {
+            if  ( i4FluorescentIndex < F_IDX_TH2 )
+                eIdx_CCM_CCT_new = eIDX_CCM_CCT_CWF;
+            else
+                eIdx_CCM_CCT_new = eIDX_CCM_CCT_TL84;
+        }
+        else
+        {
+            eIdx_CCM_CCT_new = eIDX_CCM_CCT_D65;
+        }
+        break;
+    case eIDX_CCM_CCT_CWF:
+        if  ( i4CCT < THA )
+        {
+            eIdx_CCM_CCT_new = eIDX_CCM_CCT_TL84;
+        }
+        else if ( i4CCT < THD )
+        {
+            if  ( i4FluorescentIndex > F_IDX_TH1 )
+                eIdx_CCM_CCT_new = eIDX_CCM_CCT_TL84;
+            else
+                eIdx_CCM_CCT_new = eIDX_CCM_CCT_CWF;
+        }
+        else
+        {
+            eIdx_CCM_CCT_new = eIDX_CCM_CCT_D65;
+        }
+        break;
+    case eIDX_CCM_CCT_D65:
+        if  ( i4CCT > THC )
+        {
+	        eIdx_CCM_CCT_new = eIDX_CCM_CCT_D65;
+        }
+        else if ( i4CCT > TH1 )
+        {
+            if(i4FluorescentIndex > F_IDX_TH2)
+                eIdx_CCM_CCT_new = eIDX_CCM_CCT_TL84;
+            else
+                eIdx_CCM_CCT_new = eIDX_CCM_CCT_CWF;
+        }
+        else
+        {
+            eIdx_CCM_CCT_new = eIDX_CCM_CCT_TL84;
+        }
+        break;
+    }
+
+//#if ENABLE_MY_LOG
+    if  ( eIdx_CCM_CCT_old != eIdx_CCM_CCT_new )
+    {
+        LOGD(
+            "[-evaluate_CCM_CCT_index] CCM CCT Idx(old,new)=(%d,%d)"
+            , eIdx_CCM_CCT_old, eIdx_CCM_CCT_new
+        );
+    }
+//#endif
+    return  eIdx_CCM_CCT_new;
+}
+
+
+
+
+
+
+
+
+/*******************************************************************************
+*
+*   rCamInfo
+*       [in]    ISP Camera Info for RAW sensor. Its members are as below:
+*
+*           eIdx_Scene:
+*               SCENE_MODE_OFF,             // Disable scene mode equal Auto mode
+*               SCENE_MODE_NORMAL,          // Normal mode
+*               SCENE_MODE_ACTION,          // Action mode
+*               SCENE_MODE_PORTRAIT,        // Portrait mode
+*               SCENE_MODE_LANDSCAPE,       // Landscape
+*               SCENE_MODE_NIGHTSCENE,      // Night Scene
+*               SCENE_MODE_NIGHTPORTRAIT,   // Night Portrait
+*               SCENE_MODE_THEATRE,         // Theatre mode
+*               SCENE_MODE_BEACH,           // Beach mode
+*               SCENE_MODE_SNOW,            // Snow mode
+*               SCENE_MODE_SUNSET,          // Sunset mode
+*               SCENE_MODE_STEADYPHOTO,     // Steady photo mode
+*               SCENE_MODE_FIREWORKS,       // Fireworks mode
+*               SCENE_MODE_SPORTS,          // Sports mode
+*               SCENE_MODE_PARTY,           // Party mode
+*               SCENE_MODE_CANDLELIGHT,     // Candle light mode
+*
+*           u4ISOValue:
+*               ISO value to determine eISO.
+*
+*           eIdx_ISO:
+*               eIDX_ISO_100,
+*               eIDX_ISO_200,
+*               eIDX_ISO_400,
+*               eIDX_ISO_800,
+*               eIDX_ISO_1600
+*
+*           i4CCT:
+*               Correlated color temperature
+*
+*           eCCTIndex_CCM:
+*               Correlated color temperature index for CCM
+*                   eIDX_CCM_CCT_TL84
+*                   eIDX_CCM_CCT_CWF
+*                   eIDX_CCM_CCT_D65
+*
+*           u4ZoomRatio_x100:
+*               zoom ratio (x100)
+*
+*           i4LightValue_x10:
+*               light value (x10)
+*
+*
+*******************************************************************************/
+MBOOL
+IspTuningCustom::
+is_to_invoke_offline_capture(RAWIspCamInfo const& rCamInfo) const
+{
+#if 1
+    EIndex_Scene_T const eIdx_Scene = rCamInfo.eIdx_Scene;
+    EIndex_ISO_T const     eIdx_ISO = rCamInfo.eIdx_ISO;        //  ISO enum
+    MUINT32 const        u4ISOValue = rCamInfo.u4ISOValue;      //  real ISO
+    MUINT32 const             i4CCT = rCamInfo.i4CCT;
+    MUINT32 const  u4ZoomRatio_x100 = rCamInfo.u4ZoomRatio_x100;
+    MINT32 const   i4LightValue_x10 = rCamInfo.i4LightValue_x10;
+#endif
+#if 0
+    switch  (eIdx_ISO)
+    {
+    case eIDX_ISO_100:
+    case eIDX_ISO_200:
+    case eIDX_ISO_400:
+    case eIDX_ISO_800:
+    case eIDX_ISO_1600:
+    default:
+        break;
+    }
+#endif
+#if 0
+		if(eIdx_ISO==eIDX_ISO_400 ||eIdx_ISO==eIDX_ISO_800 || eIdx_ISO==eIDX_ISO_1600)
+		{
+			return  MTRUE;
+		}
+		else
+#endif
+    return  MTRUE;
+}
+#endif
+
+/*******************************************************************************
+*
+*******************************************************************************/
 
 

@@ -361,11 +361,11 @@ typedef struct
 #define MAX_REF_FREE_YUV_BUFFER_NUM 18
 typedef struct
 {
-#if 0
+#if 1
     VCODEC_BUFFER_T       *prRetBitsBuf;
 #else
     unsigned int          u4ReturnInputCnt;
-    VCODEC_BUFFER_T       rReturnInput[MAX_BITSTREAM_BUFFER_INFO_NUM]; 
+    VCODEC_DEC_INPUT_T   *parReturnInput[MAX_BITSTREAM_BUFFER_INFO_NUM]; 
 #endif
     unsigned int          u4RefFreeYUVBufCnt;
     VCODEC_BUFFER_T        parRefFreeYUVBuf[MAX_REF_FREE_YUV_BUFFER_NUM]; 

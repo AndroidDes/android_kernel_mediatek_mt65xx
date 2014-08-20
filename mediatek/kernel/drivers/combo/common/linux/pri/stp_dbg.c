@@ -719,14 +719,6 @@ INT32 wcn_compressor_out(P_WCN_COMPRESSOR_T cprs, PUINT8 *pbuf, PINT32 plen)
 
     STP_DBG_INFO_FUNC("0x%08x, len %d\n", (unsigned int)*pbuf, *plen);
     
-#if 1
-    ret = zlib_deflateReset((z_stream*)cprs->worker);
-    if (ret != Z_OK) {
-        STP_DBG_ERR_FUNC("reset failed!\n");
-        return -2;
-    }
-#endif
-
     return 0;
 }
 
@@ -1122,15 +1114,9 @@ static int stp_dbg_nl_bind(
 
     if(num_bind_process < MAX_BIND_PROCESS) 
     {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
         bind_pid[num_bind_process] = info->snd_pid;
         num_bind_process++;
         STP_DBG_INFO_FUNC("%s():-> pid  = %d\n", __func__, info->snd_pid);
-#else
-        bind_pid[num_bind_process] = info->snd_portid;
-        num_bind_process++;
-        STP_DBG_INFO_FUNC("%s():-> pid  = %d\n", __func__, info->snd_portid);
-#endif
     }
     else 
     {

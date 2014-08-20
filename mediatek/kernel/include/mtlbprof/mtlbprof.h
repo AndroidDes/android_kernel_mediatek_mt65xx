@@ -67,8 +67,6 @@ void mt_lbprof_rqinfo(char *strings);
 
 #endif /* CONFIG_MT_LOAD_BALANCE_PROFILER */
 
-extern int mt_lbprof_enable(void);
-extern int mt_lbprof_disable(void);
 extern void mt_lbprof_update_status(void);
 extern void mt_lbprof_update_state(int cpu, int rq_cnt);
 extern void mt_lbprof_update_state_has_lock(int cpu, int rq_cnt);

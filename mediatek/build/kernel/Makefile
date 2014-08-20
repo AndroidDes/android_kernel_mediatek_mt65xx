@@ -32,9 +32,6 @@ endif
 LINUXINCLUDE    += -I$(MTK_PATH_PLATFORM)/core/include/
 LINUXINCLUDE    += -I$(MTK_PATH_SOURCE)/include/
 LINUXINCLUDE    += -I$(MTK_ROOT_CUSTOM)/$(MTK_PROJECT)/common/
-LINUXINCLUDE    += -I$(MTK_PATH_PLATFORM)/drivers/dispsys
-LINUXINCLUDE    += -I$(MTK_PATH_PLATFORM)/drivers/uart/
-LINUXINCLUDE    += -I$(MTK_PATH_PLATFORM)/drivers/video
 KBUILD_CFLAGS   += $(call mtk.custom.generate-macros)
 
 ifneq (,$(MTK_MODEM_SUPPORT))

@@ -22,7 +22,7 @@ die "can not create log file:$!" if (! open OUTPUT, ">>out/target/product/${proj
 
 
 my $temp_dir = "out/target/product/${proj}_assetsOverlay";
-
+ 
 if ($overlay_path eq ""){
     print "$assets_path";
     exit 0;
@@ -52,22 +52,21 @@ else
 
 &p_system("rm -rf $temp_dir/$path") if (-d "$temp_dir/$path");
 &p_system("mkdir -p $temp_dir/$path/");
-&p_system("cp -apf $assets_path $temp_dir/$path");
+&p_system("cp -af $assets_path $temp_dir/$path");
 
-my $command = "find ".$assets_path."/";
+my $command = "find ".$assets_path."/";     
 my @result = readpipe($command);
-
+  
 
 # est. ref.hash table
 my $buildPass = 1;
 my $errorMessage = "";
 
-foreach my $overlay (@overlays) {
-   next if (! -d "$overlay/$assets_path");
-   &p_system("cp -apf $overlay/$assets_path $temp_dir/$path");
-   my $commandSub = "find ".$overlay."/".$assets_path."/";
+foreach $overlay (@overlays) {
+   &p_system("cp -af $overlay/$assets_path $temp_dir/$path");
+   my $commandSub = "find ".$overlay."/".$assets_path."/";     
    my @resultSub = readpipe($commandSub);
-   foreach my $resultSub (@resultSub) {
+   foreach $resultSub (@resultSub) {
       chomp $resultSub;
       my $overlaySub = $overlay."/";
       my @search = split("$overlaySub",$resultSub,5);
@@ -86,7 +85,7 @@ if ($buildPass == 0){
 
 print "$temp_dir/$assets_path";
 # foreach ovrlays, call overlay_process
-
+ 
 
 
 sub p_system

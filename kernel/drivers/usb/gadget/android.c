@@ -28,9 +28,11 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
+
 /* Add for HW/SW connect */
-#include <linux/musb/mtk_musb.h>
+#include <mach/mtk_musb.h>
 /* Add for HW/SW connect */
+
 #include "gadget_chips.h"
 #include "logger.h"
 
@@ -208,7 +210,7 @@ static void android_work(struct work_struct *data)
 		return ;
 	}
 
-	if(usb_cable_connected())
+	if(is_usb_connected())
 			is_hwconnected = true;
 	else
 			is_hwconnected = false;
@@ -561,7 +563,6 @@ static int serial_initialized = 0;
 
 struct acm_function_config {
 	int instances;
-	int port_index;
 };
 
 static int
@@ -598,14 +599,6 @@ acm_function_bind_config(struct android_usb_function *f,
 	int ret = 0;
 	struct acm_function_config *config = f->config;
 
-	/*1st:Modem, 2nd:Modem, 3rd:BT*/
-	if(config->port_index) {
-		pr_err("Only open Port[%d]\n", config->port_index);
-		ret = acm_bind_config(c, (config->port_index-1));
-		config->port_index = 0;
-		return ret;
-	}
-
 	for (i = 0; i < config->instances; i++) {
 		ret = acm_bind_config(c, i);
 		if (ret) {
@@ -641,34 +634,8 @@ static ssize_t acm_instances_store(struct device *dev,
 
 static DEVICE_ATTR(instances, S_IRUGO | S_IWUSR, acm_instances_show,
 						 acm_instances_store);
-
-static ssize_t acm_port_index_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct android_usb_function *f = dev_get_drvdata(dev);
-	struct acm_function_config *config = f->config;
-	return sprintf(buf, "%d\n", config->port_index);
-}
-
-static ssize_t acm_port_index_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t size)
-{
-	struct android_usb_function *f = dev_get_drvdata(dev);
-	struct acm_function_config *config = f->config;
-	int value;
-
-	sscanf(buf, "%d", &value);
-	config->port_index = (value> MAX_SERIAL_PORTS) ? 0 : value;
-
-	return size;
-}
-
-static DEVICE_ATTR(port_index, S_IRUGO | S_IWUSR, acm_port_index_show,
-						 acm_port_index_store);
-
 static struct device_attribute *acm_function_attributes[] = {
 	&dev_attr_instances,
-	&dev_attr_port_index, /*Only open the specific port*/
 	NULL
 };
 
@@ -975,7 +942,7 @@ eem_function_bind_config(struct android_usb_function *f,
 
 	//ret = gether_setup_name(c->cdev->gadget, rndis->ethaddr, "eem");
 	// emulate as rndis interface, this can help network framework to integrate without changing the binding interface name
-	ret = gether_setup_name(c->cdev->gadget, eem->ethaddr, "rndis");
+	ret = gether_setup_name(c->cdev->gadget, eem->ethaddr, "rndis"); 
 	if (ret) {
 		pr_err("%s: gether_setup failed\n", __func__);
 		return ret;
@@ -1725,67 +1692,6 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	return size;
 }
 
-#ifdef MTK_OWNER_SDCARD_ONLY_SUPPORT
- 
-static int otg_flag = 0;
-static ssize_t otg_enable_show(struct device *pdev, struct device_attribute *attr,
-			   char *buf)
-{
-	return sprintf(buf, "%d\n", otg_flag);
-}
-
-static ssize_t otg_enable_store(struct device *pdev, struct device_attribute *attr,
-			    const char *buf, size_t size)
-{
-	       bool i;
-		sscanf(buf, "%d", &otg_flag);
-		if(1==otg_flag)
-		{
-			//printk("remove otg_device\n");
-			mt_set_gpio_mode(GPIO57,7);
-		}
-		else if(0==otg_flag)
-		{
-			//printk("resume otg_device\n");
-			mt_set_gpio_mode(GPIO57,1);			
-		}
-		return size;
-
-}
-
-
-static int sd_flag = 0;
-static ssize_t sd_enable_show(struct device *pdev, struct device_attribute *attr,
-			   char *buf)
-{
-	return sprintf(buf, "%d\n", sd_flag);
-}
-
-static ssize_t sd_enable_store(struct device *pdev, struct device_attribute *attr,
-			    const char *buf, size_t size)
-{
-	       bool i;
-		sscanf(buf, "%d", &sd_flag);
-		if(1==sd_flag)
-		{
-			//printk("remove sd_device\n");
-			mt_set_gpio_mode(GPIO184,0);
-			//mt_set_gpio_mode(GPIO186,0);
-			mt_set_gpio_mode(GPIO171,0);
-		}
-		else if(0==sd_flag)
-		{
-			//printk("resume sd_device\n");
-			mt_set_gpio_mode(GPIO171,1);		
-			mt_set_gpio_mode(GPIO184,1);
-			//mt_set_gpio_mode(GPIO186,1);	
-
-		}
-		return size;
-
-}
-#endif
-
 static ssize_t enable_show(struct device *pdev, struct device_attribute *attr,
 			   char *buf)
 {
@@ -1858,7 +1764,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		pr_err("android_usb: already %s\n",
 				dev->enabled ? "enabled" : "disabled");
 		/* Add for HW/SW connect */
-		if (!usb_cable_connected()) {
+		if (!is_usb_connected()) {
 			schedule_work(&dev->work);
 			xlog_printk(ANDROID_LOG_VERBOSE, USB_LOG, "%s: enable 0->0 case - no usb cable", __func__);
 		}
@@ -1944,10 +1850,6 @@ DESCRIPTOR_STRING_ATTR(iSerial, serial_string)
 static DEVICE_ATTR(functions, S_IRUGO | S_IWUSR, functions_show,
 						 functions_store);
 static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
-#ifdef MTK_OWNER_SDCARD_ONLY_SUPPORT
-static DEVICE_ATTR(otg_enable, S_IRUGO | S_IWUSR, otg_enable_show, otg_enable_store);
-static DEVICE_ATTR(sd_enable, S_IRUGO | S_IWUSR, sd_enable_show, sd_enable_store);
-#endif
 static DEVICE_ATTR(state, S_IRUGO, state_show, NULL);
 
 static struct device_attribute *android_usb_attributes[] = {
@@ -1963,10 +1865,6 @@ static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_functions,
 	&dev_attr_enable,
 	&dev_attr_state,
-#ifdef MTK_OWNER_SDCARD_ONLY_SUPPORT
-	&dev_attr_otg_enable,
-	&dev_attr_sd_enable,
-#endif
 	NULL
 };
 

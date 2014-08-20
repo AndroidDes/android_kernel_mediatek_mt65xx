@@ -59,6 +59,7 @@
 #define PART_BLKS_PRELOADER   BLK_NUM(PART_SIZE_PRELOADER)
 #define PART_BLKS_MBR   BLK_NUM(PART_SIZE_MBR)
 #define PART_BLKS_EBR1   BLK_NUM(PART_SIZE_EBR1)
+#define PART_BLKS_PMT   BLK_NUM(PART_SIZE_PMT)
 #define PART_BLKS_PRO_INFO   BLK_NUM(PART_SIZE_PRO_INFO)
 #define PART_BLKS_NVRAM   BLK_NUM(PART_SIZE_NVRAM)
 #define PART_BLKS_PROTECT_F   BLK_NUM(PART_SIZE_PROTECT_F)
@@ -78,7 +79,7 @@
 #define PART_BLKS_FAT   BLK_NUM(PART_SIZE_FAT)
 
 
-#define PMT_END_NAME "FAT"
+#define PMT_END_NAME "__NODL_FAT"
 
 struct NAND_CMD{
 	u32	u4ColAddr;
@@ -93,7 +94,6 @@ typedef union {
         unsigned int magic;        /* partition magic */
         unsigned int dsize;        /* partition data size */
         char         name[32];     /* partition name */
-	unsigned int maddr;        /* partition memory address */
     } info;
     unsigned char data[BLK_SIZE];
 } part_hdr_t;
@@ -128,14 +128,6 @@ struct part_dev {
     int (*read)  (part_dev_t *dev, ulong src, uchar *dst, int size);
     int (*write) (part_dev_t *dev, uchar *src, ulong dst, int size);
 #endif
-};
-enum{
-	RAW_DATA_IMG,
-	YFFS2_IMG,
-	UBIFS_IMG,
-	EXT4_IMG,	
-	FAT_IMG,
-	UNKOWN_IMG,
 };
 extern struct part_name_map g_part_name_map[];
 extern int mt_part_register_device(part_dev_t *dev);

@@ -40,11 +40,18 @@
 #include "mach/eint.h"
 #include "mach/irqs.h"
 
+#ifdef MT6575
+#include <mach/mt6575_devs.h>
+#include <mach/mt6575_typedefs.h>
+#include <mach/mt6575_gpio.h>
+#include <mach/mt6575_pm_ldo.h>
+#endif
+#ifdef MT6589
 #include <mach/devs.h>
 #include <mach/mt_typedefs.h>
 #include <mach/mt_gpio.h>
 #include <mach/mt_pm_ldo.h>
-
+#endif
 
 
 #define ENABLE_CEC_IRQ() 	(mt8193_write(0x1500,0x20))//(mt_set_gpio_pull_select(GPIO60,  GPIO_PULL_UP))

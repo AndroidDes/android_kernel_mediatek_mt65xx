@@ -58,10 +58,6 @@ struct mtd_ipanic_data {
 	struct proc_dir_entry *oops;
 };
 
-#ifdef CONFIG_MTK_WQ_DEBUG
-extern int mt_dump_wq_debugger();
-#endif
-
 static struct mtd_ipanic_data mtd_drv_ctx;
 
 static int mtd_ipanic_block_scan(struct mtd_ipanic_data *ctx) 
@@ -738,10 +734,6 @@ static int mtd_ipanic(struct notifier_block *this, unsigned long event,
     int rc;
 
     aee_wdt_dump_info();
-
-#ifdef CONFIG_MTK_WQ_DEBUG
-	mt_dump_wq_debugger();
-#endif
 
     /*In case many core run here concurrently*/
     spin_lock(&ipanic_lock);

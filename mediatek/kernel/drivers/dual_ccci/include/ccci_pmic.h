@@ -1,6 +1,15 @@
-#ifndef __CCCI_PMIC_H__
-#define __CCCI_PMIC_H__
-
+#ifndef _CCCI_PMIC_H
+#define _CCCI_PMIC_H
+#if 0
+#if defined(CONFIG_ARCH_MT6516)
+	#include <mach/mt6516_typedefs.h>
+#elif defined(CONFIG_ARCH_MT6573)
+	#include <mach/mt6573_typedefs.h>
+#else
+	#error "ARCH not supported!"
+#endif
+#endif
+#include "ccci.h"
 typedef enum
 {
 	PMIC6326_VSIM_ENABLE = 0,
@@ -81,4 +90,4 @@ int __init ccci_pmic_init(void);
 void __exit ccci_pmic_exit(void);
 
 #define CCCI_PMIC_SMEM_SIZE sizeof(shared_mem_pmic_t)
-#endif // __CCCI_PMIC_H__
+#endif // !_CCCI_PMIC_H

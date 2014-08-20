@@ -36,13 +36,6 @@ typedef struct
 // The H264 uses the private data to transfer NAL units
 // The related data structure informations are defined as below
 //
-typedef struct
-{
-    unsigned int MaxSupportWidthForYUV420_ASP;
-    unsigned int MaxSupportHeightForYUV420_ASP;
-    unsigned short u2FrameWidthInContainer;
-    unsigned short u2FrameHeightInContainer;
-} MPEG4_DECODER_PRIVATE_PARAM_T;
 
 typedef struct 
 {
@@ -72,8 +65,6 @@ typedef struct
 {
     unsigned int u4Address;
     unsigned int u4Length;
-    unsigned short u2FrameWidthInContainer;
-    unsigned short u2FrameHeightInContainer;
 } MPEG4_DECODER_PAYLOAD_INFO_T;
 
 typedef struct

@@ -49,9 +49,7 @@
 
 #define KXTIK1004_SELF_TEST           0x10
 	 	 
-#define KXTIK1004_DEVICE_ID	 0x05
-#define KXCJK1013_DEVICE_ID	 0x11
-
+	 
 #define KXTIK1004_SUCCESS						0
 #define KXTIK1004_ERR_I2C						-1
 #define KXTIK1004_ERR_STATUS					-3

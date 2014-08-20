@@ -1,9 +1,5 @@
 #!/usr/bin/perl
 
-use lib "mediatek/build/tools";
-use pack_dep_gen;
-PrintDependModule($0);
-
 ##########################################################
 # Initialize Variables
 ##########################################################
@@ -17,11 +13,7 @@ my $secro_tool = "mediatek/build/tools/SecRo/SECRO_POST";
 my $MTK_ENABLE_MD1 = $ENV{"MTK_ENABLE_MD1"};
 my $MTK_ENABLE_MD2 = $ENV{"MTK_ENABLE_MD2"};
 my $MTK_PLATFORM = $ENV{"MTK_PLATFORM"};
-my $secro_ini = "mediatek/custom/out/$prj/modem/SECRO_WP.ini";
 
-print "******************************************************\n";
-print "*********************** SETTINGS *********************\n";
-print "******************************************************\n";
 print " Project           =  $prj\n";
 print " Custom Dir  =  $custom_dir\n";
 print " MTK_ENABLE_MD1 = $MTK_ENABLE_MD1\n";
@@ -90,47 +82,9 @@ if ( ! -e $md2_secro )
 }
 print " md2_secro = $md2_secro\n";
 
-
-open(SECRO_FH, ">$secro_ini") or die "open file error $secro_ini\n";
-
-print SECRO_FH "SECRO_CFG = $secro_cfg\n";
-print SECRO_FH "AND_SECRO = $and_secro\n";
-print SECRO_FH "AC_REGION = $ac_region\n";
-PrintDependency($secro_cfg);
-PrintDependency($and_secro);
-PrintDependency($ac_region);
-
-opendir(DIR, "mediatek/custom/out/$prj/modem");
-@files = grep(/^SECURE_RO*/,readdir(DIR));
-
-my $count = 0;
-foreach my $file (@files)
-{
-	PrintDependency("mediatek/custom/out/$prj/modem/$file");
-	print SECRO_FH "SECRO[$count] = mediatek/custom/out/$prj/modem/$file\n";
-	$count++;
-}
-
-if($count>=10)
-{
-	die "Maximum support of SECRO for world phone is 10, but current is $count\n";
-}
-
-while($count<=9)
-{
-	print SECRO_FH "SECRO[$count] = mediatek/custom/common/secro/SECURE_RO\n";
-	$count++;
-}
-
-closedir(DIR);
-close(SECRO_FH);
-
 system("chmod 777 $ac_region") == 0 or die "can't configure $ac_region as writable";
 print "MTK_SEC_SECRO_AC_SUPPORT = $secro_ac\n";
 if (${secro_ac} eq "yes")
 {		
-	PrintDependency($secro_ini);
-	PrintDependency("$sml_dir/SML_ENCODE_KEY.ini");
-	PrintDependency($secro_tool);
-	system("./$secro_tool $secro_ini $sml_dir/SML_ENCODE_KEY.ini $secro_out") == 0 or die "SECRO POST Tool return error\n";
+	system("./$secro_tool $secro_cfg $sml_dir/SML_ENCODE_KEY.ini $and_secro $md_secro $md2_secro $ac_region $secro_out") == 0 or die "SECRO POST Tool return error\n";
 }

@@ -114,7 +114,6 @@ $LDVT_SUPPORT= $ENV{MTK_LDVT_SUPPORT};
 $MTK_EMMC_OTP_SUPPORT= $ENV{MTK_EMMC_SUPPORT_OTP};
 $MTK_SHARED_SDCARD=$ENV{MTK_SHARED_SDCARD};
 
-$MTK_NAND_UBIFS_SUPPORT=$ENV{MTK_NAND_UBIFS_SUPPORT};
 
 my $PART_TABLE_FILENAME   = "mediatek/build/tools/ptgen/$PLATFORM/partition_table_${PLATFORM}.xls"; # excel file name
 my $REGION_TABLE_FILENAME = "mediatek/build/tools/emigen/$PLATFORM/MemoryDeviceList_${PLATFORM}.xls";  #eMMC region information
@@ -193,9 +192,7 @@ EMMC_SUPPORT= $ENV{MTK_EMMC_SUPPORT};
 LDVT_SUPPORT= $ENV{MTK_LDVT_SUPPORT};
 TARGET_BUILD_VARIANT= $ENV{TARGET_BUILD_VARIANT};
 MTK_EMMC_OTP_SUPPORT= $ENV{MTK_EMMC_OTP_SUPPORT};
-MTK_SHARED_SDCARD=$ENV{MTK_SHARED_SDCARD};
-MTK_NAND_UBIFS_SUPPORT=$ENV{MTK_NAND_UBIFS_SUPPORT};
-\n";
+MTK_SHARED_SDCARD=$ENV{MTK_SHARED_SDCARD};\n";
 print "SHEET_NAME=$SHEET_NAME\n";
 print "SCAT_NAME=$SCAT_NAME\n" ;
 
@@ -1970,15 +1967,7 @@ sub GenLK_PartitionC(){
 	print SOURCE "\n\nstruct part_name_map g_part_name_map[PART_MAX_COUNT] = {\n";
 	for ($iter=0; $iter< $total_rows; $iter++){
 		last if($PARTITION_FIELD[$iter] eq "BMTPOOL" || $PARTITION_FIELD[$iter] eq "OTP");
-		if($TYPE_FIELD[$iter] eq "UBIFS/YAFFS2"){
-			if($MTK_NAND_UBIFS_SUPPORT eq "yes"){
-				$temp_t = "ubifs";
-			}else{
-				$temp_t = "yaffs2";			
-			}
-		}else{
-			$temp_t = lc($TYPE_FIELD[$iter]);
-		}
+		$temp_t = lc($TYPE_FIELD[$iter]);
 		if($lk_alias{$PARTITION_FIELD[$iter]}){
 			if($uboot_alias{$PARTITION_FIELD[$iter]}){
 				$temp = "\t{\"$lk_alias{$PARTITION_FIELD[$iter]}\",\tPART_$uboot_alias{$PARTITION_FIELD[$iter]},\t\"$temp_t\",\t$iter,\t$FB_ERASE_FIELD[$iter],\t$FB_DL_FIELD[$iter]},\n";
@@ -2106,16 +2095,6 @@ struct part_dev {
     int (*write) (part_dev_t *dev, uchar *src, ulong dst, int size);
 #endif
 };
-
-enum{
-	RAW_DATA_IMG,
-	YFFS2_IMG,
-	UBIFS_IMG,
-	EXT4_IMG,	
-	FAT_IMG,
-	UNKOWN_IMG,
-};
-
 extern struct part_name_map g_part_name_map[];
 extern int mt_part_register_device(part_dev_t *dev);
 extern part_t* mt_part_get_partition(char *name);

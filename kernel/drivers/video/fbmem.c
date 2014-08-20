@@ -35,22 +35,6 @@
 
 #include <asm/fb.h>
 
-/* M: dump debug info @{ */
-#include <linux/mmprofile.h>
-static struct MTKFB_MMP_Events_t {
-	MMP_Event FB;
-	MMP_Event IOCtrl;
-} FB_MMP_Events;
-
-static void init_fb_mmp_events(void) {
-	if (FB_MMP_Events.FB == 0) {
-		FB_MMP_Events.FB = MMProfileRegisterEvent(MMP_RootEvent, "FB");
-		FB_MMP_Events.IOCtrl = MMProfileRegisterEvent(FB_MMP_Events.FB, "IOCtrl");
-		MMProfileEnableEventRecursive(FB_MMP_Events.FB, 1);
-	}
-}
-/* M: @}*/
-
 
     /*
      *  Frame buffer device initialization and setup routines
@@ -1093,7 +1077,6 @@ static long do_fb_ioctl(struct file *file, struct fb_info *info, unsigned int cm
 	struct fb_event event;
 	void __user *argp = (void __user *)arg;
 	long ret = 0;
-	long package[2];
 
 	switch (cmd) {
 	case FBIOGET_VSCREENINFO:
@@ -1219,17 +1202,17 @@ static long do_fb_ioctl(struct file *file, struct fb_info *info, unsigned int cm
         unlock_fb_info(info);
         break;
     case FBIOLOCKED_IOCTL:
-    	if (copy_from_user(&package, argp, sizeof(package)))
-    		return -EFAULT;
-    	if (!lock_fb_info(info))
-    		return -ENODEV;
         fb = info->fbops;
         if (fb->fb_ioctl) {
+            long package[2];
+            if (copy_from_user(&package, argp, sizeof(package))) {
+                return -EFAULT;
+            }
+
             ret = fb->fb_ioctl(file, info, package[0], package[1]);
         } else {
             ret = -ENOTTY;
         }
-    	unlock_fb_info(info);
         break;
 	default:
 		if (!lock_fb_info(info))
@@ -1246,22 +1229,11 @@ static long do_fb_ioctl(struct file *file, struct fb_info *info, unsigned int cm
 
 static long fb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int ret = 0;
-	/* M: dump debug mmprofile log info
-	 * NOTICE: remember to match MMProfileFlagStart <--> MMProfileFlagEnd
-	 */
-	MMProfileLogEx(FB_MMP_Events.IOCtrl, MMProfileFlagStart, cmd, arg);
-
 	struct fb_info *info = file_fb_info(file);
 
-	if (!info) {
-		ret = -ENODEV;
-	} else {
-		ret = do_fb_ioctl(file, info, cmd, arg);
-	}
-
-	MMProfileLogEx(FB_MMP_Events.IOCtrl, MMProfileFlagEnd, cmd, arg);
-	return ret;
+	if (!info)
+		return -ENODEV;
+	return do_fb_ioctl(file, info, cmd, arg);
 }
 
 #ifdef CONFIG_COMPAT
@@ -1420,43 +1392,55 @@ static long fb_compat_ioctl(struct file *file, unsigned int cmd,
 static int
 fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
-    struct fb_info *info = file_fb_info(file);
-    struct fb_ops *fb;
-    unsigned long off;
-    unsigned long start;
-    unsigned long mmio_pgoff;
-    u32 len;
-    
-    if (!info)
-        return -ENODEV;
-    fb = info->fbops;
-    if (!fb)
-        return -ENODEV;
-    mutex_lock(&info->mm_lock);
-    if (fb->fb_mmap) {
-        int res;
-        res = fb->fb_mmap(info, vma);
-        mutex_unlock(&info->mm_lock);
-        return res;
-    }
-    
-    /*
-    * Ugh. This can be either the frame buffer mapping, or
-    * if pgoff points past it, the mmio mapping.
-    */
-    start = info->fix.smem_start;
-    len = info->fix.smem_len;
-    mmio_pgoff = PAGE_ALIGN((start & ~PAGE_MASK) + len) >> PAGE_SHIFT;
-    if (vma->vm_pgoff >= mmio_pgoff) {
-        vma->vm_pgoff -= mmio_pgoff;
-        start = info->fix.mmio_start;
-        len = info->fix.mmio_len;
-    }
-    mutex_unlock(&info->mm_lock);
-    vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
-    fb_pgprotect(file, vma, start);
-    
-    return vm_iomap_memory(vma, start, len);
+	struct fb_info *info = file_fb_info(file);
+	struct fb_ops *fb;
+	unsigned long off;
+	unsigned long start;
+	u32 len;
+
+	if (!info)
+		return -ENODEV;
+	if (vma->vm_pgoff > (~0UL >> PAGE_SHIFT))
+		return -EINVAL;
+	off = vma->vm_pgoff << PAGE_SHIFT;
+	fb = info->fbops;
+	if (!fb)
+		return -ENODEV;
+	mutex_lock(&info->mm_lock);
+	if (fb->fb_mmap) {
+		int res;
+		res = fb->fb_mmap(info, vma);
+		mutex_unlock(&info->mm_lock);
+		return res;
+	}
+
+	/* frame buffer memory */
+	start = info->fix.smem_start;
+	len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.smem_len);
+	if (off >= len) {
+		/* memory mapped io */
+		off -= len;
+		if (info->var.accel_flags) {
+			mutex_unlock(&info->mm_lock);
+			return -EINVAL;
+		}
+		start = info->fix.mmio_start;
+		len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.mmio_len);
+	}
+	mutex_unlock(&info->mm_lock);
+	start &= PAGE_MASK;
+	if ((vma->vm_end - vma->vm_start + off) > len)
+		return -EINVAL;
+	off += start;
+	vma->vm_pgoff = off >> PAGE_SHIFT;
+	/* This is an IO map - tell maydump to skip this VMA */
+	vma->vm_flags |= VM_IO | VM_RESERVED;
+	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
+	fb_pgprotect(file, vma, off);
+	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
+			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
+		return -EAGAIN;
+	return 0;
 }
 
 static int
@@ -1464,9 +1448,6 @@ fb_open(struct inode *inode, struct file *file)
 __acquires(&info->lock)
 __releases(&info->lock)
 {
-    /// M: dump debug mmprofile log info
-	init_fb_mmp_events();
-	
 	int fbidx = iminor(inode);
 	struct fb_info *info;
 	int res = 0;

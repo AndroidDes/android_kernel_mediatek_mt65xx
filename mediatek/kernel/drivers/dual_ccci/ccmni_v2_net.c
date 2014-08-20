@@ -18,7 +18,10 @@
  *
  ****************************************************************************/
 
-#include <ccci.h>
+#include <ccci_common.h>
+#include <ccmni_net.h>
+
+
 #define CCMNI_DBG_INFO 1
 
 extern void *ccmni_ctl_block[];
@@ -54,9 +57,8 @@ typedef struct _ccmni_v2_ctl_block
 {
 	int						m_md_id;
 	int						ccci_is_ready;
-	ccmni_v2_instance_t		*ccmni_v2_instance[CCMNI_V2_PORT_NUM];
+	ccmni_v2_instance_t		*ccmni_v2_instance[CCMNI_MAX_CHANNELS];
 	struct wake_lock		ccmni_wake_lock;
-	char                    wakelock_name[16];
 	MD_CALL_BACK_QUEUE		ccmni_notifier;
 }ccmni_v2_ctl_block_t;
 
@@ -147,7 +149,7 @@ int ccmni_v2_ipo_h_restore(int md_id)
 	ccmni_v2_ctl_block_t	*ctlb;
 	int 					i;
 	ctlb = ccmni_ctl_block[md_id];
-	for(i=0; i<CCMNI_V2_PORT_NUM; i++)
+	for(i=0; i<CCMNI_CHANNEL_CNT; i++)
 		ccmni_v2_reset_buffers(ctlb->ccmni_v2_instance[i]);
 
 	return 0;
@@ -195,7 +197,7 @@ static void ccmni_v2_notifier_call(MD_CALL_BACK_QUEUE *notifier, unsigned long v
 	{
 		case CCCI_MD_EXCEPTION :
 			ctl_b->ccci_is_ready=0;
-			for(i=0;i<CCMNI_V2_PORT_NUM;i++)
+			for(i=0;i<CCMNI_CHANNEL_CNT;i++)
 			{
 				instance = ctl_b->ccmni_v2_instance[i];
 				if (instance)
@@ -207,7 +209,7 @@ static void ccmni_v2_notifier_call(MD_CALL_BACK_QUEUE *notifier, unsigned long v
 			
 		case CCCI_MD_RESET     :
 			ctl_b->ccci_is_ready=0;
-			for(i=0;i<CCMNI_V2_PORT_NUM;i++)
+			for(i=0;i<CCMNI_CHANNEL_CNT;i++)
 			{
 				instance = ctl_b->ccmni_v2_instance[i];
 				if (instance)
@@ -222,7 +224,7 @@ static void ccmni_v2_notifier_call(MD_CALL_BACK_QUEUE *notifier, unsigned long v
 			if (ctl_b->ccci_is_ready==0)
 			{	
 				ctl_b->ccci_is_ready=1;
-				for(i=0;i<CCMNI_V2_PORT_NUM;i++)
+				for(i=0;i<CCMNI_CHANNEL_CNT;i++)
 				{
 					instance = ctl_b->ccmni_v2_instance[i];
 					if (instance) 
@@ -848,7 +850,7 @@ static int ccmni_v2_create_instance(int md_id, int channel)
 	ccmni->channel = channel;
 	ccmni->owner   = ccmni_ctl_block[md_id];
 
-	if(md_id == MD_SYS1) {
+	if(md_id == 0) {
 		sprintf(dev->name, "ccmni%d", channel);
 	} else {
 		sprintf(dev->name, "cc%dmni%d", md_id+1, channel);
@@ -870,6 +872,7 @@ static int ccmni_v2_create_instance(int md_id, int channel)
 		CCCI_MSG_INF(md_id, "net", "CCMNI%d allocate memory fail\n", ccmni->channel);
 		unregister_netdev(dev);        
 		ret = -ENOMEM;
+
 		goto _ccmni_create_instance_exit;
 	}
 
@@ -917,7 +920,7 @@ static int ccmni_v2_create_instance(int md_id, int channel)
 			break;            
 
 		default:
-			CCCI_MSG_INF(md_id, "net", "[Error]CCMNI%d Invalid ccmni number\n", ccmni->channel);
+			CCCI_MSG_INF(md_id, "net", "CCMNI%d, Invalid ccmni number\n", ccmni->channel);
 			unregister_netdev(dev);
 			ret = -ENOSYS;
 			goto _ccmni_create_instance_exit;
@@ -971,8 +974,7 @@ static int ccmni_v2_create_instance(int md_id, int channel)
     
 _ccmni_create_instance_exit:
 	free_netdev(dev);
-	kfree(ccmni);
-    ctl_b->ccmni_v2_instance[channel] = NULL;
+    
 	return ret;
 }
 
@@ -983,7 +985,6 @@ static void ccmni_v2_destroy_instance(int md_id, int channel)
 
 	if (ccmni != NULL)
 	{
-		ccmni->ready = 0;
 		un_register_to_logic_ch(md_id, ccmni->uart_rx);
 		un_register_to_logic_ch(md_id, ccmni->uart_tx_ack);
                         
@@ -995,7 +996,8 @@ static void ccmni_v2_destroy_instance(int md_id, int channel)
 		if(ccmni->dev != NULL) {
 			unregister_netdev(ccmni->dev);
 		}
-		//tasklet_kill(&ccmni->tasklet);
+		tasklet_kill(&ccmni->tasklet);
+		ccmni->ready = 0;
 		ctl_b->ccmni_v2_instance[channel] = NULL;
 	}
 }
@@ -1005,6 +1007,7 @@ int ccmni_v2_init(int md_id)
 {
 	int						count, ret, curr;
 	ccmni_v2_ctl_block_t	*ctl_b;
+	char					ccmni_lock_name[32];
 
 	// Create control block structure
 	ctl_b = (ccmni_v2_ctl_block_t *)kmalloc(sizeof(ccmni_v2_ctl_block_t), GFP_KERNEL);
@@ -1019,14 +1022,14 @@ int ccmni_v2_init(int md_id)
 	ctl_b->ccmni_notifier.call = ccmni_v2_notifier_call;
 	ctl_b->ccmni_notifier.next = NULL;
 
-	for(count = 0; count < CCMNI_V2_PORT_NUM; count++)
+	for(count = 0; count < CCMNI_CHANNEL_CNT; count++)
 	{
 		ret = ccmni_v2_create_instance(md_id, count);
 		if (ret != 0) {
 			CCCI_MSG_INF(md_id, "net", "CCMNI%d create instance fail: %d\n", count, ret);
 			goto _CCMNI_INSTANCE_CREATE_FAIL;
 		} else {
-			//CCCI_DBG_MSG(md_id, "net", "CCMNI%d create instance ok!\n", count);
+			CCCI_DBG_MSG(md_id, "net", "CCMNI%d create instance ok!\n", count);
 		}
 	}
 
@@ -1036,13 +1039,13 @@ int ccmni_v2_init(int md_id)
 		goto _CCMNI_INSTANCE_CREATE_FAIL;
 	}
 
-	snprintf(ctl_b->wakelock_name, sizeof(ctl_b->wakelock_name), "ccci%d_net_v2", (md_id+1));  
-	wake_lock_init(&ctl_b->ccmni_wake_lock, WAKE_LOCK_SUSPEND, ctl_b->wakelock_name);
+	snprintf(ccmni_lock_name, 32, "cc%dmni wake lock", md_id);
     
+	wake_lock_init(&ctl_b->ccmni_wake_lock, WAKE_LOCK_SUSPEND, ccmni_lock_name);
 	return ret;
 
 _CCMNI_INSTANCE_CREATE_FAIL:
-	for(curr=0; curr<=count; curr++) {
+	for(curr=0; curr<count-1; curr++) {
 		ccmni_v2_destroy_instance(md_id, curr);
 	}
 	kfree(ctl_b);
@@ -1055,14 +1058,14 @@ void ccmni_v2_exit(int md_id)
 	int count;
 	ccmni_v2_ctl_block_t *ctl_b = (ccmni_v2_ctl_block_t *)ccmni_ctl_block[md_id];
 
-	if (ctl_b) {
-		for(count = 0; count < CCMNI_V2_PORT_NUM; count++)
-		{
-			ccmni_v2_destroy_instance(md_id, count);
-		}
-		md_unregister_call_chain(md_id, &ctl_b->ccmni_notifier);
-		wake_lock_destroy(&ctl_b->ccmni_wake_lock);
+	for(count = 0; count < CCMNI_CHANNEL_CNT; count++)
+	{
+		ccmni_v2_destroy_instance(md_id, count);
 	}
+	md_unregister_call_chain(md_id, &ctl_b->ccmni_notifier);
+	wake_lock_destroy(&ctl_b->ccmni_wake_lock);
+	kfree(ctl_b);
+	ccmni_ctl_block[md_id] = NULL;
 
 	return;
 }

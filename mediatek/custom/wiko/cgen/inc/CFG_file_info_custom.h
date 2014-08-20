@@ -67,8 +67,6 @@
 #include "../cfgdefault/CFG_WIFI_Default.h"
 #include "../cfgfileinc/CFG_PRODUCT_INFO_File.h"
 #include "../cfgdefault/CFG_PRODUCT_INFO_Default.h"
-#include "../cfgdefault/CFG_STS_Default.h"//add by renbin.wei for sts
-#include "../cfgfileinc/CFG_STS_File.h"//add by renbin.wei for sts
 #include <stdio.h>
 #ifdef __cplusplus
 extern "C"
@@ -156,16 +154,6 @@ extern "C"
 
 		{ "/data/nvram/APCFG/APRDCL/Audio_Hd_Record_48k_Param",   VER(AP_CFG_RDCL_FILE_AUDIO_HD_REC_48K_PAR_LID), CFG_FILE_AUDIO_HD_REC_48K_PAR_SIZE,
             CFG_FILE_AUDIO_HD_REC_48K_PAR_TOTAL, SIGNLE_DEFUALT_REC  ,    (char *)&Hd_Recrod_48k_Par_default, DataReset , NULL
-        },
-        
-        { "/data/nvram/APCFG/APRDCL/Audio_Buffer_DC_Calibration_Param",   VER(AP_CFG_RDCL_FILE_AUDIO_BUFFER_DC_CALIBRATION_PAR_LID), CFG_FILE_AUDIO_BUFFER_DC_CALIBRATION_PAR_SIZE,
-            CFG_FILE_AUDIO_BUFFER_DC_CALIBRATION_PAR_TOTAL, SIGNLE_DEFUALT_REC  ,    (char *)&Audio_Buffer_DC_Calibration_Par_default, DataReset , NULL
-        },
-        
-        //add by renbin.wei for sts
-        {
-            "/data/nvram/APCFG/APRDEB/STS_CUSTOM",	VER(AP_CFG_RDEB_STS_CUSTOM_LID),	CFG_FILE_STS_CUSTOM_REC_SIZE,
-            CFG_FILE_STS_CUSTOM_REC_TOTAL,		    SIGNLE_DEFUALT_REC,				    (char *)&stStsCustomDefault, DataReset , NULL
         },
     };
 

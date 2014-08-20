@@ -11,7 +11,7 @@ ANDROID_JAVA_HOME=/mtkoss/jdk/jdk1.6.0_23
 export ANDROID_JAVA_HOME
 
 # Overwrite PATH environment setting for JDK & arm-eabi if already exists
-PATH=/mtkoss/jdk/jdk1.6.0_23/bin:$PWD/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6:$PWD/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin:$PATH
+PATH=/mtkoss/jdk/jdk1.6.0_23/bin:$PWD/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.6/bin:$PATH
 export PATH
 
 # Add MediaTek developed Python libraries path into PYTHONPATH

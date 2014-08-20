@@ -10,4 +10,3 @@
 #include "../cfgfileinc/CFG_UUID_File.h"
 #include "../cfgfileinc/CFG_AUDIO_File.h"
 #include "../cfgfileinc/CFG_OMADMUSB_File.h"
-#include "../cfgfileinc/CFG_MDTYPE_File.h"

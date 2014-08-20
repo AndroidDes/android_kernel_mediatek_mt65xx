@@ -67,7 +67,7 @@ static char* _hdmi_ioctl_spy(unsigned int cmd)
             return "MTK_HDMI_POST_VIDEO_BUFFER";
         case MTK_HDMI_FACTORY_MODE_ENABLE:
             return "MTK_HDMI_FACTORY_MODE_ENABLE";
-#if defined(MTK_MT8193_HDMI_SUPPORT)||defined(MTK_INTERNAL_HDMI_SUPPORT)
+#ifdef MTK_MT8193_HDMI_SUPPORT
         case MTK_HDMI_WRITE_DEV:
             return "MTK_HDMI_WRITE_DEV";
         case MTK_HDMI_READ_DEV:
@@ -104,10 +104,6 @@ static char* _hdmi_ioctl_spy(unsigned int cmd)
             return "MTK_HDMI_GET_SLTDATA";
         case MTK_HDMI_COLOR_DEEP:
             return "MTK_HDMI_COLOR_DEEP";			
-#endif
-#if defined(MTK_INTERNAL_HDMI_SUPPORT)
-        case MTK_HDMI_AUDIO_SETTING:
-	        return "MTK_HDMI_AUDIO_SETTING";	
 #endif
         default:
             return "unknown ioctl command";

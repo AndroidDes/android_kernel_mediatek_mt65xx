@@ -10,10 +10,8 @@
 #include <linux/linkage.h>
 #include <linux/atomic.h>
 #include <linux/module.h>
-#include <linux/uaccess.h>
 #include <asm/stacktrace.h>
 #include <asm/traps.h>
-#include <linux/semaphore.h>
 
 #include "../common/aee-common.h"
 #include "aed.h"
@@ -36,8 +34,6 @@ int notrace aed_unwind_frame(struct stackframe *frame, unsigned long stack_addre
 	unsigned long high, low;
 	unsigned long fp = frame->fp;
 
-	unsigned long thread_info = stack_address - THREAD_SIZE;
-
 	/* only go to a higher address on the stack */
 	low = frame->sp;
 	high = ALIGN(low, THREAD_SIZE);
@@ -49,15 +45,6 @@ int notrace aed_unwind_frame(struct stackframe *frame, unsigned long stack_addre
 	if ((fp < (low + 12)) || ((fp + 4) >= high))
 		return -EINVAL;
 
-	if ((fp < thread_info) || (fp >= (stack_address - 4))) {
-	  printk("%s: fp(%lx) out of process stack base(%lx)\n", __func__, fp, stack_address);
-	  /* disable stack dump to reduce logs
-	  show_data(thread_info, THREAD_SIZE, "Stack");
-	  aee_kernel_warning("Kernel", "Stack corruption");
-	  */
-	  return -EINVAL;
-	}
-	
 	/* restore the registers from the stack frame */
 	frame->fp = *(unsigned long *)(fp - 12);
 	frame->sp = *(unsigned long *)(fp - 8);
@@ -152,38 +139,28 @@ static void aed_get_bt(struct task_struct *tsk, struct aee_process_bt *bt)
 	}
 }
 
-static DEFINE_SEMAPHORE(process_bt_sem);
-
 int aed_get_process_bt(struct aee_process_bt *bt)
 {
 	int nr_cpus, err;
 	struct bt_sync s;
 	struct task_struct *task;
 
-	if (down_interruptible(&process_bt_sem) < 0) {
-	  return -ERESTARTSYS;
-	}
-
-	err = 0;
 	if (bt->pid > 0) {
 		task = find_task_by_vpid(bt->pid);
 		if (task == NULL) {
-			err = -EINVAL;
-			goto exit;
+			return -EINVAL;
 		}
 	}
 	else {
-		err = -EINVAL;
-		goto exit;
+		return -EINVAL;
 	}
 
 	err = mutex_lock_killable(&task->signal->cred_guard_mutex);
         if (err)
-		goto exit;
+                return err;
         if (!ptrace_may_access(task, PTRACE_MODE_ATTACH)) {
                 mutex_unlock(&task->signal->cred_guard_mutex);
-		err = -EPERM;
-		goto exit;
+                return -EPERM;
         }
  
 	get_online_cpus();
@@ -208,8 +185,5 @@ int aed_get_process_bt(struct aee_process_bt *bt)
 
         mutex_unlock(&task->signal->cred_guard_mutex);
 
-exit:
-	up(&process_bt_sem);
-	return err;
-
+	return 0;
 }

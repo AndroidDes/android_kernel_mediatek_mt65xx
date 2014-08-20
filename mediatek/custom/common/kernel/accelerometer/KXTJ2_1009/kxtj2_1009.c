@@ -1,3 +1,38 @@
+/* Copyright Statement:
+ *
+ * This software/firmware and related documentation ("MediaTek Software") are
+ * protected under relevant copyright laws. The information contained herein
+ * is confidential and proprietary to MediaTek Inc. and/or its licensors.
+ * Without the prior written permission of MediaTek inc. and/or its licensors,
+ * any reproduction, modification, use or disclosure of MediaTek Software,
+ * and information contained herein, in whole or in part, shall be strictly prohibited.
+ */
+/* MediaTek Inc. (C) 2010. All rights reserved.
+ *
+ * BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
+ * THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
+ * RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO RECEIVER ON
+ * AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NONINFRINGEMENT.
+ * NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH RESPECT TO THE
+ * SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY, INCORPORATED IN, OR
+ * SUPPLIED WITH THE MEDIATEK SOFTWARE, AND RECEIVER AGREES TO LOOK ONLY TO SUCH
+ * THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. RECEIVER EXPRESSLY ACKNOWLEDGES
+ * THAT IT IS RECEIVER'S SOLE RESPONSIBILITY TO OBTAIN FROM ANY THIRD PARTY ALL PROPER LICENSES
+ * CONTAINED IN MEDIATEK SOFTWARE. MEDIATEK SHALL ALSO NOT BE RESPONSIBLE FOR ANY MEDIATEK
+ * SOFTWARE RELEASES MADE TO RECEIVER'S SPECIFICATION OR TO CONFORM TO A PARTICULAR
+ * STANDARD OR OPEN FORUM. RECEIVER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND
+ * CUMULATIVE LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE,
+ * AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE,
+ * OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE CHARGE PAID BY RECEIVER TO
+ * MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
+ *
+ * The following software/firmware and/or related documentation ("MediaTek Software")
+ * have been modified by MediaTek Inc. All revisions are subject to any receiver's
+ * applicable license agreements with MediaTek Inc.
+ */
+
 /* KXTJ2_1009 motion sensor driver
  *
  *
@@ -149,8 +184,6 @@ static struct kxtj2_1009_i2c_data *obj_i2c_data = NULL;
 static bool sensor_power = true;
 static GSENSOR_VECTOR3D gsensor_gain;
 static char selftestRes[8]= {0}; 
-static DEFINE_MUTEX(kxtj2_1009_mutex);
-static bool enable_status = false;
 
 
 /*----------------------------------------------------------------------------*/
@@ -203,7 +236,6 @@ static int KXTJ2_1009_SetDataResolution(struct kxtj2_1009_i2c_data *obj)
 {
 	int err;
 	u8  databuf[2], reso;
-	bool cur_sensor_power = sensor_power;
 
 	KXTJ2_1009_SetPowerMode(obj->client, false);
 
@@ -226,7 +258,7 @@ static int KXTJ2_1009_SetDataResolution(struct kxtj2_1009_i2c_data *obj)
 		return KXTJ2_1009_ERR_I2C;
 	}
 
-	KXTJ2_1009_SetPowerMode(obj->client, cur_sensor_power/*true*/);
+	KXTJ2_1009_SetPowerMode(obj->client, true);
 
 	//kxtj2_1009_data_resolution[0] has been set when initialize: +/-2g  in 8-bit resolution:  15.6 mg/LSB*/   
 	obj->reso = &kxtj2_1009_data_resolution[0];
@@ -569,7 +601,6 @@ static int KXTJ2_1009_SetDataFormat(struct i2c_client *client, u8 dataformat)
 	struct kxtj2_1009_i2c_data *obj = i2c_get_clientdata(client);
 	u8 databuf[10];    
 	int res = 0;
-	bool cur_sensor_power = sensor_power;
 
 	memset(databuf, 0, sizeof(u8)*10);  
 
@@ -594,7 +625,7 @@ static int KXTJ2_1009_SetDataFormat(struct i2c_client *client, u8 dataformat)
 		return KXTJ2_1009_ERR_I2C;
 	}
 
-	KXTJ2_1009_SetPowerMode(client, cur_sensor_power/*true*/);
+	KXTJ2_1009_SetPowerMode(client, true);
 	
 	printk("KXTJ2_1009_SetDataFormat OK! \n");
 	
@@ -606,7 +637,6 @@ static int KXTJ2_1009_SetBWRate(struct i2c_client *client, u8 bwrate)
 {
 	u8 databuf[10];    
 	int res = 0;
-	bool cur_sensor_power = sensor_power;
 
 	memset(databuf, 0, sizeof(u8)*10);    
 
@@ -633,7 +663,7 @@ static int KXTJ2_1009_SetBWRate(struct i2c_client *client, u8 bwrate)
 	}
 
 	
-	KXTJ2_1009_SetPowerMode(client, cur_sensor_power/*true*/);
+	KXTJ2_1009_SetPowerMode(client, true);
 	printk("KXTJ2_1009_SetBWRate OK! \n");
 	
 	return KXTJ2_1009_SUCCESS;    
@@ -669,7 +699,7 @@ static int kxtj2_1009_init_client(struct i2c_client *client, int reset_cali)
 		return res;
 	}	
 
-	res = KXTJ2_1009_SetPowerMode(client, enable_status/*false*/);
+	res = KXTJ2_1009_SetPowerMode(client, false);
 	if(res != KXTJ2_1009_SUCCESS)
 	{
 		return res;
@@ -753,18 +783,14 @@ static int KXTJ2_1009_ReadSensorData(struct i2c_client *client, char *buf, int b
 		return -2;
 	}
 
-	if (atomic_read(&obj->suspend))
-	{
-		return 0;
-	}
-	/*if(sensor_power == FALSE)
+	if(sensor_power == FALSE)
 	{
 		res = KXTJ2_1009_SetPowerMode(client, true);
 		if(res)
 		{
 			GSE_ERR("Power on kxtj2_1009 error %d!\n", res);
 		}
-	}*/
+	}
 
 	if(res = KXTJ2_1009_ReadData(client, obj->data))
 	{        
@@ -1291,20 +1317,12 @@ static ssize_t show_status_value(struct device_driver *ddri, char *buf)
 /*----------------------------------------------------------------------------*/
 static ssize_t show_power_status_value(struct device_driver *ddri, char *buf)
 {
-	u8 databuf[2];    
-	u8 addr = KXTJ2_1009_REG_POWER_CTL;
-	if(hwmsen_read_block(kxtj2_1009_i2c_client, addr, databuf, 0x01))
-	{
-		GSE_ERR("read power ctl register err!\n");
-		return KXTJ2_1009_ERR_I2C;
-	}
-    
 	if(sensor_power)
 		printk("G sensor is in work mode, sensor_power = %d\n", sensor_power);
 	else
 		printk("G sensor is in standby mode, sensor_power = %d\n", sensor_power);
 
-	return snprintf(buf, PAGE_SIZE, "%x\n", databuf[0]);
+	return 0;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1491,10 +1509,8 @@ int gsensor_operate(void* self, uint32_t command, void* buff_in, int size_in,
 				{
 					sample_delay = KXTJ2_1009_BW_50HZ;
 				}
-
-				mutex_lock(&kxtj2_1009_mutex);
+				
 				err = KXTJ2_1009_SetBWRate(priv->client, sample_delay);
-				mutex_unlock(&kxtj2_1009_mutex);
 				if(err != KXTJ2_1009_SUCCESS ) //0x2C->BW=100Hz
 				{
 					GSE_ERR("Set delay parameter error!\n");
@@ -1527,26 +1543,14 @@ int gsensor_operate(void* self, uint32_t command, void* buff_in, int size_in,
 			else
 			{
 				value = *(int *)buff_in;
-				mutex_lock(&kxtj2_1009_mutex);
 				if(((value == 0) && (sensor_power == false)) ||((value == 1) && (sensor_power == true)))
 				{
-					enable_status = sensor_power;
 					GSE_LOG("Gsensor device have updated!\n");
 				}
 				else
 				{
-					enable_status = !sensor_power;
-					if (atomic_read(&priv->suspend) == 0)
-					{
-						err = KXTJ2_1009_SetPowerMode( priv->client, enable_status);
-						GSE_LOG("Gsensor not in suspend KXTJ2_1009_SetPowerMode!, enable_status = %d\n",enable_status);
-					}
-					else
-					{
-						GSE_LOG("Gsensor in suspend and can not enable or disable!enable_status = %d\n",enable_status);
-					}
+					err = KXTJ2_1009_SetPowerMode( priv->client, !sensor_power);
 				}
-				mutex_unlock(&kxtj2_1009_mutex);
 			}
 			break;
 
@@ -1559,9 +1563,7 @@ int gsensor_operate(void* self, uint32_t command, void* buff_in, int size_in,
 			else
 			{
 				gsensor_data = (hwm_sensor_data *)buff_out;
-				mutex_lock(&kxtj2_1009_mutex);
 				KXTJ2_1009_ReadSensorData(priv->client, buff, KXTJ2_1009_BUFSIZE);
-				mutex_unlock(&kxtj2_1009_mutex);
 				sscanf(buff, "%x %x %x", &gsensor_data->values[0], 
 					&gsensor_data->values[1], &gsensor_data->values[2]);				
 				gsensor_data->status = SENSOR_STATUS_ACCURACY_MEDIUM;				
@@ -1655,7 +1657,7 @@ static long kxtj2_1009_unlocked_ioctl(struct file *file, unsigned int cmd,unsign
 				err = -EINVAL;
 				break;	  
 			}
-			KXTJ2_1009_SetPowerMode(obj->client, true);
+			
 			KXTJ2_1009_ReadSensorData(client, strbuf, KXTJ2_1009_BUFSIZE);
 			if(copy_to_user(data, strbuf, strlen(strbuf)+1))
 			{
@@ -1795,7 +1797,7 @@ static int kxtj2_1009_suspend(struct i2c_client *client, pm_message_t msg)
 			return;
 		}
 
-		//sensor_power = false;      
+		sensor_power = false;      
 		KXTJ2_1009_power(obj->hw, 0);
 	}
 	return err;
@@ -1837,16 +1839,14 @@ static void kxtj2_1009_early_suspend(struct early_suspend *h)
 		GSE_ERR("null pointer!!\n");
 		return;
 	}
-	mutex_lock(&kxtj2_1009_mutex);
 	atomic_set(&obj->suspend, 1); 
 	if(err = KXTJ2_1009_SetPowerMode(obj->client, false))
 	{
 		GSE_ERR("write power control fail!!\n");
 		return;
 	}
-	mutex_unlock(&kxtj2_1009_mutex);
 
-	//sensor_power = false;
+	sensor_power = false;
 	
 	KXTJ2_1009_power(obj->hw, 0);
 }
@@ -1864,14 +1864,12 @@ static void kxtj2_1009_late_resume(struct early_suspend *h)
 	}
 
 	KXTJ2_1009_power(obj->hw, 1);
-	mutex_lock(&kxtj2_1009_mutex);
 	if(err = kxtj2_1009_init_client(obj->client, 0))
 	{
 		GSE_ERR("initialize client fail!!\n");
 		return;        
 	}
-	atomic_set(&obj->suspend, 0); 
-	mutex_unlock(&kxtj2_1009_mutex);
+	atomic_set(&obj->suspend, 0);    
 }
 /*----------------------------------------------------------------------------*/
 #endif /*CONFIG_HAS_EARLYSUSPEND*/

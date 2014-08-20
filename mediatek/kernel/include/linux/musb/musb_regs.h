@@ -188,10 +188,6 @@
 #define MUSB_RXCSR_FIFOFULL		0x0002
 #define MUSB_RXCSR_RXPKTRDY		0x0001
 
-//ALPS00798316, Enable DMA RxMode1
-#define MUSB_EP_RXPKTCOUNT		0x0300
-//ALPS00798316, Enable DMA RxMode1
-
 /* RXCSR in Peripheral mode */
 #define MUSB_RXCSR_P_ISO		0x4000
 #define MUSB_RXCSR_P_SENTSTALL		0x0040
@@ -309,50 +305,6 @@
 
 #define MUSB_BUSCTL_OFFSET(_epnum, _offset) \
 	(0x80 + (8*(_epnum)) + (_offset))
-
-/*
-MTK Software reset reg
-*/
-#define MUSB_SWRST 0x74
-#define MUSB_SWRST_PHY_RST         (1<<7)
-#define MUSB_SWRST_PHYSIG_GATE_HS  (1<<6)
-#define MUSB_SWRST_PHYSIG_GATE_EN  (1<<5)
-#define MUSB_SWRST_REDUCE_DLY      (1<<4)
-#define MUSB_SWRST_UNDO_SRPFIX     (1<<3)
-#define MUSB_SWRST_FRC_VBUSVALID   (1<<2)
-#define MUSB_SWRST_SWRST           (1<<1)
-#define MUSB_SWRST_DISUSBRESET     (1<<0)
-
-#define USB_L1INTS (0x00a0)  /* USB level 1 interrupt status register */
-#define USB_L1INTM (0x00a4)  /* USB level 1 interrupt mask register  */
-#define USB_L1INTP (0x00a8)  /* USB level 1 interrupt polarity register  */
-
-#define DMA_INTR (USB_BASE + 0x0200)
-#define DMA_INTR_UNMASK_CLR_OFFSET (16)
-#define DMA_INTR_UNMASK_SET_OFFSET (24)
-#define USB_DMA_REALCOUNT(chan) (0x0280+0x10*(chan))
-
-
-/* ====================== */
-/* USB interrupt register */
-/* ====================== */
-
-/* word access */
-#define TX_INT_STATUS        (1<<0)
-#define RX_INT_STATUS        (1<<1)
-#define USBCOM_INT_STATUS    (1<<2)
-#define DMA_INT_STATUS       (1<<3)
-#define PSR_INT_STATUS       (1<<4)
-#define QINT_STATUS          (1<<5)
-#define QHIF_INT_STATUS      (1<<6)
-#define DPDM_INT_STATUS      (1<<7)
-#define VBUSVALID_INT_STATUS (1<<8)
-#define IDDIG_INT_STATUS     (1<<9)
-#define DRVVBUS_INT_STATUS   (1<<10)
-
-#define VBUSVALID_INT_POL    (1<<8)
-#define IDDIG_INT_POL        (1<<9)
-#define DRVVBUS_INT_POL      (1<<10)
 
 static inline void musb_write_txfifosz(void __iomem *mbase, u8 c_size)
 {

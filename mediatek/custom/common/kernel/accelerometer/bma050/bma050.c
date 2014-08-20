@@ -130,10 +130,6 @@ static struct i2c_board_info __initdata i2c_bma250={ I2C_BOARD_INFO("BMA250", (0
 /*----------------------------------------------------------------------------*/
 static int bma250_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id); 
 static int bma250_i2c_remove(struct i2c_client *client);
-static int bma250_suspend(struct i2c_client *client, pm_message_t msg);
-static int bma250_resume(struct i2c_client *client);
-
-
 //static int bma250_i2c_detect(struct i2c_client *client, int kind, struct i2c_board_info *info);
 
 /*----------------------------------------------------------------------------*/
@@ -156,13 +152,6 @@ struct data_resolution {
 };
 /*----------------------------------------------------------------------------*/
 #define C_MAX_FIR_LENGTH (32)
-//#define USE_EARLY_SUSPEND
-static bool enable_status = false;
-static DEFINE_MUTEX(bma050_i2c_mutex);
-static DEFINE_MUTEX(bma050_op_mutex);
-
-
-
 /*----------------------------------------------------------------------------*/
 struct data_filter {
     s16 raw[C_MAX_FIR_LENGTH][BMA250_AXES_NUM];
@@ -194,7 +183,7 @@ struct bma250_i2c_data {
     struct data_filter      fir;
 #endif 
     /*early suspend*/
-#if defined(USE_EARLY_SUSPEND)
+#if defined(CONFIG_HAS_EARLYSUSPEND)
     struct early_suspend    early_drv;
 #endif     
 };
@@ -207,7 +196,7 @@ static struct i2c_driver bma250_i2c_driver = {
 	.probe      		= bma250_i2c_probe,
 	.remove    			= bma250_i2c_remove,
 //	.detect				= bma250_i2c_detect,
-#if !defined(USE_EARLY_SUSPEND)    
+#if !defined(CONFIG_HAS_EARLYSUSPEND)    
     .suspend            = bma250_suspend,
     .resume             = bma250_resume,
 #endif
@@ -235,88 +224,6 @@ static struct data_resolution bma250_data_resolution[1] = {
 };
 /*----------------------------------------------------------------------------*/
 static struct data_resolution bma250_offset_resolution = {{3, 9}, 256};
-
-#define C_I2C_FIFO_SIZE         8        
-static int bma050_i2c_read_block(struct i2c_client *client, u8 addr, u8 *data, u8 len)
-{
-    u8 beg = addr;
-	int err;
-	struct i2c_msg msgs[2]={{0},{0}};
-	
-	mutex_lock(&bma050_i2c_mutex);
-	
-	msgs[0].addr = client->addr;
-	msgs[0].flags = 0;
-	msgs[0].len =1;
-	msgs[0].buf = &beg;
-
-	msgs[1].addr = client->addr;
-	msgs[1].flags = I2C_M_RD;
-	msgs[1].len =len;
-	msgs[1].buf = data;
-	
-	if (!client)
-	{
-	    mutex_unlock(&bma050_i2c_mutex);
-		return -EINVAL;
-	}
-	else if (len > C_I2C_FIFO_SIZE) 
-	{
-		GSE_ERR(" length %d exceeds %d\n", len, C_I2C_FIFO_SIZE);
-		mutex_unlock(&bma050_i2c_mutex);
-		return -EINVAL;
-	}
-	err = i2c_transfer(client->adapter, msgs, sizeof(msgs)/sizeof(msgs[0]));
-	if (err != 2) 
-	{
-		GSE_ERR("i2c_transfer error: (%d %p %d) %d\n",addr, data, len, err);
-		err = -EIO;
-	} 
-	else 
-	{
-		err = 0;
-	}
-	mutex_unlock(&bma050_i2c_mutex);
-	return err;
-
-}
-
-static int bma050_i2c_write_block(struct i2c_client *client, u8 addr, u8 *data, u8 len)
-{   /*because address also occupies one byte, the maximum length for write is 7 bytes*/
-    int err, idx, num;
-    char buf[C_I2C_FIFO_SIZE];
-    err =0;
-	mutex_lock(&bma050_i2c_mutex);
-    if (!client)
-    {
-        mutex_unlock(&bma050_i2c_mutex);
-        return -EINVAL;
-    }
-    else if (len >= C_I2C_FIFO_SIZE) 
-	{        
-        GSE_ERR(" length %d exceeds %d\n", len, C_I2C_FIFO_SIZE);
-		mutex_unlock(&bma050_i2c_mutex);
-        return -EINVAL;
-    }    
-
-    num = 0;
-    buf[num++] = addr;
-    for (idx = 0; idx < len; idx++)
-    {
-        buf[num++] = data[idx];
-    }
-
-    err = i2c_master_send(client, buf, num);
-    if (err < 0)
-	{
-        GSE_ERR("send command error!!\n");
-		mutex_unlock(&bma050_i2c_mutex);
-        return -EFAULT;
-    } 
-	mutex_unlock(&bma050_i2c_mutex);
-    return err;
-}
-
 
 /*--------------------BMA250 power control function----------------------------------*/
 static void BMA250_power(struct acc_hw *hw, unsigned int on) 
@@ -385,7 +292,7 @@ static int BMA250_ReadData(struct i2c_client *client, s16 data[BMA250_AXES_NUM])
 	{
 		err = -EINVAL;
 	}
-	else if((err = bma050_i2c_read_block(client, addr, buf, BMA250_DATA_LEN)))
+	else if((err = hwmsen_read_block(client, addr, buf, BMA250_DATA_LEN)))
 	{
 		GSE_ERR("error: %d\n", err);
 	}
@@ -474,7 +381,7 @@ static int BMA250_ReadOffset(struct i2c_client *client, s8 ofs[BMA250_AXES_NUM])
 #ifdef SW_CALIBRATION
 	ofs[0]=ofs[1]=ofs[2]=0x0;
 #else
-	if(err = bma050_i2c_read_block(client, BMA250_REG_OFSX, ofs, BMA250_AXES_NUM))
+	if(err = hwmsen_read_block(client, BMA250_REG_OFSX, ofs, BMA250_AXES_NUM))
 	{
 		GSE_ERR("error: %d\n", err);
 	}
@@ -493,7 +400,7 @@ static int BMA250_ResetCalibration(struct i2c_client *client)
 	#ifdef SW_CALIBRATION
 		
 	#else
-		if(err = bma050_i2c_write_block(client, BMA250_REG_OFSX, ofs, 4))
+		if(err = hwmsen_write_block(client, BMA250_REG_OFSX, ofs, 4))
 		{
 			GSE_ERR("error: %d\n", err);
 		}
@@ -606,7 +513,7 @@ static int BMA250_WriteCalibration(struct i2c_client *client, int dat[BMA250_AXE
 		obj->offset[BMA250_AXIS_X], obj->offset[BMA250_AXIS_Y], obj->offset[BMA250_AXIS_Z],
 		obj->cali_sw[BMA250_AXIS_X], obj->cali_sw[BMA250_AXIS_Y], obj->cali_sw[BMA250_AXIS_Z]);
 
-	if(err = bma050_i2c_write_block(obj->client, BMA250_REG_OFSX, obj->offset, BMA250_AXES_NUM))
+	if(err = hwmsen_write_block(obj->client, BMA250_REG_OFSX, obj->offset, BMA250_AXES_NUM))
 	{
 		GSE_ERR("write offset fail: %d\n", err);
 		return err;
@@ -624,11 +531,22 @@ static int BMA250_CheckDeviceID(struct i2c_client *client)
 	memset(databuf, 0, sizeof(u8)*2);    
 	databuf[0] = BMA250_REG_DEVID;    
 
-    res = bma050_i2c_read_block(client,BMA250_REG_DEVID,databuf,0x1);
-	if(res < 0)
+	res = i2c_master_send(client, databuf, 0x1);
+	if(res <= 0)
 	{
 		goto exit_BMA250_CheckDeviceID;
 	}
+	
+	udelay(500);
+
+	databuf[0] = 0x0;        
+	res = i2c_master_recv(client, databuf, 0x01);
+	if(res <= 0)
+	{
+		goto exit_BMA250_CheckDeviceID;
+	}
+	
+
 	if(databuf[0]!=BMA250_FIXED_DEVID)
 	{
 		printk("BMA250_CheckDeviceID %d failt!\n ", databuf[0]);
@@ -640,7 +558,7 @@ static int BMA250_CheckDeviceID(struct i2c_client *client)
 	}
 
 	exit_BMA250_CheckDeviceID:
-	if (res < 0)
+	if (res <= 0)
 	{
 		return BMA250_ERR_I2C;
 	}
@@ -662,7 +580,7 @@ static int BMA250_SetPowerMode(struct i2c_client *client, bool enable)
 		return BMA250_SUCCESS;
 	}
 
-	if(bma050_i2c_read_block(client, addr, databuf, 0x01))
+	if(hwmsen_read_block(client, addr, databuf, 0x01))
 	{
 		GSE_ERR("read power ctl register err!\n");
 		return BMA250_ERR_I2C;
@@ -677,11 +595,13 @@ static int BMA250_SetPowerMode(struct i2c_client *client, bool enable)
 	{
 		databuf[0] |= BMA250_MEASURE_MODE;
 	}
-	//databuf[1] = databuf[0];
-	//databuf[0] = BMA250_REG_POWER_CTL;
+	databuf[1] = databuf[0];
+	databuf[0] = BMA250_REG_POWER_CTL;
 	
-    res = bma050_i2c_write_block(client,BMA250_REG_POWER_CTL,databuf,0x1);
-	if(res < 0)
+
+	res = i2c_master_send(client, databuf, 0x2);
+
+	if(res <= 0)
 	{
 		GSE_LOG("set power mode failed!\n");
 		return BMA250_ERR_I2C;
@@ -709,7 +629,7 @@ static int BMA250_SetDataFormat(struct i2c_client *client, u8 dataformat)
 
 	memset(databuf, 0, sizeof(u8)*10);    
 
-	if(bma050_i2c_read_block(client, BMA250_REG_DATA_FORMAT, databuf, 0x01))
+	if(hwmsen_read_block(client, BMA250_REG_DATA_FORMAT, databuf, 0x01))
 	{
 		printk("bma250 read Dataformat failt \n");
 		return BMA250_ERR_I2C;
@@ -717,9 +637,13 @@ static int BMA250_SetDataFormat(struct i2c_client *client, u8 dataformat)
 
 	databuf[0] &= ~BMA250_RANGE_MASK;
 	databuf[0] |= dataformat;
-	
-    res = bma050_i2c_write_block(client,BMA250_REG_DATA_FORMAT,databuf,0x1);
-	if(res < 0)
+	databuf[1] = databuf[0];
+	databuf[0] = BMA250_REG_DATA_FORMAT;
+
+
+	res = i2c_master_send(client, databuf, 0x2);
+
+	if(res <= 0)
 	{
 		return BMA250_ERR_I2C;
 	}
@@ -737,7 +661,7 @@ static int BMA250_SetBWRate(struct i2c_client *client, u8 bwrate)
 
 	memset(databuf, 0, sizeof(u8)*10);    
 
-	if(bma050_i2c_read_block(client, BMA250_REG_BW_RATE, databuf, 0x01))
+	if(hwmsen_read_block(client, BMA250_REG_BW_RATE, databuf, 0x01))
 	{
 		printk("bma250 read rate failt \n");
 		return BMA250_ERR_I2C;
@@ -745,9 +669,13 @@ static int BMA250_SetBWRate(struct i2c_client *client, u8 bwrate)
 
 	databuf[0] &= ~BMA250_BW_MASK;
 	databuf[0] |= bwrate;
+	databuf[1] = databuf[0];
+	databuf[0] = BMA250_REG_BW_RATE;
 
-    res = bma050_i2c_write_block(client,BMA250_REG_BW_RATE,databuf,0x1);
-	if(res < 0)
+
+	res = i2c_master_send(client, databuf, 0x2);
+
+	if(res <= 0)
 	{
 		return BMA250_ERR_I2C;
 	}
@@ -817,7 +745,7 @@ static int bma250_init_client(struct i2c_client *client, int reset_cali)
 	}
 	printk("BMA250 disable interrupt function!\n");
 
-	res = BMA250_SetPowerMode(client, enable_status);
+	res = BMA250_SetPowerMode(client, false);
 		if(res != BMA250_SUCCESS)
 		{
 			return res;
@@ -934,18 +862,16 @@ static int BMA250_ReadSensorData(struct i2c_client *client, char *buf, int bufsi
 		*buf = 0;
 		return -2;
 	}
-	/*
-	if(false == enable_status )
+
+	if(sensor_power == FALSE)
 	{
-		
-		acc[BMA250_AXIS_X]=-1;
-		acc[BMA250_AXIS_Y]=-1;
-		acc[BMA250_AXIS_Z]=-1;
-		sprintf(buf, "%04x %04x %04x", acc[BMA250_AXIS_X], acc[BMA250_AXIS_Y], acc[BMA250_AXIS_Z]);
-        GSE_ERR("sensor disable read invalid data!\n");
-		return 0;
+		res = BMA250_SetPowerMode(client, true);
+		if(res)
+		{
+			GSE_ERR("Power on bma250 error %d!\n", res);
+		}
 	}
-	*/
+
 	if((res = BMA250_ReadData(client, obj->data)))
 	{        
 		GSE_ERR("I2C error: ret value=%d", res);
@@ -1022,33 +948,34 @@ static int bma250_set_mode(struct i2c_client *client, unsigned char mode)
 		return -1;
 	}
 
-	comres = bma050_i2c_read_block(client,
-			BMA250_EN_LOW_POWER__REG, data, 1);
+	comres = hwmsen_read_block(client,
+			BMA250_EN_LOW_POWER__REG, data+1, 1);
 	switch (mode) {
 	case BMA250_MODE_NORMAL:
-		data[0]  = BMA250_SET_BITSLICE(data[0],
+		data[1]  = BMA250_SET_BITSLICE(data[1],
 				BMA250_EN_LOW_POWER, 0);
-		data[0]  = BMA250_SET_BITSLICE(data[0],
+		data[1]  = BMA250_SET_BITSLICE(data[1],
 				BMA250_EN_SUSPEND, 0);
 		break;
 	case BMA250_MODE_LOWPOWER:
-		data[0]  = BMA250_SET_BITSLICE(data[0],
+		data[1]  = BMA250_SET_BITSLICE(data[1],
 				BMA250_EN_LOW_POWER, 1);
-		data[0]  = BMA250_SET_BITSLICE(data[0],
+		data[1]  = BMA250_SET_BITSLICE(data[1],
 				BMA250_EN_SUSPEND, 0);
 		break;
 	case BMA250_MODE_SUSPEND:
-		data[0]  = BMA250_SET_BITSLICE(data[0],
+		data[1]  = BMA250_SET_BITSLICE(data[1],
 				BMA250_EN_LOW_POWER, 0);
-		data[0]  = BMA250_SET_BITSLICE(data[0],
+		data[1]  = BMA250_SET_BITSLICE(data[1],
 				BMA250_EN_SUSPEND, 1);
 		break;
 	default:
 		break;
 	}
 
-    comres = bma050_i2c_write_block(client,BMA250_EN_LOW_POWER__REG,data,0x1);
-	if(comres < 0)
+	comres = i2c_master_send(client, data, 2);
+
+	if(comres <= 0)
 	{
 		return BMA250_ERR_I2C;
 	}
@@ -1066,7 +993,7 @@ static int bma250_get_mode(struct i2c_client *client, unsigned char *mode)
 	{
 		return -1;
 	}
-	comres = bma050_i2c_read_block(client,
+	comres = hwmsen_read_block(client,
 			BMA250_EN_LOW_POWER__REG, mode, 1);
 	*mode  = (*mode) >> 6;
 		
@@ -1084,13 +1011,15 @@ static int bma250_set_range(struct i2c_client *client, unsigned char range)
 		return -1;
 	}
 	
-	comres = bma050_i2c_read_block(client,
-			BMA250_RANGE_SEL__REG, data, 1);
+	comres = hwmsen_read_block(client,
+			BMA250_RANGE_SEL__REG, data+1, 1);
 
-	data[0]  = BMA250_SET_BITSLICE(data[0],
+	data[1]  = BMA250_SET_BITSLICE(data[1],
 			BMA250_RANGE_SEL, range);
-    comres= bma050_i2c_write_block(client,BMA250_RANGE_SEL__REG,data,0x1);
-	if(comres < 0)
+
+	comres = i2c_master_send(client, data, 2);
+
+	if(comres <= 0)
 	{
 		return BMA250_ERR_I2C;
 	}
@@ -1110,7 +1039,7 @@ static int bma250_get_range(struct i2c_client *client, unsigned char *range)
 		return -1;
 	}
 
-	comres = bma050_i2c_read_block(client, BMA250_RANGE_SEL__REG,	&data, 1);
+	comres = hwmsen_read_block(client, BMA250_RANGE_SEL__REG,	&data, 1);
 	*range = BMA250_GET_BITSLICE(data, BMA250_RANGE_SEL);
 
 	return comres;
@@ -1126,14 +1055,15 @@ static int bma250_set_bandwidth(struct i2c_client *client, unsigned char bandwid
 		return -1;
 	}
 	
-	comres = bma050_i2c_read_block(client,
-			BMA250_BANDWIDTH__REG, data, 1);
+	comres = hwmsen_read_block(client,
+			BMA250_BANDWIDTH__REG, data+1, 1);
 
-	data[0]  = BMA250_SET_BITSLICE(data[0],
+	data[1]  = BMA250_SET_BITSLICE(data[1],
 			BMA250_BANDWIDTH, bandwidth);
 
-    comres = bma050_i2c_write_block(client,BMA250_BANDWIDTH__REG,data,0x1);
-	if(comres < 0)
+	comres = i2c_master_send(client, data, 2);
+
+	if(comres <= 0)
 	{
 		return BMA250_ERR_I2C;
 	}
@@ -1153,7 +1083,7 @@ static int bma250_get_bandwidth(struct i2c_client *client, unsigned char *bandwi
 		return -1;
 	}
 
-	comres = bma050_i2c_read_block(client, BMA250_BANDWIDTH__REG, &data, 1);
+	comres = hwmsen_read_block(client, BMA250_BANDWIDTH__REG, &data, 1);
 	data = BMA250_GET_BITSLICE(data, BMA250_BANDWIDTH);
 
 	if (data < 0x08) //7.81Hz
@@ -1712,21 +1642,14 @@ int gsensor_operate(void* self, uint32_t command, void* buff_in, int size_in,
 			else
 			{
 				value = *(int *)buff_in;
-				mutex_lock(&bma050_op_mutex);
-				GSE_LOG("Gsensor enable_status value = %d,sensor_power=%d\n",value,sensor_power);
 				if(((value == 0) && (sensor_power == false)) ||((value == 1) && (sensor_power == true)))
 				{
 					GSE_LOG("Gsensor device have updated!\n");
-					enable_status = sensor_power;
 				}
 				else
 				{
-				    enable_status = !sensor_power;
 					err = BMA250_SetPowerMode( priv->client, !sensor_power);
-					
 				}
-				GSE_LOG("Gsensor enable_status = %d\n",enable_status);
-				mutex_unlock(&bma050_op_mutex);
 			}
 			break;
 
@@ -1833,7 +1756,7 @@ static long bma250_unlocked_ioctl(struct file *file, unsigned int cmd,unsigned l
 				err = -EINVAL;
 				break;	  
 			}
-			BMA250_SetPowerMode(client,true);
+			
 			BMA250_ReadSensorData(client, strbuf, BMA250_BUFSIZE);
 			if(copy_to_user(data, strbuf, strlen(strbuf)+1))
 			{
@@ -1950,33 +1873,29 @@ static struct miscdevice bma250_device = {
 	.fops = &bma250_fops,
 };
 /*----------------------------------------------------------------------------*/
-#ifndef USE_EARLY_SUSPEND
+#ifndef CONFIG_HAS_EARLYSUSPEND
 /*----------------------------------------------------------------------------*/
 static int bma250_suspend(struct i2c_client *client, pm_message_t msg) 
 {
 	struct bma250_i2c_data *obj = i2c_get_clientdata(client);    
 	int err = 0;
 	GSE_FUN();    
-    mutex_lock(&bma050_op_mutex);
+
 	if(msg.event == PM_EVENT_SUSPEND)
 	{   
 		if(obj == NULL)
 		{
 			GSE_ERR("null pointer!!\n");
-			mutex_unlock(&bma050_op_mutex);
 			return -EINVAL;
 		}
 		atomic_set(&obj->suspend, 1);
 		if((err = BMA250_SetPowerMode(obj->client, false)))
 		{
 			GSE_ERR("write power control fail!!\n");
-			mutex_unlock(&bma050_op_mutex);
-			return -EINVAL;
-		}
-		sensor_power = false;
+			return;
+		}       
 		BMA250_power(obj->hw, 0);
 	}
-	mutex_unlock(&bma050_op_mutex);
 	return err;
 }
 /*----------------------------------------------------------------------------*/
@@ -1991,16 +1910,15 @@ static int bma250_resume(struct i2c_client *client)
 		GSE_ERR("null pointer!!\n");
 		return -EINVAL;
 	}
-    mutex_lock(&bma050_op_mutex);
+
 	BMA250_power(obj->hw, 1);
 	if((err = bma250_init_client(client, 0)))
 	{
 		GSE_ERR("initialize client fail!!\n");
-		mutex_unlock(&bma050_op_mutex);
 		return err;        
 	}
 	atomic_set(&obj->suspend, 0);
-    mutex_unlock(&bma050_op_mutex);
+
 	return 0;
 }
 /*----------------------------------------------------------------------------*/
@@ -2050,7 +1968,7 @@ static void bma250_late_resume(struct early_suspend *h)
 	atomic_set(&obj->suspend, 0);    
 }
 /*----------------------------------------------------------------------------*/
-#endif /*USE_EARLY_SUSPEND*/
+#endif /*CONFIG_HAS_EARLYSUSPEND*/
 /*----------------------------------------------------------------------------*/
 //static int bma250_i2c_detect(struct i2c_client *client, int kind, struct i2c_board_info *info) 
 //{    
@@ -2065,7 +1983,6 @@ static int bma250_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 	struct bma250_i2c_data *obj;
 	struct hwmsen_object sobj;
 	int err = 0;
-	int retry = 0;
 	GSE_FUN();
 
 	if(!(obj = kzalloc(sizeof(*obj), GFP_KERNEL)))
@@ -2111,16 +2028,12 @@ static int bma250_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 
 	bma250_i2c_client = new_client;	
 
-	for(retry = 0; retry < 3; retry++){
-		if((err = bma250_init_client(new_client, 1)))
-		{
-			GSE_ERR("bma050_device init cilent fail time: %d\n", retry);
-			continue;
-		}
-	}
-	if(err != 0)
+	if((err = bma250_init_client(new_client, 1)))
+	{
 		goto exit_init_failed;
-		
+	}
+	
+
 	if((err = misc_register(&bma250_device)))
 	{
 		GSE_ERR("bma250_device register failed\n");
@@ -2142,7 +2055,7 @@ static int bma250_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 		goto exit_kfree;
 	}
 
-#ifdef USE_EARLY_SUSPEND
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	obj->early_drv.level    = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1,
 	obj->early_drv.suspend  = bma250_early_suspend,
 	obj->early_drv.resume   = bma250_late_resume,    

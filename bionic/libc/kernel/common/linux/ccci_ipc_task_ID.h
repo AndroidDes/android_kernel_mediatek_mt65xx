@@ -24,7 +24,7 @@
 #define AGPS_AP_MOD_MMI 0   
 //agps AP begin task_id
 //Wait to add    
-#define GPS_AP_MOD 2
+
 //--------------------------------------------------------------------------
 X_IPC_MODULE_CONF(1, AGPS_MD_MOD_L4C, MD_UNIFY_ID_FLAG|0, 1)
 X_IPC_MODULE_CONF(1, AGPS_MD_MOD_L4C_2, MD_UNIFY_ID_FLAG|1, 1)
@@ -33,7 +33,6 @@ X_IPC_MODULE_CONF(1, AGPS_MD_MOD_L4C_4, MD_UNIFY_ID_FLAG|3, 1)
 //Wait to add 
 //--------------------------------------------------------------------------
 X_IPC_MODULE_CONF(1, AGPS_AP_MOD_MMI, AP_UNIFY_ID_FLAG|0, 1)
-X_IPC_MODULE_CONF(1, GPS_AP_MOD, AP_UNIFY_ID_FLAG|2, 1)
 //Wait to add 
 //-------------------------------------------------------------------------
 

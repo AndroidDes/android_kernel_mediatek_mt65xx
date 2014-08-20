@@ -364,7 +364,7 @@ config TOI_EXPORTS
 	default y
 
 config TOI_ZRAM_SUPPORT
-	def_bool n
+	def_bool y
 	depends on TOI && ZRAM!=n
 
 config PM_SLEEP

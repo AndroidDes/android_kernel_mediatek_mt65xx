@@ -113,7 +113,6 @@ struct mmc_host_ops {
 	bool	(*check_written_data)(struct mmc_host *host, struct mmc_request *req);
 /*--add written data check for Mediatek MSDC host--*/
 
-
 	/*
 	 * Avoid calling these three functions too often or in a "fast path",
 	 * since underlaying controller might implement them in an expensive

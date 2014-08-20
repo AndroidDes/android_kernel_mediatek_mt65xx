@@ -48,7 +48,9 @@ MOD_OBJ  = $(D_ROOT)/out
 MOD_SRC  := \
 custom_emi.c \
 cust_msdc.c \
-cust_part.c 
+cust_part.c \
+mt_memory.c \
+memory_test.s 
 #cust_gpio.c
 
 ###################################################################

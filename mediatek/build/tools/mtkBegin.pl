@@ -7,12 +7,7 @@
 $flag_subrel = "mediatek/build/android/full/config.mk";
 $flag_custrel = "mediatek/build/android/full/config.mk.custrel";
 $srcDir = "vendor/mediatek/$prj/artifacts/out/";
-my $out_dir = "out";
-if (exists $ENV{"OUT_DIR"})
-{
-	$out_dir = $ENV{"OUT_DIR"};
-}
-$dstDir = "$out_dir/";
+$dstDir = "out/";
 $tmpDir = "vendor/mediatek/$prj/artifacts/kernel/out/";
 
 exit 0, if (!-e $flag_subrel && !-e $flag_custrel);

@@ -65,15 +65,8 @@ static inline struct sk_buff *dequeue_skb(struct Qdisc *q)
 			q->q.qlen--;
 		} else
 			skb = NULL;
-			
-	    if (skb == NULL) {
-	    	printk(KERN_INFO "[mtk_net]dequeue_skb gso_skb return NULL \n");
-	    }
 	} else {
 		skb = q->dequeue(q);
-		if (skb == NULL) {
-	    	printk(KERN_INFO "[mtk_net]dequeue_skb dequeue return NULL \n");
-	    }
 	}
 
 	return skb;
@@ -130,9 +123,6 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 	HARD_TX_LOCK(dev, txq, smp_processor_id());
 	if (!netif_xmit_frozen_or_stopped(txq))
 		ret = dev_hard_start_xmit(skb, dev, txq);
-	else {
-		printk(KERN_INFO "[mtk_net]dev_hard_start_xmit txq state = %lu(%s)\n", txq->state, dev->name);
-	}
 
 	HARD_TX_UNLOCK(dev, txq);
 
@@ -477,8 +467,7 @@ static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc *qdisc)
 		qdisc->q.qlen++;
 		return __qdisc_enqueue_tail(skb, qdisc, list);
 	}
-	printk(KERN_INFO "[mtk_net] pfifo_fast_enqueue drop, dev:%s, skb_qlen = %d, dev_qlen = %lu!\n", 
-		qdisc_dev(qdisc)->name, skb_queue_len(&qdisc->q), qdisc_dev(qdisc)->tx_queue_len);
+
 	return qdisc_drop(skb, qdisc);
 }
 

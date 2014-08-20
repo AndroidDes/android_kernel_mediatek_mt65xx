@@ -55,41 +55,22 @@ extern void request_wakeup_md_timeout(unsigned int dev_id, unsigned int dev_sub_
 static void musbfsh_port_suspend(struct musbfsh *musbfsh, bool do_suspend)
 {
 	u8		power;
-	u8		intrusbe;
-	u8		intrusb;
 	void __iomem	*mbase = musbfsh->mregs;
 	int retries = 0;
+
+#if 0	
+	if (!is_host_active(musbfsh))
+		return;
+#endif
 
 	/* NOTE:  this doesn't necessarily put PHY into low power mode,
 	 * turning off its clock; that's a function of PHY integration and
 	 * MUSBFSH_POWER_ENSUSPEND.  PHY may need a clock (sigh) to detect
 	 * SE0 changing to connect (J) or wakeup (K) states.
 	 */
+	INFO("musbfsh_port_suspend++\r\n");
+	power = musbfsh_readb(mbase, MUSBFSH_POWER);
 	if (do_suspend) {
-		/* clean MUSBFSH_INTR_SOF in MUSBFSH_INTRUSBE */
-		intrusbe = musbfsh_readb(mbase, MUSBFSH_INTRUSBE);
-		intrusbe &= ~MUSBFSH_INTR_SOF;
-		musbfsh_writeb(mbase, MUSBFSH_INTRUSBE, intrusbe);
-		mb();
-		/* clean MUSBFSH_INTR_SOF in MUSBFSH_INTRUSB */
-		intrusb = musbfsh_readb(mbase, MUSBFSH_INTRUSB);
-		intrusb |= MUSBFSH_INTR_SOF;
-		musbfsh_writeb(mbase, MUSBFSH_INTRUSB, intrusb);
-		mb();
-		retries = 10000;
-		intrusb = musbfsh_readb(mbase, MUSBFSH_INTRUSB);
-		while (!(intrusb & MUSBFSH_INTR_SOF)) {
-			intrusb = musbfsh_readb(mbase, MUSBFSH_INTRUSB);
-			if (retries-- < 1)
-				break;
-		}
-
-		/* delay 10 us */
-		udelay(10);
-
-		/* set MUSBFSH_POWER_SUSPENDM in MUSBFSH_POWER_SUSPENDM */
-		power = musbfsh_readb(mbase, MUSBFSH_POWER);
-
 #if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 		/* mask remote wake up IRQ between port suspend and bus suspend.
 		    hub.c will call set_port_feature first then usb_set_device_state, so if EINT comes between them, resume flow may see
@@ -113,20 +94,11 @@ static void musbfsh_port_suspend(struct musbfsh *musbfsh, bool do_suspend)
 			if (retries-- < 1)
 				break;
 		}
-		mb();
+
 		WARNING( "Root port suspended, power 0x%02x\n", power);
 
 		musbfsh->port1_status |= USB_PORT_STAT_SUSPEND;
-	} else {
-		power = musbfsh_readb(mbase, MUSBFSH_POWER);
-		if(!(power & MUSBFSH_POWER_SUSPENDM)) {
-			WARNING("Root port resuming abort, power 0x%02x\n", power);
-			if(power & MUSBFSH_POWER_RESUME)
-				goto finish;
-			else
-				return;
-		}
-
+	} else if (power & MUSBFSH_POWER_SUSPENDM) {//has been suspend, should to resume the bus
 #if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 		INFO("EINT to wake up MD for resume\n");
 		request_wakeup_md_timeout(0, 0); //wx, wakeup MD first
@@ -134,9 +106,9 @@ static void musbfsh_port_suspend(struct musbfsh *musbfsh, bool do_suspend)
 		power &= ~MUSBFSH_POWER_SUSPENDM;
 		power |= MUSBFSH_POWER_RESUME;
 		musbfsh_writeb(mbase, MUSBFSH_POWER, power);
-		mb();
+
 		WARNING("Root port resuming, power 0x%02x\n", power);
-finish:
+
 		/* later, GetPortStatus will stop RESUME signaling */
 		musbfsh->port1_status |= MUSBFSH_PORT_STAT_RESUME;
 		musbfsh->rh_timer = jiffies + msecs_to_jiffies(20);
@@ -147,23 +119,21 @@ static void musbfsh_port_reset(struct musbfsh *musbfsh, bool do_reset)
 {
 	u8		power;
 	void __iomem	*mbase = musbfsh->mregs;
-
+	INFO("musbfsh_port_reset++, reset=%d\r\n",do_reset);
 	/* NOTE:  caller guarantees it will turn off the reset when
 	 * the appropriate amount of time has passed
 	 */
 	power = musbfsh_readb(mbase, MUSBFSH_POWER);
-	WARNING("reset=%d power=0x%x\n", do_reset, power);
+	INFO("power=0x%x\r\n",power);
 	if (do_reset) {
 		if(power & MUSBFSH_POWER_SUSPENDM) {
-			WARNING("reset a suspended device\n");
-
-#if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 			INFO("EINT to wake up MD for reset\n");
+#if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 			request_wakeup_md_timeout(0, 0); //wx, we may have to reset a suspended MD
 #endif
 			musbfsh_writeb(mbase, MUSBFSH_POWER,
 				power | MUSBFSH_POWER_RESUME);
-			mdelay(20);
+			msleep(30);
 			musbfsh_writeb(mbase, MUSBFSH_POWER,
 				power & ~MUSBFSH_POWER_RESUME);
 		}
@@ -176,19 +146,18 @@ static void musbfsh_port_reset(struct musbfsh *musbfsh, bool do_reset)
 		 * detected".
 		 */
 		if (power &  MUSBFSH_POWER_RESUME) {
-			WARNING("reset a resuming device\n");
 			while (time_before(jiffies, musbfsh->rh_timer))
-				mdelay(1);
+				msleep(1);
 			musbfsh_writeb(mbase, MUSBFSH_POWER,//stop the resume signal
 				power & ~MUSBFSH_POWER_RESUME);
-			mdelay(1);
+			msleep(1);
 		}
 
 		musbfsh->ignore_disconnect = true;
 		power &= 0xf0;
 		musbfsh_writeb(mbase, MUSBFSH_POWER,
 				power | MUSBFSH_POWER_RESET);
-		mb();
+
 		musbfsh->port1_status |= USB_PORT_STAT_RESET;
 		musbfsh->port1_status &= ~USB_PORT_STAT_ENABLE;
 		musbfsh->rh_timer = jiffies + msecs_to_jiffies(50);
@@ -196,7 +165,7 @@ static void musbfsh_port_reset(struct musbfsh *musbfsh, bool do_reset)
 		INFO( "Root port reset stopped\n");
 		musbfsh_writeb(mbase, MUSBFSH_POWER,
 				power & ~MUSBFSH_POWER_RESET);
-		mb();
+        
 		musbfsh->ignore_disconnect = false;
 
 		power = musbfsh_readb(mbase, MUSBFSH_POWER);
@@ -234,11 +203,11 @@ void musbfsh_root_disconnect(struct musbfsh *musbfsh)
 /*---------------------------------------------------------------------*/
 
 /* Caller may or may not hold musbfsh->lock */
-int musbfsh_hub_status_data(struct usb_hcd *hcd, char *buf)
+int musbfsh_hub_status_data(struct usb_hcd *hcd, char *buf) 
 {
 	struct musbfsh	*musbfsh = hcd_to_musbfsh(hcd);
 	int		retval = 0;
-
+	
 	INFO("musbfsh_hub_status_data++\r\n");
 	/* called in_irq() via usb_hcd_poll_rh_status() */
 	if (musbfsh->port1_status & 0xffff0000) {
@@ -260,11 +229,11 @@ int musbfsh_hub_control(
 	u32		temp;
 	int		retval = 0;
 	unsigned long	flags;
-
+	
 	INFO("musbfsh_hub_control++,typeReq=0x%x,wValue=0x%x,wIndex=0x%x\r\n",typeReq,wValue,wIndex);
 	spin_lock_irqsave(&musbfsh->lock, flags);
 
-	if (unlikely(!HCD_HW_ACCESSIBLE(hcd))) {
+	if (unlikely(!HCD_HW_ACCESSIBLE(hcd))) {	
 		spin_unlock_irqrestore(&musbfsh->lock, flags);
 		return -ESHUTDOWN;
 	}
@@ -295,7 +264,7 @@ int musbfsh_hub_control(
 			musbfsh_port_suspend(musbfsh, false);//here is clearing the suspend
 			break;
 		case USB_PORT_FEAT_POWER:
-			musbfsh_platform_set_vbus(musbfsh, 0);//only power off the vbus
+			musbfsh_set_vbus(musbfsh, 0);//only power off the vbus
 			break;
 		case USB_PORT_FEAT_C_CONNECTION:
 		case USB_PORT_FEAT_C_ENABLE:
@@ -350,7 +319,6 @@ int musbfsh_hub_control(
 			power &= ~MUSBFSH_POWER_RESUME;
 			WARNING( "Root port resume stopped, power 0x%02x\n",power);
 			musbfsh_writeb(musbfsh->mregs, MUSBFSH_POWER, power);
-
 #if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 			mt65xx_eint_unmask(CUST_EINT_DT_EXT_MD_WK_UP_USB_NUM);
 #endif
@@ -390,7 +358,7 @@ int musbfsh_hub_control(
 			 * initialization logic, e.g. for OTG, or change any
 			 * logic relating to VBUS power-up.
 			 */
-			INFO("musbfsh_start is called in hub control\n");
+			INFO("musbfsh_start is called in hub control\r\n");
 			musbfsh_start(musbfsh);
 			break;
 		case USB_PORT_FEAT_RESET:
@@ -427,7 +395,7 @@ int musbfsh_hub_control(
 				pr_debug("TEST_FORCE_ENABLE\n");
 				temp = MUSBFSH_TEST_FORCE_HOST
 					| MUSBFSH_TEST_FORCE_FS;
-
+				
 				musbfsh_writeb(musbfsh->mregs, MUSBFSH_DEVCTL,
 						MUSBFSH_DEVCTL_SESSION);
 				break;

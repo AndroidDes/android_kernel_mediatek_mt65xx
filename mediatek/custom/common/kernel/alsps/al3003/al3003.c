@@ -1,3 +1,38 @@
+/* Copyright Statement:
+ *
+ * This software/firmware and related documentation ("MediaTek Software") are
+ * protected under relevant copyright laws. The information contained herein
+ * is confidential and proprietary to MediaTek Inc. and/or its licensors.
+ * Without the prior written permission of MediaTek inc. and/or its licensors,
+ * any reproduction, modification, use or disclosure of MediaTek Software,
+ * and information contained herein, in whole or in part, shall be strictly prohibited.
+ */
+/* MediaTek Inc. (C) 2010. All rights reserved.
+ *
+ * BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
+ * THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
+ * RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO RECEIVER ON
+ * AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NONINFRINGEMENT.
+ * NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH RESPECT TO THE
+ * SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY, INCORPORATED IN, OR
+ * SUPPLIED WITH THE MEDIATEK SOFTWARE, AND RECEIVER AGREES TO LOOK ONLY TO SUCH
+ * THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. RECEIVER EXPRESSLY ACKNOWLEDGES
+ * THAT IT IS RECEIVER'S SOLE RESPONSIBILITY TO OBTAIN FROM ANY THIRD PARTY ALL PROPER LICENSES
+ * CONTAINED IN MEDIATEK SOFTWARE. MEDIATEK SHALL ALSO NOT BE RESPONSIBLE FOR ANY MEDIATEK
+ * SOFTWARE RELEASES MADE TO RECEIVER'S SPECIFICATION OR TO CONFORM TO A PARTICULAR
+ * STANDARD OR OPEN FORUM. RECEIVER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND
+ * CUMULATIVE LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE,
+ * AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE,
+ * OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE CHARGE PAID BY RECEIVER TO
+ * MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
+ *
+ * The following software/firmware and/or related documentation ("MediaTek Software")
+ * have been modified by MediaTek Inc. All revisions are subject to any receiver's
+ * applicable license agreements with MediaTek Inc.
+ */
+
 /* drivers/hwmon/mt6516/amit/al3003.c - AL3003 ALS/PS driver
  * 
  * Author: MingHsien Hsieh <minghsien.hsieh@mediatek.com>
@@ -44,13 +79,12 @@
 
 
 
-extern void mt_eint_mask(unsigned int eint_num);
-extern void mt_eint_unmask(unsigned int eint_num);
-extern void mt_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms);
-extern void mt_eint_set_polarity(unsigned int eint_num, unsigned int pol);
-extern unsigned int mt_eint_set_sens(unsigned int eint_num, unsigned int sens);
-extern void mt_eint_registration(unsigned int eint_num, unsigned int flow, void (EINT_FUNC_PTR)(void), unsigned int is_auto_umask);
-extern void mt_eint_print_status(void);
+extern void mt65xx_eint_unmask(unsigned int line);
+extern void mt65xx_eint_mask(unsigned int line);
+extern void mt65xx_eint_set_polarity(unsigned int eint_num, unsigned int pol);
+extern void mt65xx_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms);
+extern unsigned int mt65xx_eint_set_sens(unsigned int eint_num, unsigned int sens);
+extern void mt65xx_eint_registration(unsigned int eint_num, unsigned int is_deb_en, unsigned int pol, void (EINT_FUNC_PTR)(void), unsigned int is_auto_umask);
 
 
 #define POWER_NONE_MACRO MT65XX_POWER_NONE
@@ -58,9 +92,11 @@ extern void mt_eint_print_status(void);
 
 #define ALSPS_REGISTER_INTERRPUT(intrrupt_handle_func)   \
 {\
-	mt_eint_set_hw_debounce(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_CN);	\
-	mt_eint_registration(CUST_EINT_ALS_NUM, CUST_EINT_ALS_TYPE, intrrupt_handle_func, 0);	\
-	mt_eint_unmask(CUST_EINT_ALS_NUM);	\
+	mt65xx_eint_set_sens(CUST_EINT_ALS_NUM, CUST_EINT_ALS_SENSITIVE); \
+		mt65xx_eint_set_polarity(CUST_EINT_ALS_NUM, CUST_EINT_ALS_POLARITY); \
+		mt65xx_eint_set_hw_debounce(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_CN); \
+		mt65xx_eint_registration(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_EN, CUST_EINT_ALS_POLARITY, intrrupt_handle_func, 0); \
+		mt65xx_eint_unmask(CUST_EINT_ALS_NUM);	\
 }
 
 
@@ -268,7 +304,17 @@ return 200;
 */
 }
 /*----------------------------------------------------------------------------*/
+/*
+int al3003_config_timing(int sample_div, int step_div)
+{
+	u32 base = I2C2_BASE; 
+	unsigned long tmp;
 
+	tmp  = __raw_readw(mt6516_I2C_TIMING) & ~((0x7 << 8) | (0x1f << 0));
+	tmp  = (sample_div & 0x7) << 8 | (step_div & 0x1f) << 0 | tmp;
+
+	return (__raw_readw(mt6516_I2C_HS) << 16) | (tmp);
+}*/
 /*----------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------*/
@@ -828,8 +874,13 @@ static void al3003_eint_work(struct work_struct *work)
 	  }
 	}
 	
-	mt_eint_unmask(CUST_EINT_ALS_NUM);  
-
+	#ifdef MT6573
+	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);  
+	#endif
+	#ifdef MT6575
+	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);      
+	#endif
+	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);  
 }
 
 /*----------------------------------------------------------------------------*/
@@ -845,6 +896,30 @@ int al3003_setup_eint(struct i2c_client *client)
     mt_set_gpio_dir(GPIO_ALS_EINT_PIN, GPIO_DIR_IN);
 	mt_set_gpio_pull_enable(GPIO_ALS_EINT_PIN, GPIO_PULL_ENABLE);
 	mt_set_gpio_pull_select(GPIO_ALS_EINT_PIN, GPIO_PULL_UP);
+	
+	//mt_set_gpio_dir(GPIO_ALS_EINT_PIN, GPIO_DIR_IN);
+	//mt_set_gpio_mode(GPIO_ALS_EINT_PIN, GPIO_ALS_EINT_PIN_M_EINT);
+	//mt_set_gpio_pull_enable(GPIO_ALS_EINT_PIN, GPIO_PULL_ENABLE);
+	//mt_set_gpio_pull_select(GPIO_ALS_EINT_PIN, GPIO_PULL_UP);
+
+    //
+#ifdef MT6573
+	
+    mt65xx_eint_set_sens(CUST_EINT_ALS_NUM, CUST_EINT_ALS_SENSITIVE);
+	mt65xx_eint_set_polarity(CUST_EINT_ALS_NUM, CUST_EINT_ALS_POLARITY);
+	mt65xx_eint_set_hw_debounce(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_CN);
+	mt65xx_eint_registration(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_EN, CUST_EINT_ALS_POLARITY, al3003_eint_func, 0);
+	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);  
+#endif  
+	
+#ifdef MT6575
+			
+	mt65xx_eint_set_sens(CUST_EINT_ALS_NUM, CUST_EINT_ALS_SENSITIVE);
+	mt65xx_eint_set_polarity(CUST_EINT_ALS_NUM, CUST_EINT_ALS_POLARITY);
+	mt65xx_eint_set_hw_debounce(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_CN);
+	mt65xx_eint_registration(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_EN, CUST_EINT_ALS_POLARITY, al3003_eint_func, 0);
+	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);	
+#endif 
 
 	ALSPS_REGISTER_INTERRPUT(al3003_eint_func);
 
@@ -1062,6 +1137,26 @@ static ssize_t al3003_show_i2c(struct device_driver *ddri, char *buf)
 /*----------------------------------------------------------------------------*/
 static ssize_t al3003_store_i2c(struct device_driver *ddri, char *buf, size_t count)
 {
+/*	int sample_div, step_div;
+	unsigned long tmp;
+	u32 base = I2C2_BASE;    
+
+	if(!al3003_obj)
+	{
+		APS_ERR("al3003_obj is null!!\n");
+		return 0;
+	}
+	else if(2 != sscanf(buf, "%d %d", &sample_div, &step_div))
+	{
+		APS_ERR("invalid format: '%s'\n", buf);
+		return 0;
+	}
+	tmp  = __raw_readw(mt6516_I2C_TIMING) & ~((0x7 << 8) | (0x1f << 0));
+	tmp  = (sample_div & 0x7) << 8 | (step_div & 0x1f) << 0 | tmp;
+	__raw_writew(tmp, mt6516_I2C_TIMING);        
+
+	return count;
+	*/
 	return 0;
 }
 /*----------------------------------------------------------------------------*/
