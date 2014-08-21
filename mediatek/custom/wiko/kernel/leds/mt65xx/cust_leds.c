@@ -1,10 +1,8 @@
 #include <cust_leds.h>
+#include <cust_leds_def.h>
 #include <mach/mt_pwm.h>
-#include <mach/mt_gpio.h>
 
 #include <linux/kernel.h>
-#include <linux/delay.h>
-#include <asm/delay.h>
 #include <mach/pmic_mt6329_hw_bank1.h> 
 #include <mach/pmic_mt6329_sw_bank1.h> 
 #include <mach/pmic_mt6329_hw.h>
@@ -12,81 +10,57 @@
 #include <mach/upmu_common_sw.h>
 #include <mach/upmu_hw.h>
 
-//extern int mtkfb_set_backlight_level(unsigned int level);
-//extern int mtkfb_set_backlight_pwm(int div);
 extern int disp_bls_set_backlight(unsigned int level);
-/*
+
 #define ERROR_BL_LEVEL 0xFFFFFFFF
 
 unsigned int brightness_mapping(unsigned int level)
 {  
-	return ERROR_BL_LEVEL;
-}
-*/
-void one_wire_control(unsigned int count)
-{
-	mt_set_gpio_mode(129, GPIO_MODE_GPIO);
-	mt_set_gpio_dir(129, GPIO_DIR_OUT);
-	
-	count = 17-count;
-
-	mt_set_gpio_out(129, 0);
-	mdelay(3);
-	printk("one_wire_control shot down LED driver IC to clear previous setting\n");
-	
-	while(count--)	//count = 1~16
-	{
-		
-		mt_set_gpio_out(129, 1);
-		udelay(100);
-		mt_set_gpio_out(129, 0);
-		udelay(100);
-		//mt_set_gpio_out(gpio_num, 1);
+	if(level) {
+		return level/32;
+	}else {
+		return level;
 	}
-	mt_set_gpio_out(129, 1);
 }
 
-int Cust_GPIO_SetBacklight(unsigned int level)
-{
-	unsigned int mapped_level;
-
-	if(0 != level)
-	{
-	    mapped_level = level/16 + 1; //1-wire control in S5 phone only has 16 step 
-		printk("Cust_GPIO_SetBacklight:current_level=%d\n", mapped_level);
-		one_wire_control(mapped_level);
-	}
-	else
-	{
-		mt_set_gpio_out(129, 0);
-	}
-	return 0;
-}
-unsigned int brightness_mapping(unsigned int level)
-{
-    unsigned int mapped_level;
-    
-    mapped_level = level;
-       
-	return mapped_level;
-}
-
+/*
 unsigned int Cust_SetBacklight(int level, int div)
 {
-    //mtkfb_set_backlight_pwm(div);
-    //mtkfb_set_backlight_level(brightness_mapping(level));
-    disp_bls_set_backlight(brightness_mapping(level));
+	kal_uint32 ret=0;
+//    mtkfb_set_backlight_pwm(div);
+//    mtkfb_set_backlight_level(brightness_mapping(level));
+
+//	hwPWMsetting(MT65XX_PMIC_PWM_NUMBER PWMmode, kal_uint32 duty, kal_uint32 freqSelect);
+//	hwBacklightBoostTuning(kal_uint32 MODE, kal_uint32 VRSEL, 0);
+//	hwBacklightBoostTurnOn();
+//	hwPWMsetting(0, , kal_uint32 freqSelect);
+//	hwBacklightBoostTuning(kal_uint32 MODE, kal_uint32 VRSEL, 0);
+//	hwBacklightBoostTurnOn();
+//echo 15 13 > pmic_access_bank1
+//echo 40 0A > pmic_access_bank1
+//echo 3F 91 > pmic_access_bank1
+//echo 2E 1F > pmic_access_bank1 
+	printk("backlight temp solution, level=%d, div=%d\n", level, div);
+	ret=pmic_bank1_config_interface(0x15, 0x13, 0xFF, 0x0);
+	//backlight voltage
+	ret=pmic_bank1_config_interface(0x40, 0x0A, 0xFF, 0x0);
+	//bit0=1, enable boost backlight; bit2=0, CABC disable;bit5-bit4=01,PWM1;bit7=1,boost mode;
+	ret=pmic_bank1_config_interface(0x3F, 0x91, 0xFF, 0x0);
+	//PWM1 duty=32/32
+	ret=pmic_bank1_config_interface(0x2E, 0x1F, 0xFF, 0x0);
+    
     return 0;
 }
+*/
 
 
 static struct cust_mt65xx_led cust_led_list[MT65XX_LED_TYPE_TOTAL] = {
-	{"red",               MT65XX_LED_MODE_PMIC, MT65XX_LED_PMIC_NLED_ISINK2,{0}},
-	{"green",             MT65XX_LED_MODE_PMIC, MT65XX_LED_PMIC_NLED_ISINK1,{0}},
+	{"red",               MT65XX_LED_MODE_PMIC, MT65XX_LED_PMIC_NLED_ISINK1,{0}},
+	{"green",             MT65XX_LED_MODE_PMIC, MT65XX_LED_PMIC_NLED_ISINK0,{0}},
 	{"blue",              MT65XX_LED_MODE_NONE, -1,{0}},
 	{"jogball-backlight", MT65XX_LED_MODE_NONE, -1,{0}},
 	{"keyboard-backlight",MT65XX_LED_MODE_NONE, -1,{0}},
-	{"button-backlight",  MT65XX_LED_MODE_PMIC, MT65XX_LED_PMIC_NLED_ISINK0,{0}},
+	{"button-backlight",  MT65XX_LED_MODE_PMIC, MT65XX_LED_PMIC_NLED_ISINK2,{0}},
 	{"lcd-backlight",     MT65XX_LED_MODE_CUST_BLS_PWM, (int)disp_bls_set_backlight,{0}},
 };
 

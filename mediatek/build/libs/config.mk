@@ -27,7 +27,8 @@ mediatek-configs.$(1): $(2)
 $(2): PRIVATE_FILE_LIST := $(3)
 $(2): $(3) $(4)
 	@echo "[CONFIG] generate $(2)"
-	@$(5) $(3) > $(2)
+	@mkdir -p $(dir $(2))
+	@python $(4) $(3) > $(2)
 endef
 
 define .mtk.config.generate-auto-rules
@@ -37,7 +38,7 @@ $(eval _merge_order_ := $(call wildcard2,$(foreach m,$(merge-order),$(foreach p,
 $(eval _target_file_ := $(MTK_ROOT_GEN_CONFIG)/$1) \
 $(if $(call seq,auto-merge,$(config-type)),$(eval \
   $(call .mtk.config.generate-auto-merge-rules,$1,$(_target_file_),$(_merge_order_)\
-         ,$(MTK_ROOT_GEN_CONFIG),$(merge-command))
+         ,$(merge-tool))
 ),$(eval #################### add your own config file parsing rule here ###################### )
 )$(_target_file_)
 endef
@@ -69,14 +70,10 @@ define mtk.config.generate-rules
 $(eval \
 .PHONY: mediatek-configs
 $(1): mediatek-configs
-$(1): $(MTK_ROOT_GEN_CONFIG)
-$(MTK_ROOT_GEN_CONFIG):
-	@mkdir -p $$@
 $(1): $(MTK_ROOT_CONFIG_OUT)/ProjectConfig.mk
-$(MTK_ROOT_CONFIG_OUT):
-	@mkdir -p $$@
-$(MTK_ROOT_CONFIG_OUT)/ProjectConfig.mk: $(MTK_ROOT_CONFIG_OUT) $(MTK_PROJECT_CONFIGS)
+$(MTK_ROOT_CONFIG_OUT)/ProjectConfig.mk: $(MTK_PROJECT_CONFIGS)
 	@echo "[CONFIG] generate $$@"
+	@mkdir -p $$(dir $$@)
 	@if [ -e $$@ ]; then chmod u+w $$@; fi
 	@python $(MTK_PATH_BUILD)/tools/config/merge-project.py $(MTK_PROJECT_CONFIGS) > $$@
 ) \
@@ -113,7 +110,7 @@ endef
 # Example Config File
 # prepare mediatek/config/common/xxx/config.mk with following content:
 # config-type   := auto-merge
-# merge-command := python $(MTK_ROOT_BUILD)/tools/config/merge.py
+# merge-tool := $(MTK_ROOT_BUILD)/tools/config/merge.py
 # merge-order   := \
 #     common \
 #     platform \

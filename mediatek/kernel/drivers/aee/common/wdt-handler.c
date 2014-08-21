@@ -14,9 +14,10 @@
 #include <mach/irqs.h>
 
 #include "aee-common.h"
+#include <mach/wd_api.h>
 
-//#undef WDT_DEBUG_VERBOSE
-#define WDT_DEBUG_VERBOSE
+#undef WDT_DEBUG_VERBOSE
+//#define WDT_DEBUG_VERBOSE
 
 #ifdef WDT_DEBUG_VERBOSE
 extern int dump_localtimer_info(char* buffer, int size);
@@ -29,14 +30,6 @@ extern int dump_idle_info(char *buffer, int size);
 #ifdef CONFIG_SCHED_DEBUG
 extern int sysrq_sched_debug_show_at_KE(void);
 #endif
-
-enum wk_wdt_type {
-	WK_WDT_LOC_TYPE,
-	WK_WDT_EXT_TYPE,
-	WK_WDT_LOC_TYPE_NOLOCK,
-	WK_WDT_EXT_TYPE_NOLOCK,	
-};
-extern void mtk_wdt_restart(enum wk_wdt_type type);
 
 #ifdef CONFIG_SMP
 extern void dump_log_idle(void);
@@ -149,6 +142,8 @@ void aee_wdt_printf(const char *fmt, ...)
 	va_end(args);
 }
 
+
+#if defined(CONFIG_FIQ_DEBUGGER)
 /* save registers in bin buffer, may comes from various cpu */
 static void aee_dump_cpu_reg_bin(int cpu, void *regs_ptr)
 {
@@ -229,6 +224,7 @@ static void aee_wdt_dump_stack_bin(unsigned int cpu, unsigned long bottom, unsig
 
 	return;
 }
+#endif	// #ifdef CONFIG_FIQ_GLUE
 
 /* save binary register and stack value into ram console */
 static void aee_save_reg_stack_sram(void)
@@ -310,19 +306,7 @@ void aee_smp_send_stop(void)
 		udelay(1);
 
 	if (num_online_cpus() > 1) {
-		unsigned int *log, len;
-		int i, l;
-		extern int get_fiq_isr_log(int cpu, unsigned int *log, unsigned int *len);
 		aee_wdt_printf("WDT: failed to stop other CPUs in FIQ \n");
-		for (i = 0; i < NR_CPUS; i++) {
-			if (!get_fiq_isr_log(i, (unsigned int *)(&log), &len)) {
-				aee_wdt_printf("fiq_isr_log_%d: ", i);
-				for (l = 0; l < (len / 4); l++) {
-					aee_wdt_printf("0x%x,", *(log + l));
-				}
-				aee_wdt_printf("\n");
-			}
-		}
 	}
 }
 #else
@@ -357,9 +341,17 @@ void aee_wdt_irq_info(void)
 {
 	unsigned long long t;
 	unsigned long nanosec_rem;
+	int res=0;
+	struct wd_api*wd_api = NULL;
+	res = get_wd_api(&wd_api);
 
 	aee_rr_rec_fiq_step(AEE_FIQ_STEP_WDT_IRQ_KICK);
-	mtk_wdt_restart(WK_WDT_EXT_TYPE_NOLOCK);
+	if(res)
+	{
+		aee_wdt_printf("aee_wdt_irq_info, get wd api error\n");
+	} else {
+		wd_api->wd_restart(WD_TYPE_NOLOCK);
+	}
 
 	aee_rr_rec_fiq_step(AEE_FIQ_STEP_WDT_IRQ_SMP_STOP);
 	#ifdef CONFIG_SMP

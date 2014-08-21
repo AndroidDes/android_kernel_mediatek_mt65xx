@@ -98,6 +98,10 @@
 #include "hdmitx.h"
 
 #include <linux/switch.h>
+
+/// if resize to zoom out, please set to 5 normally. DO NOT bigger than 10
+#define WFD_DISPLAY_ZOOM_OUT_FACTOR 0
+
 int wfd_log_on = 1;
 #define WFD_LOG(fmt, arg...) \
     do { \
@@ -151,7 +155,7 @@ static HDMI_DRIVER *hdmi_drv = NULL;
 
 static struct timeval  timestamp[16];
 
-// xuecheng, this is for exernal display driver blocking "get buffer" method
+// mediatek, this is for exernal display driver blocking "get buffer" method
 static atomic_t wfd_buffer_update_flag = ATOMIC_INIT(0);
 #define WFD_PUT_NEW_BUFFER() atomic_set(&wfd_buffer_update_flag, 1)
 #define WFD_CLEAR_NEW_BUFFER() atomic_set(&wfd_buffer_update_flag, 0)
@@ -387,10 +391,10 @@ static int hdmi_update_kthread(void *data)
 				//HDMI_LOG("wq wakeup\n");
 				//hdmi_update_impl();
 
+				atomic_set(&hdmi_update_event,0);
 
 				hdmi_update_impl();
 				
-				atomic_set(&hdmi_update_event,0);
 
 				
 				if (kthread_should_stop())
@@ -400,23 +404,12 @@ static int hdmi_update_kthread(void *data)
 		return 0;
 }
 
-unsigned int wfd_get_current_ovl_dst_addr(void)
-{
-	unsigned int addr = 0;
-	addr = overlay_dst_mva  + hdmi_buffer_lcdw_id * p->lcm_width * p->lcm_height * 3;
-	return addr;
-}
 /* Used for HDMI Driver update */
 static int hdmi_overlay_config_kthread(void *data)
 {
 		unsigned int addr = 0;
 		struct sched_param param = { .sched_priority = RTPM_PRIO_SCRN_UPDATE };
-		struct disp_path_config_mem_out_struct wdma1Config = {0};
 		sched_setscheduler(current, SCHED_RR, &param);
-
-		wdma1Config.outFormat = WDMA_OUTPUT_FORMAT_RGB888;
-        wdma1Config.srcROI.x = 0;
-        wdma1Config.srcROI.y = 0;
 
 		for( ;; ) {
 			
@@ -430,12 +423,7 @@ static int hdmi_overlay_config_kthread(void *data)
                     hdmi_buffer_lcdw_id_tmp = (hdmi_buffer_lcdw_id + 1) % hdmi_temp_buffer_number;
                     addr = overlay_dst_mva + hdmi_buffer_lcdw_id_tmp * p->lcm_width * p->lcm_height * 3;
 
-                    //DISP_REG_SET(0x1000+DISP_REG_WDMA_DST_ADDR, addr);
-                    wdma1Config.enable = 1;
-                    wdma1Config.dstAddr = addr;
-                    wdma1Config.srcROI.width = p->lcm_width;
-                    wdma1Config.srcROI.height = p->lcm_height;
-                    disp_path_config_mem_out(&wdma1Config);
+                    DISP_REG_SET(0x1000+DISP_REG_WDMA_DST_ADDR, addr);
 
                     disp_path_release_mutex();
                 }
@@ -468,11 +456,9 @@ void wfd_source_buffer_switch(void)
     //hdmi_buffer_lcdw_id = 0;
 
     MMProfileLog(WFD_MMP_Events.OverlayDone, MMProfileFlagStart);
-	 if (p->lcm_is_video_mode)
-	 {
-    	atomic_set(&hdmi_overlay_config_event, 1);
-    	wake_up_interruptible(&hdmi_overlay_config_wq);
-	 }
+
+    atomic_set(&hdmi_overlay_config_event, 1);
+    wake_up_interruptible(&hdmi_overlay_config_wq);
 
     //LCD_CHECK_RET(LCD_FBSetAddress(LCD_FB_0, temp_mva + p->lcm_width*p->lcm_height*3*hdmi_buffer_lcdw_id));
     MMProfileLog(WFD_MMP_Events.OverlayDone, MMProfileFlagEnd);
@@ -576,7 +562,19 @@ static void hdmi_update_impl(void)
 		//LCD_WaitForNotBusy();
 		//hdmi_buffer_write_id = (hdmi_buffer_write_id+1) % hdmi_temp_buffer_number;
 
-	
+		if(p->is_reconfig_needed || p->is_wfd_suspend)
+		{
+				int i = 0;
+				for(i=0;i<hdmi_temp_buffer_number;i++)
+				{
+					memset((void*)(ddp_dst_va+i*p->hdmi_width*p->hdmi_height*3), 0x00,p->hdmi_width*p->hdmi_height);
+					memset((void*)(ddp_dst_va+i*p->hdmi_width*p->hdmi_height*3+p->hdmi_width*p->hdmi_height), 0x80, p->hdmi_width*p->hdmi_height);
+				}
+				if(p->is_reconfig_needed)
+				{
+					p->is_reconfig_needed = false;
+				}
+		}
 
 		if(p->is_wfd_suspend)
 		{	
@@ -617,7 +615,7 @@ static void hdmi_update_impl(void)
                          ((pddp.orientation == 90 || pddp.orientation == 270) && p->lcm_height < p->lcm_width);
 
 		#if 0
-		// xuecheng, this is for IT only
+		// mediatek, this is for IT only
 		{
 			MMP_MetaDataBitmap_t Bitmap;
 			Bitmap.data1 = hdmi_buffer_lcdw_id;
@@ -636,17 +634,20 @@ static void hdmi_update_impl(void)
 		#else
 		MMProfileLogEx(WFD_MMP_Events.DDPKBitblt, MMProfileFlagStart, hdmi_buffer_write_id, 0);
 		#endif
-
+		int scaling = (100 - WFD_DISPLAY_ZOOM_OUT_FACTOR);
+		if(scaling < 90)
+			scaling = 90;
+		
 		if(portraitOutput)
 		{
 			// make sure in portrait mode, MDP resize must be as propotion
 			// that is p.dstW/p.dstH == lcm_width/lcm_height
 			pddp.dstX = pddp.dstY = 0;
 			if(p->lcm_height > p->lcm_width)
-			    pddp.dstW = ALIGN_TO(p->lcm_width * p->hdmi_height / p->lcm_height, 4);
+			    pddp.dstW = ALIGN_TO(p->lcm_width * p->hdmi_height / p->lcm_height* scaling / 100, 4);
 			else
-			    pddp.dstW = ALIGN_TO(p->lcm_height * p->hdmi_height / p->lcm_width, 4);
-			pddp.dstH = ALIGN_TO(p->hdmi_height,4);
+			    pddp.dstW = ALIGN_TO(p->lcm_height * p->hdmi_height / p->lcm_width* scaling / 100, 4);
+			pddp.dstH = ALIGN_TO(p->hdmi_height* scaling / 100,4);
 
 			if(p->is_wfd)
 			{
@@ -698,9 +699,9 @@ static void hdmi_update_impl(void)
 		else
 		{
             pddp.dstX = pddp.dstY = 0;
-            pddp.dstW = p->hdmi_width;
-            pddp.dstH = p->hdmi_height;
-
+            pddp.dstW = ALIGN_TO(p->hdmi_width* scaling / 100,4);
+            pddp.dstH = ALIGN_TO(p->hdmi_height* scaling / 100,4);
+			
             if(p->is_wfd)
             {
                 pddp.dstFormat = eYUV_420_3P_K;
@@ -724,10 +725,18 @@ static void hdmi_update_impl(void)
             }
             else if(pddp.dstFormat == eYUV_420_3P_K)
             {
-                pddp.dstAddr[0] = ddp_dst_mva+ hdmi_buffer_write_id * p->hdmi_width * p->hdmi_height * 3;
-                pddp.dstAddr[1] = ddp_dst_mva+ hdmi_buffer_write_id * p->hdmi_width * p->hdmi_height * 3 + p->hdmi_width*p->hdmi_height;
-                pddp.dstAddr[2] = ddp_dst_mva+ hdmi_buffer_write_id * p->hdmi_width * p->hdmi_height * 3 + p->hdmi_width*p->hdmi_height/4*5;
-                pddp.dstBufferSize[0] = p->hdmi_width*p->hdmi_height;
+				pddp.dstAddr[0] = ddp_dst_mva+ hdmi_buffer_write_id * p->hdmi_width * p->hdmi_height * 3 +
+                            (p->hdmi_height - pddp.dstH) / 2 * p->hdmi_width +
+                            (p->hdmi_width - pddp.dstW) / 2;
+                pddp.dstAddr[1] = ddp_dst_mva+ hdmi_buffer_write_id * p->hdmi_width * p->hdmi_height * 3 +
+                            p->hdmi_width*p->hdmi_height +
+                            (p->hdmi_height - pddp.dstH) / 2 * p->hdmi_width / 4 +
+                            (p->hdmi_width - pddp.dstW) / 2 / 2;
+                pddp.dstAddr[2] = ddp_dst_mva+ hdmi_buffer_write_id * p->hdmi_width * p->hdmi_height * 3 +
+                            p->hdmi_width*p->hdmi_height /4 * 5 +
+                            (p->hdmi_height - pddp.dstH) / 2 * p->hdmi_width / 4 +
+                            (p->hdmi_width - pddp.dstW) / 2 / 2;
+				pddp.dstBufferSize[0] = p->hdmi_width*p->hdmi_height;
                 pddp.dstBufferSize[1] = p->hdmi_width*p->hdmi_height /4;
                 pddp.dstBufferSize[2] = p->hdmi_width*p->hdmi_height /4;
                 pddp.dstPlaneNum = 3;
@@ -745,17 +754,6 @@ static void hdmi_update_impl(void)
 		WFD_LOG("ts:sec=%d, nsec=%d\n", timestamp[hdmi_buffer_write_id].tv_sec, timestamp[hdmi_buffer_write_id].tv_usec);
 
 		profile_t = get_current_time_us();
-		if(p->is_reconfig_needed)
-		{
-			int i = 0;
-			WFD_LOG("re-config happen!\n");
-			for(i = 0; i < hdmi_temp_buffer_number;i++)
-			{
-				memset((void*)(ddp_dst_va+i*p->hdmi_width*p->hdmi_height*3), 0x00,p->hdmi_width*p->hdmi_height);
-				memset((void*)(ddp_dst_va+i*p->hdmi_width*p->hdmi_height*3+p->hdmi_width*p->hdmi_height), 0x80, p->hdmi_width*p->hdmi_height);
-			}
-			p->is_reconfig_needed = false;
-		}
 
 		ret = DDPK_Bitblt_Config( DDPK_CH_HDMI_0, &pddp );
 		if(ret)
@@ -790,7 +788,7 @@ static void _register_updated_irq_handler(unsigned int param)
     if(param & 1)
     {
         hdmi_buffer_lcdw_id = hdmi_buffer_lcdw_id_tmp;
-        //WFD_LOG("wdma1 register updated, ovl_w=%d\n", hdmi_buffer_lcdw_id);
+        WFD_LOG("wdma1 register updated, ovl_w=%d\n", hdmi_buffer_lcdw_id);
 
         wfd_source_buffer_switch();
     }
@@ -898,10 +896,11 @@ static HDMI_STATUS hdmi_drv_init(void)
 
 		if(p->lcm_is_video_mode)
 		{
+		    wfd_display_path_overlay_config(true);
 		    disp_register_irq(DISP_MODULE_MUTEX, _register_updated_irq_handler);
 		}
-
-		DISP_Config_Overlay_to_Memory(overlay_dst_mva, 1);
+        else
+            DISP_Config_Overlay_to_Memory(overlay_dst_mva, 1);
 
 		WFD_LOG("overlay_dst_va=0x%08x, overlay_dst_mva=0x%08x, buffer size=0x%08x\n", overlay_dst_va, overlay_dst_mva, ovl_dst_buffer_size);
 
@@ -926,10 +925,10 @@ static HDMI_STATUS hdmi_drv_deinit(void)
 	if(p->lcm_is_video_mode)
 	{
 	    disp_unregister_irq(DISP_MODULE_MUTEX, _register_updated_irq_handler);
+	    wfd_display_path_overlay_config(false);
 	}
-
-	DISP_Config_Overlay_to_Memory(overlay_dst_mva, 0);
-
+	else
+	    DISP_Config_Overlay_to_Memory(overlay_dst_mva, 0);
 	WFD_LOG("disable overlay output to memory\n");
 	
 	portStruct.ePortID = M4U_PORT_WDMA1;			 //hardware port ID, defined in M4U_PORT_ID_ENUM
@@ -968,25 +967,12 @@ static HDMI_STATUS hdmi_drv_deinit(void)
 				printk("[hdmi][HDMI] can't get semaphore in %s\n", __func__);
 				return;
 		}
-		MMProfileLogEx(WFD_MMP_Events.Rotate, MMProfileFlagPulse, p->orientation, orientation);
 
 		WFD_LOG("old ori=%d, new ori=%d\n", p->orientation, orientation);
-		if(p->orientation != orientation)
-		{
-			if((p->lcm_height > p->lcm_width) && (orientation == 0 ||orientation == 180))
-			{
-				WFD_LOG("reconfig_needed is set, lcm height > width\n");
-				p->is_reconfig_needed = true;
-			}
-			else if((p->lcm_height < p->lcm_width) && (orientation == 90 ||orientation == 270))
-			{
-				WFD_LOG("reconfig_needed is set, lcm height < width\n");
-				p->is_reconfig_needed = true;
-			}
-
-			p->orientation = orientation;
-		}
+		p->orientation = orientation;
+		p->is_reconfig_needed = true;
 		WFD_LOG("old ori=%d, new ori=%d\n", p->orientation, orientation);
+		MMProfileLog(WFD_MMP_Events.Rotate, MMProfileFlagPulse);
 
 		//done:
 		up(&hdmi_update_mutex);
@@ -1119,7 +1105,6 @@ void wfd_force_pattern_output(int enable)
 
 void wfd_suspend(void)
 {
-	WFD_FUNC();
 	RET_VOID_IF(IS_HDMI_NOT_ON());
 	RET_VOID_IF(!p->is_wfd);
 
@@ -1147,8 +1132,6 @@ void wfd_suspend(void)
 
 void wfd_resume(void)
 {
-	WFD_FUNC();
-
 	RET_VOID_IF(IS_HDMI_NOT_ON());
 	RET_VOID_IF(!p->is_wfd);
 	
@@ -1211,17 +1194,8 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case MTK_EXT_DISPLAY_START:
 		{
 			MMProfileLog(WFD_MMP_Events.WFDStart, MMProfileFlagPulse);
-			disp_module_clock_on(DISP_MODULE_WDMA1, "external display service");
-			
-			HDMI_CHECK_RET(hdmi_drv_init());
 			SET_HDMI_ON();
-			
-			WFD_CLEAR_NEW_BUFFER();
-			
-			memset((void*)&timestamp, 0, sizeof(struct timeval)*16);
-						
-			hdmi_buffer_write_id = 0;
-			hdmi_buffer_lcdw_id = 0;
+			HDMI_CHECK_RET(hdmi_drv_init());
 			//external_display_trigger_update();
 
 			break;
@@ -1238,9 +1212,8 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			vfree((void const *)ddp_dst_va);
 			overlay_dst_va = 0;
 			ddp_dst_va = 0;
-			WFD_PUT_NEW_BUFFER();
-			wake_up_interruptible(&external_display_getbuffer_wq);	
-            disp_module_clock_off(DISP_MODULE_WDMA1, "external display service");		
+			WFD_CLEAR_NEW_BUFFER();
+			memset((void*)&timestamp, 0, sizeof(struct timeval)*16);
 			break;
 		}
 		case MTK_EXT_DISPLAY_SET_MEMORY_INFO:
@@ -1292,14 +1265,13 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			int ret = 0;
 			int get_buffer_id = 0;
 			struct ext_buffer buf = {0, 0, 0};
-			RETIF(IS_HDMI_NOT_ON(), -1);
+
 			MMProfileLogEx(WFD_MMP_Events.Getbuffer, MMProfileFlagStart, wfd_pattern_output_index, 0);
 
 			if(wfd_pattern_output)
 			{
 				struct timeval t;
 				{
-					int i = 0;
 					memset((void*)(ddp_dst_va+wfd_pattern_output_index*p->hdmi_width*p->hdmi_height*3), 0x00,p->hdmi_width*p->hdmi_height);
 					memset((void*)(ddp_dst_va+wfd_pattern_output_index*p->hdmi_width*p->hdmi_height*3+p->hdmi_width*p->hdmi_height), 0x80, p->hdmi_width*p->hdmi_height);
 
@@ -1319,6 +1291,7 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 				return ret;
 			}
+			
 
 			if(WFD_GET_NEW_BUFFER())
 			{
@@ -1348,7 +1321,7 @@ static long hdmi_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			MMProfileLogEx(WFD_MMP_Events.Getbuffer, MMProfileFlagEnd, 2, hdmi_buffer_write_id);
 			
 #if 0
-			// xuecheng, this is for IT only
+			// mediatek, this is for IT only
 			{
 				MMP_MetaDataBitmap_t Bitmap;
 				Bitmap.data1 = buf.id;
@@ -1437,7 +1410,6 @@ static int hdmi_probe(struct platform_device *pdev)
 {
 		int ret = 0;
 		struct class_device *class_dev = NULL;
-    	memset((void*)&hdmi_context, 0, sizeof(_t_hdmi_context));
 
 		printk("[hdmi]%s\n", __func__);
 
@@ -1509,7 +1481,7 @@ static int __init hdmi_init(void)
 
 module_init(hdmi_init);
 module_exit(hdmi_exit);
-MODULE_AUTHOR("Xuecheng, Zhang <xuecheng.zhang@mediatek.com>");
+MODULE_AUTHOR("<www.mediatek.com>");
 MODULE_DESCRIPTION("WFD Driver");
 MODULE_LICENSE("GPL");
 

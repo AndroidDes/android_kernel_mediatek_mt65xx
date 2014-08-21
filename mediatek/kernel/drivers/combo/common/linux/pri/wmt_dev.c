@@ -1241,10 +1241,19 @@ WMT_unlocked_ioctl (
     )
 {
 #define WMT_IOC_MAGIC        0xa0
-#define WMT_IOCTL_PORT_NAME       _IOWR(WMT_IOC_MAGIC, 20, char*)
-#define WMT_IOCTL_WMT_CFG_NAME     _IOWR(WMT_IOC_MAGIC, 21, char*)
-#define WMT_IOCTL_WMT_QUERY_CHIPID     _IOR(WMT_IOC_MAGIC, 22, int)
-#define WMT_IOCTL_WMT_TELL_CHIPID     _IOW(WMT_IOC_MAGIC, 23, int)
+#define WMT_IOCTL_SET_PATCH_NAME	 	_IOW(WMT_IOC_MAGIC,4,char*)
+#define WMT_IOCTL_SET_STP_MODE		 	_IOW(WMT_IOC_MAGIC,5,int)
+#define WMT_IOCTL_FUNC_ONOFF_CTRL		_IOW(WMT_IOC_MAGIC,6,int)
+#define WMT_IOCTL_LPBK_POWER_CTRL		_IOW(WMT_IOC_MAGIC,7,int)
+#define WMT_IOCTL_LPBK_TEST				_IOWR(WMT_IOC_MAGIC,8,char*)
+#define WMT_IOCTL_GET_CHIP_INFO			_IOR(WMT_IOC_MAGIC,12,int)
+#define WMT_IOCTL_SET_LAUNCHER_KILL		_IOW(WMT_IOC_MAGIC,13,int)
+#define WMT_IOCTL_SET_PATCH_NUM			_IOW(WMT_IOC_MAGIC,14,int)
+#define WMT_IOCTL_SET_PATCH_INFO		_IOW(WMT_IOC_MAGIC,15,char*)
+#define WMT_IOCTL_PORT_NAME       		_IOWR(WMT_IOC_MAGIC, 20, char*)
+#define WMT_IOCTL_WMT_CFG_NAME     		_IOWR(WMT_IOC_MAGIC, 21, char*)
+#define WMT_IOCTL_WMT_QUERY_CHIPID     	_IOR(WMT_IOC_MAGIC, 22, int)
+#define WMT_IOCTL_WMT_TELL_CHIPID     	_IOW(WMT_IOC_MAGIC, 23, int)
 #define WMT_IOCTL_WMT_COREDUMP_CTRL     _IOW(WMT_IOC_MAGIC, 24, int)
 
 
@@ -1253,7 +1262,7 @@ WMT_unlocked_ioctl (
     UCHAR pBuffer[NAME_MAX + 1];
     WMT_DBG_FUNC("cmd (%u), arg (0x%lx)\n", cmd, arg);
     switch(cmd) {
-    case 4: /* patch location */
+    case WMT_IOCTL_SET_PATCH_NAME: /* patch location */
         {
             
             if (copy_from_user(pBuffer, (void *)arg, NAME_MAX)) {
@@ -1265,7 +1274,7 @@ WMT_unlocked_ioctl (
         }
         break;
 
-    case 5: /* stp/hif/fm mode */
+    case WMT_IOCTL_SET_STP_MODE: /* stp/hif/fm mode */
 
         /* set hif conf */
         do {
@@ -1302,7 +1311,7 @@ WMT_unlocked_ioctl (
 
         break;
 
-    case 6: /* test turn on/off func */
+    case WMT_IOCTL_FUNC_ONOFF_CTRL: /* test turn on/off func */
 
         do {
             MTK_WCN_BOOL bRet = MTK_WCN_BOOL_FALSE;
@@ -1319,7 +1328,7 @@ WMT_unlocked_ioctl (
 
         break;
 
-        case 7:
+        case WMT_IOCTL_LPBK_POWER_CTRL:
         /*switch Loopback function on/off
                   arg:     bit0 = 1:turn loopback function on
                   bit0 = 0:turn loopback function off
@@ -1341,7 +1350,7 @@ WMT_unlocked_ioctl (
           break;
 
 
-        case 8:
+        case WMT_IOCTL_LPBK_TEST:
         do {
             P_OSAL_OP pOp;
             MTK_WCN_BOOL bRet;
@@ -1493,7 +1502,7 @@ WMT_unlocked_ioctl (
         break;
         
             
-        case 12:
+        case WMT_IOCTL_GET_CHIP_INFO:
         {
             if (0 == arg)
             {
@@ -1510,7 +1519,7 @@ WMT_unlocked_ioctl (
         }
         break;
 
-        case 13: {
+        case WMT_IOCTL_SET_LAUNCHER_KILL: {
             if (1 == arg) {
 			    WMT_INFO_FUNC("launcher may be killed,block abnormal stp tx. \n");
 			    wmt_lib_set_stp_wmt_last_close(1);
@@ -1521,7 +1530,7 @@ WMT_unlocked_ioctl (
 		}
 		break;
 		
-        case 14: {
+        case WMT_IOCTL_SET_PATCH_NUM: {
 			pAtchNum = arg;
 			WMT_INFO_FUNC(" get patch num from launcher = %d\n",pAtchNum);
 			wmt_lib_set_patch_num(pAtchNum);
@@ -1533,7 +1542,7 @@ WMT_unlocked_ioctl (
 		}
 		break;
 
-		case 15: {
+		case WMT_IOCTL_SET_PATCH_INFO: {
 			WMT_PATCH_INFO wMtPatchInfo;
 			P_WMT_PATCH_INFO pTemp = NULL;
 			UINT32 dWloadSeq;

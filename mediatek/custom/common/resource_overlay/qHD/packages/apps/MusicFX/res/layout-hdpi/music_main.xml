@@ -92,6 +92,8 @@
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:ellipsize="marquee"
                     android:fadingEdge="horizontal"
+                    android:maxLines="2"
+                    android:requiresFadingEdge="horizontal"
                     android:text="@string/bass_boost_strength" />
                 <com.android.musicfx.seekbar.SeekBar
                     android:id="@+id/bBStrengthSeekBar"
@@ -124,6 +126,8 @@
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:ellipsize="marquee"
                     android:fadingEdge="horizontal"
+                    android:maxLines="2"
+                    android:requiresFadingEdge="horizontal"
                     android:text="@string/virtualizer_strength" />
                 <com.android.musicfx.seekbar.SeekBar
                     android:id="@+id/vIStrengthSeekBar"
@@ -163,6 +167,8 @@
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:ellipsize="marquee"
                     android:fadingEdge="horizontal"
+                    android:maxLines="2"
+                    android:requiresFadingEdge="horizontal"
                     android:text="@string/presetreverb_name" />
                 <Spinner 
                     android:id="@+id/prSpinner"

@@ -75,13 +75,15 @@ static inline void kpd_pwrkey_pmic_handler(unsigned long data){}
 #endif
 
 void kpd_pmic_rstkey_handler(unsigned long pressed);
-
+//LINE <one key reboot> <DATE20130724> <one key reboot> zhangxiaofei
 #define ONEKEY_REBOOT_NORMAL_MODE
 //#define TWOKEY_REBOOT_NORMAL_MODE
-//#define ONEKEY_REBOOT_OTHER_MODE
-#define TWOKEY_REBOOT_OTHER_MODE
-//#define KPD_PMIC_RSTKEY_MAP KEY_VOLUMEDOWN
-#define KPD_PMIC_LPRST_TD 1 /* timeout period. 0: 5sec; 1: 7sec; 2: 9sec; 3: 11sec */
-
+#define ONEKEY_REBOOT_OTHER_MODE
+//#define TWOKEY_REBOOT_OTHER_MODE
+//LINE <FCHAN ENABLE> <DATE20130730> <FCHAN ENABLE> zhangxiaofei
+#define KPD_PMIC_RSTKEY_MAP KEY_VOLUMEDOWN
+//LINE <one key reboot> <DATE20130724> <one key reboot> zhangxiaofei
+#define KPD_PMIC_LPRST_TD 1  // 11sec
+//#define KPD_PMIC_LPRST_TD 0 /* timeout period. 0: 7sec; 1: 11sec; 2: 14sec; 3: 5sec */
 
 #endif

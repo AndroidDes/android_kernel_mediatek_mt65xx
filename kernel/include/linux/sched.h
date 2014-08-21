@@ -143,8 +143,9 @@ extern unsigned long nr_iowait(void);
 extern unsigned long nr_iowait_cpu(int cpu);
 extern unsigned long this_cpu_load(void);
 extern unsigned long get_cpu_load(int cpu);
-
-
+extern unsigned long long mt_get_thread_cputime(pid_t pid);
+extern unsigned long long mt_get_cpu_idle(int cpu);
+extern unsigned long long mt_sched_clock(void);
 extern void calc_global_load(unsigned long ticks);
 
 extern unsigned long get_parent_ip(unsigned long addr);
@@ -2144,6 +2145,15 @@ extern int sched_setscheduler(struct task_struct *, int,
 extern int sched_setscheduler_nocheck(struct task_struct *, int,
 				      const struct sched_param *);
 extern struct task_struct *idle_task(int cpu);
+
+#ifdef CONFIG_MT_PRIO_TRACER
+extern void set_user_nice_core(struct task_struct *p, long nice);
+extern int sched_setscheduler_core(struct task_struct *, int,
+				   const struct sched_param *);
+extern int sched_setscheduler_nocheck_core(struct task_struct *, int,
+					   const struct sched_param *);
+#endif
+
 /**
  * is_idle_task - is the specified task an idle task?
  * @p: the task in question.
@@ -2709,7 +2719,16 @@ static inline void thread_group_cputime_init(struct signal_struct *sig)
 extern void recalc_sigpending_and_wake(struct task_struct *t);
 extern void recalc_sigpending(void);
 
-extern void signal_wake_up(struct task_struct *t, int resume_stopped);
+extern void signal_wake_up_state(struct task_struct *t, unsigned int state);
+
+static inline void signal_wake_up(struct task_struct *t, bool resume)
+{
+	signal_wake_up_state(t, resume ? TASK_WAKEKILL : 0);
+}
+static inline void ptrace_signal_wake_up(struct task_struct *t, bool resume)
+{
+	signal_wake_up_state(t, resume ? __TASK_TRACED : 0);
+}
 
 /*
  * Wrappers for p->thread_info->cpu access. No-op on UP.

@@ -12,10 +12,6 @@
 /*
 ** $Log: wlan_oid.c $
 **
-** 01 17 2013 george.huang
-** [ALPS00444577] ?Lenovo A820t??Pre-test??????Critical??wifi??wifi??????????????
-** Rollback //ALPS_SW/MP/ALPS.JB2.MP/alps/mediatek/kernel/drivers/combo/drv_wlan/mt6628/wlan/common/wlan_oid.c to revision 1
-**
 ** 07 19 2012 yuche.tsai
 ** NULL
 ** Code update for JB.
@@ -5807,7 +5803,6 @@ wlanoidSetSwCtrlWrite (
 #endif
         case 0xFFFF:
             {
-            CMD_ACCESS_REG rCmdAccessReg;
 #if 1 //CFG_MT6573_SMT_TEST
             if (u2SubId == 0x0123) {
 

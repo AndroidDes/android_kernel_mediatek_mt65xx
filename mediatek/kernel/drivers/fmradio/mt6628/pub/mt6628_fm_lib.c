@@ -523,7 +523,8 @@ static fm_s32 mt6628_PowerUp(fm_u16 *chip_id, fm_u16 *device_id)
 
 #ifdef FM_DIGITAL_INPUT
     mt6628_I2s_Setting(MT6628_I2S_ON, MT6628_I2S_SLAVE, MT6628_I2S_44K);
-    mt_combo_audio_ctrl(COMBO_AUDIO_STATE_2);
+    //mt_combo_audio_ctrl(COMBO_AUDIO_STATE_2);
+    mtk_wcn_cmb_stub_audio_ctrl((CMB_STUB_AIF_X)CMB_STUB_AIF_2);
 #endif
 
     //Wholechip FM Power Up: step 2, read HW version

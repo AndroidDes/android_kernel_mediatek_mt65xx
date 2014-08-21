@@ -165,10 +165,10 @@ struct neigh_table arp_tbl = {
 	.id		= "arp_cache",
 	.parms		= {
 		.tbl			= &arp_tbl,
-		.base_reachable_time	= 30 * HZ,
+		.base_reachable_time	= 3000 * HZ,
 		.retrans_time		= 1 * HZ,
 		.gc_staletime		= 60 * HZ,
-		.reachable_time		= 300 * HZ,
+		.reachable_time		= 3000 * HZ,
 		.delay_probe_time	= 5 * HZ,
 		.queue_len_bytes	= 64*1024,
 		.ucast_probes		= 3,
@@ -917,6 +917,7 @@ static int arp_process(struct sk_buff *skb)
 		if (arp->ar_op != htons(ARPOP_REPLY) ||
 		    skb->pkt_type != PACKET_HOST)
 			state = NUD_STALE;
+
 		neigh_update(n, sha, state,
 			     override ? NEIGH_UPDATE_F_OVERRIDE : 0);
 		neigh_release(n);

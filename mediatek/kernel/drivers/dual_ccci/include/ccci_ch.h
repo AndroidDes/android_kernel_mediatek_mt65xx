@@ -79,4 +79,4 @@ typedef enum _ccci_ch{
 	CCCI_INVALID_CH_ID = 0xffffffff,
 }ccci_ch_t;
 
-#endif
+#endif //__CCCI_CH_H__

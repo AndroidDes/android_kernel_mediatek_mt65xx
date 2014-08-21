@@ -9,13 +9,11 @@
  * -------
  *
  ****************************************************************************/
-
 #include <linux/module.h>
 #include <linux/poll.h>
-#include <ccci.h>
 #include <linux/uaccess.h>
 #include <asm/io.h>
-#include <ccci_common.h>
+#include <ccci.h>
 
 #define local_AP_id_2_unify_id(id) local_xx_id_2_unify_id(id,1)
 #define local_MD_id_2_unify_id(id) local_xx_id_2_unify_id(id,0)

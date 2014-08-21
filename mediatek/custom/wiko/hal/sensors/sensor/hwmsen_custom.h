@@ -17,39 +17,8 @@
 #ifndef __HWMSEN_CUSTOM_H__ 
 #define __HWMSEN_CUSTOM_H__
 
-#ifdef CUSTOM_KERNEL_ACCELEROMETER
-	#define ACCELEROMETER 		"BMA050 3-axis Accelerometer"
-	#define ACCELEROMETER_VENDER 	"Bosch"
-#endif
-
-#ifdef CUSTOM_KERNEL_ALSPS
-	#define PROXIMITY 		"cm36283  Proximity Sensor"
-	#define PROXIMITY_VENDER 	"Capella"
-	#define LIGHT 			"cm36283 Light Sensor"
-	#define LIGHT_VENDER 		"Capella"
-#endif
-
-#ifdef CUSTOM_KERNEL_MAGNETOMETER
-	#define MAGNETOMETER 		"BMM050 3-axis Magnetic Field sensor"
-	#define MAGNETOMETER_VENDER 	"Bosch"
-	#define ORIENTATION 		"BMM050 Orientation sensor"
-	#define ORIENTATION_VENDER 	"Bosch"
-#endif
-
-#ifdef CUSTOM_KERNEL_GYROSCOPE
-	#define GYROSCOPE 		"MPU3050c gyroscope Sensor"
-	#define GYROSCOPE_VENDER 	"Invensensor"
-#endif
-
-#ifdef CUSTOM_KERNEL_BAROMETER
-	#define PRESSURE 		"BMA050"
-	#define PRESSURE_VENDER		"BMA050"
-#endif
-
-#ifdef CUSTOM_KERNEL_TEMPURATURE
-	#define TEMPURATURE 		"BMA050"
-	#define TEMPURATURE_VENDER	"BMA050"
-#endif
+#define MAX_NUM_SENSORS                 1
+#define MSENSOR_AMI_LIB
 
 #endif
 

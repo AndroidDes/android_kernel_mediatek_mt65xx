@@ -24,7 +24,7 @@ struct ram_console_buffer {
 
 	uint8_t     hw_status;
 	uint8_t	    fiq_step;
-	uint8_t     __pad1;
+	uint8_t     reboot_mode;
 	uint8_t     __pad2;
 	uint8_t     __pad3;
 
@@ -42,6 +42,8 @@ struct ram_console_buffer {
 	uint8_t     hotplug_data1[RC_CPU_COUNT];
 	uint8_t     hotplug_data2[RC_CPU_COUNT];
 
+	void        *kparams;
+
  	uint8_t     data[0];
 };
 
@@ -51,7 +53,6 @@ static int FIQ_log_size = sizeof(struct ram_console_buffer);
 
 static char *ram_console_old_log_init_buffer = NULL;
 
-
 static struct ram_console_buffer ram_console_old_header;
 static char *ram_console_old_log;
 static size_t ram_console_old_log_size;
@@ -59,14 +60,23 @@ static size_t ram_console_old_log_size;
 static struct ram_console_buffer *ram_console_buffer;
 static size_t ram_console_buffer_size;
 
-
-
-
-
 static DEFINE_SPINLOCK(ram_console_lock);
 
 static atomic_t rc_in_fiq = ATOMIC_INIT(0);
 
+void aee_rr_rec_reboot_mode(u8 mode)
+{
+	if (ram_console_buffer) {
+		ram_console_buffer->reboot_mode = mode;
+	}
+}
+
+extern void aee_rr_rec_kdump_params(void *params)
+{
+ 	if (ram_console_buffer) {
+		ram_console_buffer->kparams = params;
+ 	}
+}
 
 void aee_rr_rec_fiq_step(u8 i)
 {
@@ -374,8 +384,6 @@ ram_console_save_old(struct ram_console_buffer *buffer)
 static int __init ram_console_init(struct ram_console_buffer *buffer,
 				   size_t buffer_size)
 {
-	int i;
-	
 	ram_console_buffer = buffer;
 	ram_console_buffer_size =
 		buffer_size - sizeof(struct ram_console_buffer);	
@@ -383,36 +391,22 @@ static int __init ram_console_init(struct ram_console_buffer *buffer,
 	if (buffer->sig == RAM_CONSOLE_SIG) {
 		if (buffer->size > ram_console_buffer_size
 		    || buffer->start > buffer->size)
-			printk(KERN_INFO "ram_console: found existing invalid "
+			printk(KERN_ERR "ram_console: found existing invalid "
 			       "buffer, size %d, start %d\n",
 			       buffer->size, buffer->start);
 		else {
-			printk(KERN_INFO "ram_console: found existing buffer, "
+			printk(KERN_ERR "ram_console: found existing buffer, "
 			       "size %d, start %d\n",
 			       buffer->size, buffer->start);
 			ram_console_save_old(buffer);
 		}
 	} else {
-		printk(KERN_INFO "ram_console: no valid data in buffer "
+		printk(KERN_ERR "ram_console: no valid data in buffer "
 		       "(sig = 0x%08x)\n", buffer->sig);
 	}
 
+	memset(buffer, 0, buffer_size);
 	buffer->sig = RAM_CONSOLE_SIG;
-	buffer->fiq_step = 0;
-	buffer->start = 0;
-	buffer->size = 0;
-	buffer->hw_status = 0;
-	buffer->bin_log_count = 0;
-
-	for (i = 0; i < mtk_cpu_num; i++) {
-		buffer->last_irq_enter[i] = 0;
-		buffer->jiffies_last_irq_enter[i] = 0;
-		buffer->last_irq_exit[i] = 0;
-		buffer->jiffies_last_irq_exit[i] = 0;
-
-		buffer->jiffies_last_sched[i] = 0;
-		memset(buffer->last_sched_comm[i], i, TASK_COMM_LEN);
-	}
 
 	register_console(&ram_console);
 	
@@ -469,13 +463,14 @@ static int __init ram_console_late_init(void)
 	
 	if (ram_console_old_log == NULL)
 	{
-		printk(KERN_ERR"ram console olg log is null!\n");
+		printk(KERN_ERR"ram console old log is null!\n");
 		return 0;
 	}
 
 	memset(&lrr, 0, sizeof(struct last_reboot_reason));
 	lrr.wdt_status = ram_console_old_header.hw_status;
 	lrr.fiq_step = ram_console_old_header.fiq_step;
+	lrr.reboot_mode = ram_console_old_header.reboot_mode;
 
 	for(i = 0; i < NR_CPUS; i++)
 	{

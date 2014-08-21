@@ -1,8 +1,9 @@
 #ifndef _MTKTVOUT_H
 #define _MTKTVOUT_H
 
-#define MTK_TVOUT_MAJOR_NUMBER 187
+#if defined(MTK_TVOUT_SUPPORT)
 
+#define MTK_TVOUT_MAJOR_NUMBER 187
 
 // ---------------------------------------------------------------------------
 
@@ -124,6 +125,6 @@ TVOUT_STATUS TVOUT_TvCablePlugIn_Directly(void);
 TVOUT_STATUS TVOUT_TvCablePlugOut_Directly(void);
 
 
-
+#endif
 
 #endif

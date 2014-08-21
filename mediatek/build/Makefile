@@ -96,6 +96,13 @@ $(call relative-include,libs/definitions.mk)   # common functions : Functions us
 $(call relative-include,libs/custom.mk)   # custom rules : Functions for custom folders
 $(call relative-include,libs/config.mk)   # config rules : Functions for config generation
 
+ifeq (,$(ARCH_MTK_PLATFORM))
+ifneq (,$(MTK_PLATFORM))
+  ARCH_MTK_PLATFORM := $(call lc,$(MTK_PLATFORM))
+  export ARCH_MTK_PLATFORM
+endif
+endif
+
 # let makefiles included in this makefile be invisible to all later makefiles
 $(_relative_dir_depth_)/_:=
 MAKEFILE_LIST := $(_entering_makefile_list_)

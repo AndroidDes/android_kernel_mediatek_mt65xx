@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
-($#ARGV == 2 || $#ARGV == 1 || $#ARGV == 0) || &Usage;
-($prj, $platform, $emmc_support) = @ARGV;
+($#ARGV == 3 || $#ARGV == 2 || $#ARGV == 1 || $#ARGV == 0) || &Usage;
+($prj, $platform, $emmc_support, $yaml_support) = @ARGV;
 
 (exit 0) if ($prj eq "generic");
 $logDir = "out/target/product/$prj";
@@ -32,7 +32,13 @@ else
   
 if ($emmc_support eq "yes")
 {
-  push(@lnmatrix,"mediatek/misc/${platform}_Android_scatter_emmc.txt");
+  if ($yaml_support eq "yes")
+  {
+    push(@lnmatrix,"mediatek/misc/${platform}_Android_scatter.txt");
+  }
+  else{
+    push(@lnmatrix,"mediatek/misc/${platform}_Android_scatter_emmc.txt");
+  }
   push(@lnmatrix,"mediatek/misc/MBR");
 	opendir (DIR,"mediatek/misc");
 	@dir = readdir(DIR);

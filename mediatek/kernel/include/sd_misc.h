@@ -4,6 +4,10 @@
 #ifdef __KERNEL__
 #include <linux/bitops.h>
 #include <linux/mmc/host.h>
+#include <linux/mmc/card.h>
+#include <linux/mmc/core.h>
+#include <linux/mmc/mmc.h>
+#include <linux/mmc/sd.h>
 #endif
 
 
@@ -91,8 +95,7 @@ typedef enum {
     GP_PARTITION_4,
 }PARTITON_ACCESS_T;
 
-typedef enum
-{
+typedef enum {
 	SDHC_HIGHSPEED = 0,		/* 0 Host supports HS mode */
 	UHS_SDR12,		    	/* 1 Host supports UHS SDR12 mode */
 	UHS_SDR25,				/* 2 Host supports UHS SDR25 mode */
@@ -100,27 +103,55 @@ typedef enum
 	UHS_SDR104,				/* 4 Host supports UHS SDR104 mode */
 	UHS_DDR50,				/* 5 Host supports UHS DDR50 mode */
 }SD3_MODE;
-typedef enum{
 
+typedef enum {
 	DRIVER_TYPE_A = 0,	    /* 0 Host supports Driver Type A */
 	DRIVER_TYPE_B,			/* 1 Host supports Driver Type B */
 	DRIVER_TYPE_C,			/* 2 Host supports Driver Type C */
 	DRIVER_TYPE_D,			/* 3 Host supports Driver Type D */
 }SD3_DRIVE;
-typedef enum{
+
+typedef enum {
 	MAX_CURRENT_200 = 0,    /* 0 Host max current limit is 200mA */
 	MAX_CURRENT_400,		/* 1 Host max current limit is 400mA */
 	MAX_CURRENT_600,		/* 2 Host max current limit is 600mA */
 	MAX_CURRENT_800,		/* 3 Host max current limit is 800mA */
 }SD3_MAX_CURRENT;
-typedef enum{
+
+typedef enum {
 	SDXC_NO_POWER_CONTROL = 0,/* 0  Host not supports >150mA current at 3.3V /3.0V/1.8V*/
 	SDXC_POWER_CONTROL,   	  /* 1 Host supports >150mA current at 3.3V /3.0V/1.8V*/
 }SD3_POWER_CONTROL;
 
-typedef enum{
+typedef enum {
 	DUMP_INTO_BOOT_CARD_IPANIC = 0,
 	DUMP_INTO_BOOT_CARD_KDUMP  = 1,
 	DUMP_INTO_EXTERN_CARD	   = 2,
 }DUMP_STORAGE_TYPE;
+
+typedef enum {
+	EMMC_CARD_BOOT = 0,
+	SD_CARD_BOOT,
+	EMMC_CARD,
+	SD_CARD,
+}STORAGE_TPYE;
+
+typedef enum {
+	CARD_INFO = 0,
+	DISK_INFO,
+	EMMC_USER_CAPACITY,
+	EMMC_CAPACITY,
+	EMMC_RESERVE,
+}GET_STORAGE_INFO;
+
+struct storage_info {
+	struct mmc_card *card;
+	struct gendisk	*disk;
+	unsigned long long emmc_user_capacity;
+	unsigned long long emmc_capacity;
+	int emmc_reserve;
+};
+
+int msdc_get_info(STORAGE_TPYE storage_type,GET_STORAGE_INFO info_type,struct storage_info* info);
+
 #endif /* end of SD_MISC_H */

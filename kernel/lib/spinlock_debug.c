@@ -71,12 +71,12 @@ static void spin_dump(raw_spinlock_t *lock, const char *msg)
 
 static void spin_bug(raw_spinlock_t *lock, const char *msg)
 {
-    char aee_str[40];
+    char aee_str[50];
 //	if (!debug_locks_off())
 //		return;
 
 	spin_dump(lock, msg);
-    sprintf( aee_str, "Spinlock %s :%s\n", current->comm, msg);
+    snprintf( aee_str, 50, "Spinlock %s :%s\n", current->comm, msg);
     aee_kernel_warning( aee_str,"spinlock debugger\n");
 }
 

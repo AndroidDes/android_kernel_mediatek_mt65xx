@@ -151,6 +151,12 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 
 	mm = t->active_mm;
 
+    if (mm == (void *)0x6b6b6b6b) {
+        pr_err("[%s] use after free: task %s cpu/rq(%d/%d)\n", __func__, t->comm, t->on_cpu, t->on_rq);
+        WARN_ON(1);
+        return;
+    }
+
 	if (!mm || !mm->mmap)
 		return;
 
@@ -283,6 +289,29 @@ void toi_free_extra_pagedir_memory(void)
 	extra_pages_allocated = 0;
 }
 
+#ifdef CONFIG_MTK_HIBERNATION
+int is_memory_low(unsigned long delta)
+{
+    struct zone *zone;
+
+    for_each_populated_zone(zone) {
+        unsigned long free_pages, min_pages, high_pages;
+        if (!strcmp(zone->name, "Normal")) {
+            free_pages = zone_page_state(zone, NR_FREE_PAGES);
+            min_pages = min_wmark_pages(zone);
+            high_pages = high_wmark_pages(zone);
+            if (free_pages < (min_pages + high_pages + delta)) {
+                hib_warn("memory status: free(%lu) < min(%lu)+high(%lu)+delta(%lu)\n",
+                         free_pages, min_pages, high_pages, delta);
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+#endif
+
 /* toi_allocate_extra_pagedir_memory
  *
  * Description:	Allocate memory for making the atomic copy of pagedir1 in the
@@ -310,6 +339,12 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 		while ((1 << order) > num_to_alloc)
 			order--;
 
+#ifdef CONFIG_MTK_HIBERNATION
+        if (is_memory_low(4)) {
+            return extra_pages_allocated;
+        }
+#endif
+
 		extras_entry = (struct extras *) toi_kzalloc(7,
 			sizeof(struct extras), TOI_ATOMIC_GFP);
 
@@ -321,6 +356,12 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 			order--;
 			virt = toi_get_free_pages(9, flags, order);
 		}
+#ifdef CONFIG_MTK_HIBERNATION
+        if (virt && is_memory_low(0)) {
+            toi_free_pages(9, virt_to_page((void *)virt), order);
+            virt = 0;
+        }
+#endif
 
 		if (!virt) {
 			toi_kfree(7, extras_entry, sizeof(*extras_entry));
@@ -832,7 +873,11 @@ void toi_recalculate_image_contents(int atomic_copy)
 
 	if (!atomic_copy) {
 		storage_limit = toiActiveAllocator->storage_available();
+#ifdef CONFIG_MTK_HIBERNATION
+		display_stats(1, 0);
+#else
 		display_stats(0, 0);
+#endif
 	}
 }
 

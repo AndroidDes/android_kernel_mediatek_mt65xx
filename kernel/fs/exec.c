@@ -1120,7 +1120,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 	bprm->mm = NULL;		/* We're using it now */
 
 	set_fs(USER_DS);
-	current->flags &= ~(PF_RANDOMIZE | PF_FORKNOEXEC | PF_KTHREAD);
+	current->flags &=
+		~(PF_RANDOMIZE | PF_FORKNOEXEC | PF_KTHREAD | PF_NOFREEZE);
 	flush_thread();
 	current->personality &= ~bprm->per_clear;
 
@@ -1479,7 +1480,7 @@ static int do_execve_common(const char *filename,
 	const struct cred *cred = current_cred();
 #ifdef CONFIG_MT_ENG_BUILD
     int *argv_p0;
-    int argv0 = 0;
+    int argv0;
 #endif
 
 	/*
@@ -1555,8 +1556,8 @@ static int do_execve_common(const char *filename,
 
 #ifdef CONFIG_MT_ENG_BUILD
     argv_p0 = (int *)get_user_arg_ptr(argv, 0);
-    if(argv_p0 != 0)
-        argv0 = *argv_p0;
+//    if(argv_p0 != 0)
+ //       argv0 = *argv_p0;
 #endif
 
 	retval = copy_strings(bprm->argc, argv, bprm);
@@ -1567,7 +1568,7 @@ static int do_execve_common(const char *filename,
 #ifdef CONFIG_MT_ENG_BUILD
     if(retval == -999){
         printk("[exec done] argv[0] = 0x%x\n", argv0);
-        printk("[exec done] argv0_ptr = 0x%x\n", (unsigned int)argv_p0);
+//        printk("[exec done] argv0_ptr = 0x%x\n", (unsigned int)argv_p0);
     }
 #endif
 	if (retval < 0)

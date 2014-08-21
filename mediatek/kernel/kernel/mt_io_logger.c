@@ -88,6 +88,11 @@ static int printk_count = 20;
 
 //static spinlock_t io_logger_lock;
 
+#ifdef MTK_USE_RESERVED_EXT_MEM
+extern void* extmem_malloc_page_align(size_t bytes);
+extern void extmem_free(void* mem);
+#endif
+
 /*========IO PART========*/
 static struct _loggerMsgFormat_ ioLoggerFmt[]=
 {
@@ -446,9 +451,18 @@ static void modify_io_logger_bufsize(unsigned long count)
 				return;
 			}
 			if(NULL !=io_logger_mem_pool)
-			    vfree(io_logger_mem_pool);
-
+			{
+#ifdef MTK_USE_RESERVED_EXT_MEM
+				extmem_free(io_logger_mem_pool);
+#else
+				vfree(io_logger_mem_pool);
+#endif
+			}
+#ifdef MTK_USE_RESERVED_EXT_MEM
+			io_logger_mem_pool = extmem_malloc_page_align(local_logger_bs);
+#else
 			io_logger_mem_pool = vmalloc(local_logger_bs);
+#endif
 			ILog_MSG("io_logger_mem_pool_addr:0x%p, local_logger_bs:%d," \
 				"io_logger_bufsize:%d", io_logger_mem_pool, local_logger_bs, \
 				io_logger_bufsize);
@@ -895,7 +909,11 @@ static int __init io_logger_init(void)
 
 	/* IO logger buffer pool 10MB */
 	io_logger_bufsize = 2*1024*1024;
-	io_logger_mem_pool = vmalloc(io_logger_bufsize);
+#ifdef MTK_USE_RESERVED_EXT_MEM
+	io_logger_mem_pool = extmem_malloc_page_align(io_logger_bufsize);
+#else    
+        io_logger_mem_pool = vmalloc(io_logger_bufsize);
+#endif
 
 	enable_IOLogger = true;
 #else
@@ -916,11 +934,15 @@ static int __init io_logger_init(void)
 static void __exit io_logger_exit(void)
 {
 
-  if(NULL != io_logger_mem_pool)
-  {
-    vfree(io_logger_mem_pool);
-    io_logger_mem_pool = NULL;
-  }
+    if(NULL != io_logger_mem_pool)
+    {
+#ifdef MTK_USE_RESERVED_EXT_MEM
+        extmem_free(io_logger_mem_pool);
+#else
+        vfree(io_logger_mem_pool);
+#endif
+        io_logger_mem_pool = NULL;
+    }
 }
 
 module_init(io_logger_init);

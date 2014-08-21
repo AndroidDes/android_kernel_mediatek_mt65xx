@@ -30,6 +30,11 @@ void DBG_Deinit(void);
 void DBG_OnTriggerLcd(void);
 void DBG_OnTeDelayDone(void);
 void DBG_OnLcdDone(void);
+void ConfigPara_Init(void);
+void ConfigPara_Deinit(void);
+int fb_config_execute_cmd(void);
+int fbconfig_get_esd_check_exec(void);
+
 
 #include <linux/mmprofile.h>
 extern struct MTKFB_MMP_Events_t
@@ -61,6 +66,7 @@ extern struct MTKFB_MMP_Events_t
     MMP_Event DSIRead;
     MMP_Event GetLayerInfo;
     MMP_Event LayerInfo[4];
+    MMP_Event IOCtrl;
     MMP_Event Debug;
 } MTKFB_MMP_Events;
 
@@ -145,5 +151,63 @@ static inline void dbg_print(int level, const char *fmt, ...)
 #define MSG_FUNC_LEAVE()
 
 #endif	/* MTKFB_DBG */
+//*****************debug for fbconfig tool in kernel part*************//
+#define MAX_INSTRUCTION 32
+
+typedef enum
+{
+	RECORD_CMD = 0,
+	RECORD_MS = 1,
+	RECORD_PIN_SET	= 2,	
+} RECORD_TYPE;
+
+typedef struct CONFIG_RECORD{
+    struct CONFIG_RECORD * next;
+    RECORD_TYPE type;//msleep;cmd;setpin;resetpin.
+    int ins_num;
+    int ins_array[MAX_INSTRUCTION];
+}CONFIG_RECORD;
+
+
+typedef enum
+{
+	HS_PRPR = 0,
+	HS_ZERO = 1,
+	HS_TRAIL= 2,
+	TA_GO= 3,
+	TA_SURE= 4,
+	TA_GET= 5,
+	DA_HS_EXIT= 6,
+	CLK_ZERO= 7,
+	CLK_TRAIL= 8,
+	CONT_DET= 9,
+	CLK_HS_PRPR= 10,
+	CLK_HS_POST= 11,
+	CLK_HS_EXIT= 12,
+	HPW= 13,
+	HFP= 14,
+	HBP= 15,
+	VPW= 16,
+	VFP= 17,
+	VBP= 18,
+	MAX= 0XFF,	
+}MIPI_SETTING_TYPE;	
+
+typedef struct MIPI_TIMING{     
+    MIPI_SETTING_TYPE type;
+	unsigned int value;
+}MIPI_TIMING;
+
+typedef struct FBCONFIG_LAYER_INFO{     
+    int layer_enable[3]; //layer id :0 1 2 3
+	unsigned int layer_size[3] ;
+}FBCONFIG_LAYER_INFO;
+
+typedef struct ESD_PARA{     
+    int addr;
+	int para_num;
+	char * esd_ret_buffer;
+}ESD_PARA;
+
 
 #endif /* __MTKFB_DEBUG_H */

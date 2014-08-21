@@ -33,7 +33,7 @@ config ARM
 	select GENERIC_IRQ_SHOW
 	select CPU_PM if (SUSPEND || CPU_IDLE)
 	select GENERIC_PCI_IOMAP
-	select ARM_HAS_SG_CHAIN if (ARCH_MT6589)
+	select ARM_HAS_SG_CHAIN if (ARCH_MT6589 || ARCH_MT6582 || ARCH_MT6572)
 	select HAVE_BPF_JIT if NET
 	help
 	  The ARM series is a line of low-power-consumption RISC chip designs
@@ -1601,7 +1601,7 @@ config LOCAL_TIMERS
 	bool "Use local timer interrupts"
 	depends on SMP
 	default y
-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARCH_MT6589)
+	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT && !ARCH_MT6589 && !ARCH_MT6582 && !ARCH_MT6572)
 	help
 	  Enable support for local timers on SMP platforms, rather then the
 	  legacy IPI broadcast method.  Local timers allows the system
@@ -1907,6 +1907,21 @@ config USE_OF
 	select IRQ_DOMAIN
 	help
 	  Include support for flattened device tree machine descriptions.
+
+config BUILD_ARM_APPENDED_DTB_IMAGE
+	bool "Build a concatenated zImage/dtb by default"
+	depends on OF
+	help
+	  Enabling this option will cause a concatenated zImage and DTB to
+	  be built by default (instead of a standalone zImage.)  The image
+	  will built in arch/arm/boot/zImage-dtb.<dtb name>
+
+config BUILD_ARM_APPENDED_DTB_IMAGE_NAME
+	string "Default dtb name"
+	depends on BUILD_ARM_APPENDED_DTB_IMAGE
+	help
+	  name of the dtb to append when building a concatenated
+	  zImage/dtb.
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
 # TEXT and BSS so we preserve their values in the config files.

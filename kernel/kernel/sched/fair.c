@@ -3199,7 +3199,7 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		mt_lbprof_stat_or(env->fail_reason, MT_LBPROF_AFFINITY);
 		if(mt_lbprof_lt (env->sd->mt_lbprof_nr_balance_failed, MT_LBPROF_NR_BALANCED_FAILED_UPPER_BOUND)){
 			char strings[128]="";
-			sprintf(strings, "%d:balance fail:affinity:%d:%d:%s:0x%lu"
+			snprintf(strings, 128, "%d:balance fail:affinity:%d:%d:%s:0x%lu"
 				, env->dst_cpu, env->src_cpu, p->pid, p->comm, p->cpus_allowed.bits[0]);
 			trace_sched_lbprof_log(strings);
 		}
@@ -3214,7 +3214,7 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		mt_lbprof_stat_or(env->fail_reason, MT_LBPROF_RUNNING);
 		if( mt_lbprof_lt (env->sd->mt_lbprof_nr_balance_failed, MT_LBPROF_NR_BALANCED_FAILED_UPPER_BOUND)){
 			char strings[128]="";
-			sprintf(strings, "%d:balance fail:running:%d:%d:%s"
+			snprintf(strings, 128, "%d:balance fail:running:%d:%d:%s"
 				, env->dst_cpu, env->src_cpu, p->pid, p->comm);
 			trace_sched_lbprof_log(strings);
 		}
@@ -3249,7 +3249,7 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		mt_lbprof_stat_or(env->fail_reason, MT_LBPROF_CACHEHOT);
 		if(mt_lbprof_lt (env->sd->mt_lbprof_nr_balance_failed, MT_LBPROF_NR_BALANCED_FAILED_UPPER_BOUND)){
 			char strings[128]="";
-			sprintf(strings, "%d:balance fail:cache hot:%d:%d:%s"
+			snprintf(strings, 128, "%d:balance fail:cache hot:%d:%d:%s"
 				, env->dst_cpu, env->src_cpu, p->pid, p->comm);
 			trace_sched_lbprof_log(strings);
 		}
@@ -4771,12 +4771,12 @@ out:
 #ifdef CONFIG_MT_LOAD_BALANCE_PROFILER
 	if( CPU_NEWLY_IDLE == idle){
 		char strings[128]="";
-		sprintf(strings, "%d:idle balance:%d:0x%x ", this_cpu, ld_moved, env.fail_reason);
+		snprintf(strings, 128, "%d:idle balance:%d:0x%x ", this_cpu, ld_moved, env.fail_reason);
 		mt_lbprof_rqinfo(strings);
 		trace_sched_lbprof_log(strings);
 	}else{
 		char strings[128]="";
-		sprintf(strings, "%d:periodic balance:%d:0x%x ", this_cpu, ld_moved, env.fail_reason);
+		snprintf(strings, 128, "%d:periodic balance:%d:0x%x ", this_cpu, ld_moved, env.fail_reason);
 		mt_lbprof_rqinfo(strings);
 		trace_sched_lbprof_log(strings);
 	}
@@ -4815,7 +4815,7 @@ void idle_balance(int this_cpu, struct rq *this_rq)
 #if defined(CONFIG_MT_LOAD_BALANCE_PROFILER)
 		char strings[128]="";
 		mt_lbprof_update_state_has_lock(this_cpu, MT_LBPROF_ALLOW_UNBLANCE_STATE);
-		sprintf(strings, "%d:idle balance bypass: %llu %lu ", this_cpu, this_rq->avg_idle, counter);
+		snprintf(strings, 128, "%d:idle balance bypass: %llu %lu ", this_cpu, this_rq->avg_idle, counter);
 		mt_lbprof_rqinfo(strings);
 		trace_sched_lbprof_log(strings);
 #endif		

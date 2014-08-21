@@ -5,7 +5,7 @@
 #include "vcodec_OAL.h"
 
 // ME1 interface
-#include "val_types.h"
+#include "val_types_private.h"
 
 typedef enum
 {
@@ -162,7 +162,7 @@ int VCodecDrvPthread_mutex_trylock(IN VCODEC_PTHREAD_MUTEX_T *mutex);
 
 /***** Spin Functions ******/
 int VCodecDrvPthread_spin_init(OUT VCODEC_PTHREAD_SPINLOCK_T *lock, IN  int pshared);
-int VCodecDrvPthread_spin_destroy(IN VCODEC_PTHREAD_SPINLOCK_T *lock);  
+int VCodecDrvPthread_spin_destroy(IN VCODEC_PTHREAD_SPINLOCK_T *lock);
 int VCodecDrvPthread_spin_lock(IN VCODEC_PTHREAD_SPINLOCK_T *lock);
 int VCodecDrvPthread_spin_trylock(IN VCODEC_PTHREAD_SPINLOCK_T *lock);
 int VCodecDrvPthread_spin_unlock(IN VCODEC_PTHREAD_SPINLOCK_T *lock);
@@ -179,7 +179,7 @@ int VCodecDrvPthread_cond_wait(IN VCODEC_PTHREAD_COND_T *cond, IN  VCODEC_PTHREA
 /************  End of Multi-thread function ***********/
 
 /***** Semaphore Functions ******/
-	
+
 int VCodecDrv_sem_init(IN VCODEC_OAL_SEM_T * sem, IN int pshared, IN unsigned int value);
 int VCodecDrv_sem_destroy(IN VCODEC_OAL_SEM_T *sem);
 int VCodecDrv_sem_post(IN VCODEC_OAL_SEM_T *sem);
@@ -200,6 +200,10 @@ int OAL_SMP_BindingCore(int aCurrentTid, int aCPUid);   //ONLY used for TEST in 
 VCODEC_OAL_ERROR_T VCodecConfigMCIPort(IN unsigned int u4PortConfig, OUT unsigned int*pu4PortResult,IN VCODEC_CODEC_TYPE_T eCodecType);
 
 
+/***** Software vdec lib Functions ******/
+void VCodecDrvMemAllocAligned_NC(IN HANDLE hDrv,IN unsigned int u4Size,unsigned int u4AlignSize,IN VCODEC_MEMORY_TYPE_T fgCacheable,OUT VCODEC_BUFFER_T *prBuf);
+void VCodecDrvMemFree_NC(IN HANDLE hDrv, IN VCODEC_BUFFER_T *prBuf);
+VCODEC_DEC_ERROR_T VDecCodecQueryInfo(IN HANDLE hDrv, IN VCODEC_DEC_QUERY_INFO_TYPE_T ID, OUT void *pvQueryData);
 #if 0
 // MACRO
 

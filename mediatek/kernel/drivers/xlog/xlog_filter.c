@@ -179,7 +179,7 @@ static int xlog_release(struct inode *ignored, struct file *file)
 static int xlog_mmap(struct file *file, struct vm_area_struct *vma) 
 {
 	vma->vm_ops = &xLog_vmops;
-	vma->vm_flags |= VM_RESERVED;
+	vma->vm_flags |= VM_IO;
 	vma->vm_private_data = file->private_data;
 	return 0;
 }

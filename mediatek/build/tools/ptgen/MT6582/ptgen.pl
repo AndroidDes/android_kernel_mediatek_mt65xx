@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/local/bin/perl -w
 #
 #****************************************************************************/
 #*   This script will generate partition layout files

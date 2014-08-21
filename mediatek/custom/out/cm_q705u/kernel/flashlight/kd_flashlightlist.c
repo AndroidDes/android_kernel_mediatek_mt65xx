@@ -28,16 +28,9 @@ MUINT32 dummyFlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc);
 MUINT32 peakFlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc);
 MUINT32 torchFlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc);
 MUINT32 constantFlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc);
-#if defined(SGM3780_FLASHLIGHT)
-MUINT32 sgm3780FlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc);
-#endif
 
-#ifdef MTK_SUB_STROBE_SUPPORT
 
 MUINT32 subStrobeInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc);
-
-#endif
-
 KD_FLASHLIGHT_INIT_FUNCTION_STRUCT kdFlashlightList[] =
 {
     {defaultFlashlightInit},
@@ -53,16 +46,9 @@ KD_FLASHLIGHT_INIT_FUNCTION_STRUCT kdFlashlightList[] =
 #if defined(CONSTANT_FLASHLIGHT)
 	{constantFlashlightInit},
 #endif
-#if defined(SGM3780_FLASHLIGHT)
-	{sgm3780FlashlightInit},
-#endif
 
-#ifdef MTK_SUB_STROBE_SUPPORT
+
 	{subStrobeInit},
-#else
-	{defaultFlashlightInit},
-#endif
-
 /*  ADD flashlight driver before this line */
     {NULL}, //end of list
 };
@@ -176,7 +162,7 @@ FLASHLIGHT_FUNCTION_STRUCT	defaultFlashlightFunc=
 	default_flashlight_ioctl,
 };
 
-UINT32 defaultFlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc) {
+UINT32 defaultFlashlightInit(PFLASHLIGHT_FUNCTION_STRUCT *pfFunc) { 
     if (pfFunc!=NULL) {
         *pfFunc=&defaultFlashlightFunc;
     }
@@ -191,7 +177,7 @@ int kdSetFlashlightDrv(unsigned int *pSensorId)
 
 
     PK_DBG("[kdSetFlashlightDrv] flashlightIdx: %d, seonsorId %d\n",flashlightIdx, (int)(*pSensorId));
-
+    
     if (NULL != kdFlashlightList[flashlightIdx].flashlightInit) {
         kdFlashlightList[flashlightIdx].flashlightInit(&g_pFlashlightFunc);
         if (NULL == g_pFlashlightFunc) {

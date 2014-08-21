@@ -8,9 +8,20 @@
 # CONFIG_MTPROF_APPLAUNCH is not set
 # CONFIG_MTPROF_IRQ_DURATION is not set
 # CONFIG_MTPROF_KMEM is not set
+
+# MT scheduling enhancement
 # CONFIG_MT_LOAD_BALANCE_PROFILER is not set
 # CONFIG_MT_SCHED_DEBUG_ONLY is not set
+
+# MT RT scheduling enhancement for big.little
+# CONFIG_MT_RT_SCHED_LOG is not set
+# CONFIG_MT_RT_SCHED_NOTICE is not set
+# CONFIG_MT_RT_SCHED_INFO is not set
+# CONFIG_MT_RT_SCHED_DEBUG is not set
+
+
 # CONFIG_MTK_MEMCFG is not set
+# CONFIG_MT_PRIO_TRACER is not set
 
 #
 # kdb/kgdb
@@ -46,7 +57,7 @@ CONFIG_PANIC_TIMEOUT=1
 # CONFIG_DEVMEM is not set
 # CONFIG_DEVKMEM is not set
 
-CONFIG_CMDLINE="console=ttyMT3,921600n1 vmalloc=530M slub_max_order=0 androidboot.selinux=permissive"
+CONFIG_CMDLINE="console=ttyMT3,921600n1 vmalloc=496M slub_max_order=0"
 # CONFIG_CFG80211_DEBUGFS is not set
 # CONFIG_LIB80211_DEBUG is not set
 # CONFIG_DM_DEBUG is not set
@@ -103,9 +114,20 @@ CONFIG_CMDLINE="console=ttyMT3,921600n1 vmalloc=530M slub_max_order=0 androidboo
 # CONFIG_CC_STACKPROTECTOR is not set
 
 
-# Prove Locking
+# Prove Locking and Lock debugger
+# CONFIG_DEBUG_SPINLOCK is not set
 # CONFIG_DEBUG_MUTEXES is not set
 # CONFIG_DEBUG_LOCK_ALLOC is not set
 # CONFIG_PROVE_LOCKING is not set
 # CONFIG_LOCKDEP is not set
 # CONFIG_DEBUG_LOCKDEP is not set
+
+# MET
+# CONFIG_MTK_MET is not set
+# CONFIG_MTK_MET_PLF is not set
+
+# AEE
+# CONFIG_MTK_AEE_MRDUMP is not set
+
+# WQ
+# CONFIG_MTK_WQ_DEBUG is not set

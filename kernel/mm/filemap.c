@@ -1694,10 +1694,16 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct page *page;
 	pgoff_t size;
 	int ret = 0;
-
+#ifdef CONFIG_MT_ENG_BUILD
+	void add_kmem_status_filemap_fault_counter(void);
+	add_kmem_status_filemap_fault_counter();
+#endif
 	size = (i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	if (offset >= size)
+	if (offset >= size) {
+                printk(KERN_ALERT"SIGBUS debug: %s, %d, offset: %lu, size: %lu\n", 
+                        __FUNCTION__, __LINE__, (unsigned long)offset, (unsigned long)size);
 		return VM_FAULT_SIGBUS;
+        }
 
 	/*
 	 * Do we have something in the page cache already?
@@ -1712,6 +1718,7 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	} else {
 		/* No page in the page cache at all */
 		do_sync_mmap_readahead(vma, ra, file, offset);
+		count_vm_event(PGFMFAULT);
 		count_vm_event(PGMAJFAULT);
 		mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
 		ret = VM_FAULT_MAJOR;
@@ -1749,6 +1756,7 @@ retry_find:
 	if (unlikely(offset >= size)) {
 		unlock_page(page);
 		page_cache_release(page);
+                printk(KERN_ALERT"SIGBUS debug: %s, %d\n", __FUNCTION__, __LINE__);
 		return VM_FAULT_SIGBUS;
 	}
 
@@ -1777,6 +1785,7 @@ no_cached_page:
 	 */
 	if (error == -ENOMEM)
 		return VM_FAULT_OOM;
+        printk(KERN_ALERT"SIGBUS debug: %s, %d\n", __FUNCTION__, __LINE__);
 	return VM_FAULT_SIGBUS;
 
 page_not_uptodate:
@@ -1800,6 +1809,7 @@ page_not_uptodate:
 
 	/* Things didn't work out. Return zero to tell the mm layer so. */
 	shrink_readahead_size_eio(file, ra);
+        printk(KERN_ALERT"SIGBUS debug: %s, %d\n", __FUNCTION__, __LINE__);
 	return VM_FAULT_SIGBUS;
 }
 EXPORT_SYMBOL(filemap_fault);

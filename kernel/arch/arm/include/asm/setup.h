@@ -15,6 +15,8 @@
 #define __ASMARM_SETUP_H
 
 #include <linux/types.h>
+#include <dfo/dfo_boot.h>
+#include <mach/mt_devinfo.h>
 
 #define COMMAND_LINE_SIZE 1024
 
@@ -158,15 +160,12 @@ struct tag_meta_com {
     u32 meta_com_id;  /* multiple meta need to know com port id */
 };
 
-/*device information data*/
-#define ATAG_DEVINFO_DATA 0x41000804
-#define ATAG_DEVINFO_DATA_SIZE 21
 
-struct tag_devinfo_data {
-    u32 devinfo_data[ATAG_DEVINFO_DATA_SIZE]; 	/* device information */
-    u32 devinfo_data_size;                      /* device information size */
+
+#define ATAG_MDINFO_DATA 0x41000806
+struct tag_mdinfo_data{
+	u8 md_type[4];
 };
-
 
 struct tag {
 	struct tag_header hdr;
@@ -193,6 +192,8 @@ struct tag {
                 struct tag_boot         boot;
                 struct tag_meta_com     meta_com;
                 struct tag_devinfo_data devinfo_data;
+                tag_dfo_boot     dfo_data;
+                struct tag_mdinfo_data mdinfo_data;
 	} u;
 };
 

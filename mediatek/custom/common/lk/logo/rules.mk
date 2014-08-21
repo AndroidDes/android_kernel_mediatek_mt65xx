@@ -8,7 +8,6 @@ ZPIPE := $(BOOT_LOGO_DIR)/tool/zpipe
 
 BOOT_LOGO_RESOURCE := $(BUILDDIR)/$(BOOT_LOGO_DIR)/$(BOOT_LOGO).raw
 LOGO_IMAGE := $(BUILDDIR)/logo.bin
-BOOT_LOGO_IMAGE := $(LOCAL_DIR)/../../../../common/lk/logo/boot_logo
 RESOURCE_OBJ_LIST :=   \
             $(BOOT_LOGO_DIR)/$(BOOT_LOGO)/$(BOOT_LOGO)_uboot.raw \
             $(BOOT_LOGO_DIR)/$(BOOT_LOGO)/$(BOOT_LOGO)_battery.raw \
@@ -53,11 +52,10 @@ RESOURCE_OBJ_LIST :=   \
 GENERATED += \
             $(BOOT_LOGO_RESOURCE) \
             $(LOGO_IMAGE) \
-            $(BOOT_LOGO_IMAGE) \
             $(addprefix $(BUILDDIR)/,$(RESOURCE_OBJ_LIST))
 
 
-all:: $(LOGO_IMAGE) $(BOOT_LOGO_IMAGE)
+all:: $(LOGO_IMAGE) 
 
 $(LOGO_IMAGE):$(MKIMG) $(BOOT_LOGO_RESOURCE)
 	$(NOECHO) if [ ! -x $(MKIMG) ]; then chmod a+x $(MKIMG); fi
@@ -77,8 +75,3 @@ $(BUILDDIR)/%.raw: %.bmp $(BMP_TO_RAW)
 	@echo "Compiling_BMP_TO_RAW $<"
 	$(BMP_TO_RAW) $@ $<
 
-$(BOOT_LOGO_IMAGE): $(BMP_TO_RAW)
-	@$(MKDIR)
-	$(NOECHO) if [ ! -x $(BMP_TO_RAW) ]; then chmod a+x $(BMP_TO_RAW); fi
-	@echo "Compiling_BMP_TO_RAW_BOOT_LOGO"
-	$(BMP_TO_RAW) $(BOOT_LOGO_IMAGE) $(BOOT_LOGO_DIR)/$(BOOT_LOGO)/$(BOOT_LOGO)_kernel.bmp

@@ -292,6 +292,9 @@ EXPORT_SYMBOL(pm_idle);
 void cpu_idle(void)
 {
 	local_fiq_enable();
+#ifdef CONFIG_MT_LOAD_BALANCE_PROFILER
+	mt_lbprof_update_state(smp_processor_id(), MT_LBPROF_NO_TASK_STATE);
+#endif
 
 	/* endless idle loop with no priority at all */
 	while (1) {
@@ -301,7 +304,14 @@ void cpu_idle(void)
 		while (!need_resched()) {
 #ifdef CONFIG_HOTPLUG_CPU
 			if (cpu_is_offline(smp_processor_id()))
+#ifdef CONFIG_MTK_IDLE_TIME_FIX			
+			{
+			  tick_set_cpu_plugoff_flag(1);
 				cpu_die();
+			}
+#else			
+				cpu_die();
+#endif	
 #endif
 
 #ifdef CONFIG_MT_LOAD_BALANCE_PROFILER
@@ -676,6 +686,8 @@ EXPORT_SYMBOL(kernel_thread);
 unsigned long get_wchan(struct task_struct *p)
 {
 	struct stackframe frame;
+	unsigned long stack_top;
+	unsigned long stack_bottom;
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
@@ -684,7 +696,16 @@ unsigned long get_wchan(struct task_struct *p)
 	frame.sp = thread_saved_sp(p);
 	frame.lr = 0;			/* recovered from the stack */
 	frame.pc = thread_saved_pc(p);
+	stack_top = frame.sp;
+	stack_bottom = ALIGN(stack_top, THREAD_SIZE);
 	do {
+	  if (frame.fp < (stack_top + 4) || frame.fp >= (stack_bottom - 4)) {
+	    /* remove stack dump debug info
+	    show_data(task_thread_info(p), THREAD_SIZE, "Stack");
+	    aee_kernel_warning("Kernel", "Stack corruption");
+	    */
+	    return 0;
+	  }
 		int ret = unwind_frame(&frame);
 		if (ret < 0)
 			return 0;

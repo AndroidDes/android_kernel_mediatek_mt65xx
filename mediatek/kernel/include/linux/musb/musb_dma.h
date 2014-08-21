@@ -62,6 +62,12 @@ struct musb_hw_ep;
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
 
+#ifndef CONFIG_MUSB_PIO_ONLY
+#define	is_dma_capable()	(1)
+#else
+#define	is_dma_capable()	(0)
+#endif
+
 /* Anomaly 05000456 - USB Receive Interrupt Is Not Generated in DMA Mode 1
  *	Only allow DMA mode 1 to be used when the USB will actually generate the
  *	interrupts we expect.
@@ -117,7 +123,7 @@ struct dma_channel {
 static inline enum dma_channel_status
 dma_channel_status(struct dma_channel *c)
 {
-	return (c) ? c->status : MUSB_DMA_STATUS_UNKNOWN;
+	return (is_dma_capable() && c) ? c->status : MUSB_DMA_STATUS_UNKNOWN;
 }
 
 /**
@@ -153,8 +159,7 @@ struct dma_controller {
 extern void musb_dma_completion(struct musb *musb, u8 epnum, u8 transmit);
 
 
-extern struct dma_controller *__init
-dma_controller_create(struct musb *, void __iomem *);
+extern struct dma_controller *dma_controller_create(struct musb *, void __iomem *);
 
 extern void dma_controller_destroy(struct dma_controller *);
 

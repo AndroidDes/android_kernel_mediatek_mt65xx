@@ -76,6 +76,8 @@
 
 #define MTKFB_META_RESTORE_SCREEN MTK_IOW(101, unsigned long)
 #define MTKFB_VSYNC MTK_IO(102)
+#define MTKFB_ERROR_INDEX_UPDATE_TIMEOUT MTK_IO(103)
+#define MTKFB_ERROR_INDEX_UPDATE_TIMEOUT_AEE MTK_IO(104)
 
 #define FBCAPS_GENERIC_MASK     0x00000fff
 #define FBCAPS_LCDC_MASK        0x00fff000
@@ -101,19 +103,20 @@
 #define MTKFB_GET_MAX_DISPLAY_COUNT		MTK_IOR(91, unsigned int)
 #define MTKFB_AEE_LAYER_EXIST      MTK_IOR(92, unsigned long)
 #define MTKFB_GET_OVERLAY_LAYER_INFO    MTK_IOR(93, struct fb_overlay_layer_info)
+#define MTKFB_FACTORY_AUTO_TEST    MTK_IOR(94, unsigned long)
 //----------------------------------------------------------------------
 typedef enum
 {
     MTK_FB_FORMAT_UNKNOWN = 0,
         
     MTK_FB_FORMAT_RGB565   = MAKE_MTK_FB_FORMAT_ID(1, 2),
-	MTK_FB_FORMAT_RGB888   = MAKE_MTK_FB_FORMAT_ID(2, 3),
+    MTK_FB_FORMAT_RGB888   = MAKE_MTK_FB_FORMAT_ID(2, 3),
     MTK_FB_FORMAT_BGR888   = MAKE_MTK_FB_FORMAT_ID(3, 3),
     MTK_FB_FORMAT_ARGB8888 = MAKE_MTK_FB_FORMAT_ID(4, 4),
     MTK_FB_FORMAT_ABGR8888 = MAKE_MTK_FB_FORMAT_ID(5, 4),
-	MTK_FB_FORMAT_YUV422   = MAKE_MTK_FB_FORMAT_ID(6, 2),
-	MTK_FB_FORMAT_XRGB8888 = MAKE_MTK_FB_FORMAT_ID(7, 4),
-	MTK_FB_FORMAT_XBGR8888 = MAKE_MTK_FB_FORMAT_ID(8, 4),
+    MTK_FB_FORMAT_YUV422   = MAKE_MTK_FB_FORMAT_ID(6, 2),
+    MTK_FB_FORMAT_XRGB8888 = MAKE_MTK_FB_FORMAT_ID(7, 4),
+    MTK_FB_FORMAT_XBGR8888 = MAKE_MTK_FB_FORMAT_ID(8, 4),
     MTK_FB_FORMAT_BPP_MASK = 0xFF,
 } MTK_FB_FORMAT;
 
@@ -190,24 +193,26 @@ struct fb_overlay_layer {
 
     unsigned int  tgt_offset_x, tgt_offset_y;
     unsigned int  tgt_width, tgt_height;
-	MTK_FB_ORIENTATION layer_rotation;
-	MTK_FB_LAYER_TYPE	layer_type;
-	MTK_FB_ORIENTATION video_rotation;
-
-	unsigned int isTdshp;  // set to 1, will go through tdshp first, then layer blending, then to color
+    MTK_FB_ORIENTATION layer_rotation;
+    MTK_FB_LAYER_TYPE	layer_type;
+    MTK_FB_ORIENTATION video_rotation;
+    
+    unsigned int isTdshp;  // set to 1, will go through tdshp first, then layer blending, then to color
 
     int next_buff_idx;
     int identity;
     int connected_type;
+    unsigned int security;
 };
 
 struct fb_overlay_buffer_info{
-	unsigned int src_vir_addr;
-	unsigned int size;
+    unsigned int src_vir_addr;
+    unsigned int size;
 };
 
 struct fb_overlay_layer_info {
     unsigned int layer_id;
+    unsigned int layer_enabled;  // TO BE DEL
     unsigned int curr_en;
     unsigned int next_en;
     unsigned int hw_en;
@@ -221,6 +226,7 @@ struct fb_overlay_layer_info {
     int next_conn_type;
     int hw_conn_type;
 };
+#define MTKFB_ERROR_IS_EARLY_SUSPEND 0x12000000
 
 // --------------------------------------------------------------------------
 
@@ -232,21 +238,11 @@ struct fb_post_video_buffer {
 };
 
 // --------------------------------------------------------------------------
-#ifndef MT65XX_NEW_DISP
-#define HW_OVERLAY_COUNT     (6)
-// Top layer is assigned to Debug Layer
-// Second layer is assigned to UI
-// Third layer is assigned to FD
-#define RESERVED_LAYER_COUNT (3)
-#define VIDEO_LAYER_COUNT    (HW_OVERLAY_COUNT - RESERVED_LAYER_COUNT)
-#define FACE_DETECTION_LAYER_ID  (3)
-#else
 #define HW_OVERLAY_COUNT     (4)
 // Top layer is assigned to Debug Layer
 // Second layer is assigned to UI
 #define RESERVED_LAYER_COUNT (2)
 #define VIDEO_LAYER_COUNT    (HW_OVERLAY_COUNT - RESERVED_LAYER_COUNT)
-#endif
 
 #ifdef __KERNEL__
 

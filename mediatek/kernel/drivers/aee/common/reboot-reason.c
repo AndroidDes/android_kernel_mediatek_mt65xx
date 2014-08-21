@@ -6,29 +6,20 @@
 #include <linux/mm.h>
 
 #include "aee-common.h"
+#include <mach/wd_api.h>
 
 #define RR_PROC_NAME "reboot-reason"
 
+/* Some chip do not have reg dump, define a weak to avoid build error */
+int __weak mt_reg_dump(char *buf) { return 1; }
+EXPORT_SYMBOL(mt_reg_dump);
 
 static struct proc_dir_entry *aee_rr_file;
-
 struct last_reboot_reason aee_rr_last_rec;
 
 #define WDT_NORMAL_BOOT 0
 #define WDT_HW_REBOOT 1
 #define WDT_SW_REBOOT 2
-
-/*XXX Note: 2012/11/19 mtk_wdt_restart prototype is 
-* different on 77 and 89 platform. the owner promise to modify it
-*/
-enum wk_wdt_type {
-	WK_WDT_LOC_TYPE,
-	WK_WDT_EXT_TYPE,
-	WK_WDT_LOC_TYPE_NOLOCK,
-	WK_WDT_EXT_TYPE_NOLOCK,
-	
-};
-extern void mtk_wdt_restart(enum wk_wdt_type type);
 
 void aee_rr_last(struct last_reboot_reason *lrr)
 {
@@ -39,6 +30,7 @@ static ssize_t aee_rr_read_reboot_reason(char *page, char **start, off_t off,
 					 int count,int *eof, void *data)
 {
 	int len, i;
+	static char reg_buf[512]; 
 
 	len =  sprintf(page, "WDT status: %d\n"
 		       "fiq step: %u\n",
@@ -53,6 +45,9 @@ static ssize_t aee_rr_read_reboot_reason(char *page, char **start, off_t off,
 			       aee_rr_last_rec.jiffies_last_sched[i], aee_rr_last_rec.last_sched_comm[i],
 			       aee_rr_last_rec.hotplug_data1[i], aee_rr_last_rec.hotplug_data2[i]);
 	}
+	if (mt_reg_dump(reg_buf) == 0)
+		len += sprintf(page + len, "%s \n", reg_buf);
+
 	return len + 1;
 }
 
@@ -138,20 +133,29 @@ int aee_dump_stack_top_binary(char *buf, int buf_len,
     return top - bottom;
 }
 
-extern int hw_reboot_mode(void);
 extern void mt_fiq_printf(const char *fmt, ...);
 
 static atomic_t nested_panic_time = ATOMIC_INIT(0);
 void aee_stop_nested_panic(struct pt_regs *regs)
 {
-	struct thread_info *thread = current_thread_info();
+    struct thread_info *thread = current_thread_info();
     int i = 0;
     int len = 0;
     int timeout = 1000000;
-   
+    int res = 0;
+    int cpu = 0;
+    struct wd_api*wd_api = NULL;
+    res = get_wd_api(&wd_api);
+
     local_irq_disable();
     preempt_disable();
 
+    asm volatile("MRC p15,0,%0,c0,c0,5\n"
+			 "AND %0,%0,#0xf\n"
+			 : "+r" (cpu)
+			 :
+			 : "cc");
+    aee_nested_printf("\n CPU %d, nested_panic_time=%d\n", cpu, nested_panic_time);
 
     /*Data abort handler data abort again on many cpu.
       Since ram console api is lockless, this should be prevented*/
@@ -159,9 +163,15 @@ void aee_stop_nested_panic(struct pt_regs *regs)
         aee_nested_printf("multicore enters nested panic\n");
         goto out; 
     }
-
-    mtk_wdt_restart(WK_WDT_LOC_TYPE_NOLOCK);
-    hw_reboot_mode(); 
+    if(res)
+    {
+        aee_nested_printf("aee_stop_nested_panic, get wd api error\n");
+    } else {
+      aee_nested_printf("wd_api[0x%x]\n", (unsigned long)wd_api);
+      aee_nested_printf("wd_restart[0x%x]\n", (unsigned long)(wd_api->wd_restart));
+        wd_api->wd_restart(WD_TYPE_NOLOCK);
+        wd_api->wd_aee_confirm_hwreboot();
+    }
 
     /*must guarantee Only one cpu can run here*/
 	aee_nested_printf("Nested panic\n");

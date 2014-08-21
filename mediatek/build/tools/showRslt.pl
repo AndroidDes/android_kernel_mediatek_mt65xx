@@ -19,7 +19,11 @@ while (!-e $parseScrpt) {
   $parseScrpt = "../$parseScrpt";
   last if ($i > 8);
 }
-
+my $out_dir = "out";
+if (exists $ENV{"OUT_DIR"})
+{
+	$out_dir = $ENV{"OUT_DIR"};
+}
 if ($logFile =~ /\/([^\/]+)_([^_]+)\.log$/) {
   $prj = $1;
   $curMod = $2;
@@ -35,15 +39,15 @@ if ($curMod eq "uboot") {
 } elsif ($curMod eq "kernel") {
   $chkFile = "kernel/Download/flash/${prj}_kernel.bin";
   if ($ENV{'KBUILD_OUTPUT_SUPPORT'} eq "yes")
-  {  
+  {
     $chkFile = "kernel/out/kernel_${prj}.bin";
   }
   else 
-  { 
+  {
     $chkFile = "kernel/kernel_${prj}.bin"; 
   }
 } elsif ($curMod eq "android") {
-  $chkFile = "out/target/product/${prj}/system.img";
+  $chkFile = "$out_dir/target/product/${prj}/system.img";
 }
 
 if (($chkFile ne "") && (!-e $chkFile || -z $chkFile)) {

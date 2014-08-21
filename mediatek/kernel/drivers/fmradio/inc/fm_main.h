@@ -276,6 +276,18 @@ struct fm_em_parm {
 	fm_u16 item_idx;
 	fm_u32 item_value;
 };
+struct fm_top_rw_parm {
+	fm_u8 err;
+	fm_u8 rw_flag;//0:write, 1:read
+	fm_u16 addr;
+	fm_u32 val;
+};
+struct fm_host_rw_parm {
+	fm_u8 err;
+	fm_u8 rw_flag;//0:write, 1:read
+	fm_u32 addr;
+	fm_u32 val;
+};
 
 enum {
     FM_SUBSYS_RST_OFF,
@@ -335,6 +347,10 @@ extern fm_s32 fm_mute(struct fm *fm, fm_u32 bmute);
 extern fm_s32 fm_getrssi(struct fm *fm, fm_s32 *rssi);
 extern fm_s32 fm_reg_read(struct fm *fm, fm_u8 addr, fm_u16 *val);
 extern fm_s32 fm_reg_write(struct fm *fm, fm_u8 addr, fm_u16 val);
+extern fm_s32 fm_top_read(struct fm *fm, fm_u16 addr, fm_u32 *val);
+extern fm_s32 fm_top_write(struct fm *fm, fm_u16 addr, fm_u32 val);
+extern fm_s32 fm_host_read(struct fm *fm, fm_u32 addr, fm_u32 *val);
+extern fm_s32 fm_host_write(struct fm *fm, fm_u32 addr, fm_u32 val);
 extern fm_s32 fm_chipid_get(struct fm *fm, fm_u16 *chipid);
 extern fm_s32 fm_monostereo_get(struct fm *fm, fm_u16 *ms);
 extern fm_s32 fm_monostereo_set(struct fm *fm, fm_s32 ms);
@@ -365,6 +381,9 @@ extern fm_s32 fm_tune_new(struct fm *fm, struct fm_tune_t *parm);
 extern fm_s32 fm_cust_config_setup(fm_s8 * filename);
 extern fm_s32 fm_cqi_log(void);
 extern fm_s32 fm_soft_mute_tune(struct fm *fm, struct fm_softmute_tune_t *parm);
+extern fm_s32 fm_pre_search(struct fm *fm);
+extern fm_s32 fm_restore_search(struct fm *fm);
+
 extern fm_s32 fm_dump_reg(void);
 extern fm_s32 fm_get_gps_rtc_info(struct fm_gps_rtc_info *src);
 extern fm_s32 fm_over_bt(struct fm *fm, fm_s32 flag);

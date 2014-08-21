@@ -82,6 +82,10 @@ typedef struct
     unsigned char gps_lna_mode;
     
     unsigned char gps_sbas_mode;
+    unsigned int C0;
+    unsigned int C1;
+    unsigned int initU;
+    unsigned int lastU;
 } ap_nvram_gps_config_struct;
 
 

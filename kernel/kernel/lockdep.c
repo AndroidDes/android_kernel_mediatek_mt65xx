@@ -551,9 +551,12 @@ static void print_lockdep_cache(struct lockdep_map *lock)
 
 static void print_lock(struct held_lock *hlock)
 {
-	print_lock_name(hlock_class(hlock));
-	printk(", at: ");
-	print_ip_sym(hlock->acquire_ip);
+    struct lock_class *lock = hlock_class(hlock);
+    if(lock != NULL){
+        print_lock_name(lock);
+        printk(", at: ");
+        print_ip_sym(hlock->acquire_ip);
+    }
 }
 
 static void lockdep_print_held_locks(struct task_struct *curr)
@@ -1029,6 +1032,10 @@ static int __bfs(struct lock_list *source_entry,
 			head = &lock->class->locks_before;
 
 		list_for_each_entry(entry, head, entry) {
+            if(entry == NULL){
+                printk("=======\nlocklist entry is NULL, 0x%x\n=======\n",entry);
+                return -1;
+            }
 			if (!lock_accessed(entry)) {
 				unsigned int cq_depth;
 				mark_lock_accessed(entry, lock);
@@ -1157,8 +1164,6 @@ print_circular_bug_header(struct lock_list *entry, unsigned int depth,
 	if (debug_locks_silent)
 		return 0;
 
-    //Add by Mtk
-    lockdep_aee();
 
 	printk("\n");
 	printk("======================================================\n");
@@ -1219,6 +1224,9 @@ static noinline int print_circular_bug(struct lock_list *this,
 
 	printk("\nstack backtrace:\n");
 	dump_stack();
+
+    //Add by Mtk
+    lockdep_aee();
 
 	return 0;
 }

@@ -1,8 +1,8 @@
 #ifndef FTM_CUST_LCD_H
 #define FTM_CUST_LCD_H
 
-#define CUST_LCD_AVAIL_WIDTH      480
-#define CUST_LCD_AVAIL_HEIGHT     800
+#define CUST_LCD_AVAIL_WIDTH      720
+#define CUST_LCD_AVAIL_HEIGHT     1280
 
 #define DEFINE_TEST_IMAGE_FILENAMES(x)      \
 const char *x[] = {                         \

@@ -15,7 +15,7 @@
  *
  * Version:1.2
  *        V1.0:2012/05/01,create file.
- *        V1.2:2012/06/08,modify warnings.
+ *        V1.2:2012/10/17,reset_guitar etc.
  *
  */
 
@@ -56,11 +56,18 @@ typedef struct
 #pragma pack()
 st_cmd_head cmd_head;
 
+#define UPDATE_FUNCTIONS
 #define DATA_LENGTH_UINT    512
 #define CMD_HEAD_LENGTH     (sizeof(st_cmd_head) - sizeof(u8*))
 #define GOODIX_ENTRY_NAME   "goodix_tool"
 extern struct i2c_client *i2c_client_point;
 static struct i2c_client *gt_client = NULL;
+
+#ifdef UPDATE_FUNCTIONS
+extern s32 gup_enter_update_mode(struct i2c_client *client);
+extern void gup_leave_update_mode(void);
+extern s32 gup_update_proc(void *dir);
+#endif
 
 static struct proc_dir_entry *goodix_proc_entry;
 
@@ -148,6 +155,8 @@ static void unregister_i2c_func(void)
 s32 init_wr_node(struct i2c_client *client)
 {
     s32 i;
+    const s8 entry_prefix[] = "GMNode_";
+    s8 gtp_tool_entry[30];
 
     gt_client = i2c_client_point;
     GTP_INFO("client %d.%d", (int)gt_client, (int)client);
@@ -185,7 +194,13 @@ s32 init_wr_node(struct i2c_client *client)
 
     register_i2c_func();
 
-    goodix_proc_entry = create_proc_entry(GOODIX_ENTRY_NAME, 0664, NULL);
+ //   goodix_proc_entry = create_proc_entry(GOODIX_ENTRY_NAME, 0664, NULL);
+ 
+    memset(gtp_tool_entry, 0, sizeof(gtp_tool_entry));
+    i = sizeof(entry_prefix)/sizeof(s8);
+    memcpy(gtp_tool_entry, entry_prefix, i-1);
+    memcpy(&gtp_tool_entry[i-1], __DATE__, sizeof(__DATE__)/sizeof(s8));
+    goodix_proc_entry = create_proc_entry(gtp_tool_entry, 0664, NULL);
 
     if (goodix_proc_entry == NULL)
     {

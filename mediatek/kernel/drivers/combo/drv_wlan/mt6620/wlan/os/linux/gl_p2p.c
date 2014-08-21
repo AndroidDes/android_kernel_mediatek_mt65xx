@@ -742,7 +742,9 @@ static struct cfg80211_ops mtk_p2p_config_ops = {
 #endif
     .set_wiphy_params = mtk_p2p_cfg80211_set_wiphy_params,
     .del_station = mtk_p2p_cfg80211_del_station,
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3, 5, 0)
     .set_channel = mtk_p2p_cfg80211_set_channel,
+#endif
     .set_bitrate_mask = mtk_p2p_cfg80211_set_bitrate_mask,
     .mgmt_frame_register = mtk_p2p_cfg80211_mgmt_frame_register,
     .get_station            = mtk_p2p_cfg80211_get_station,

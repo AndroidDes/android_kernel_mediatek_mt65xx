@@ -166,7 +166,7 @@ void OV8825_write_shutter(kal_uint32 shutter)
 				break;
 			case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
 				extra_lines = min_framelength- (OV8825_VIDEO_PERIOD_LINE_NUMS+ ov8825.DummyLines);
-    			break;
+				break;
 			default:
 				extra_lines = min_framelength- (OV8825_PV_PERIOD_LINE_NUMS+ ov8825.DummyLines);
     			break;
@@ -1125,10 +1125,13 @@ static void OV8825_Sensor_Init(void)
 	OV8825_write_cmos_sensor(0x3615,0x00);//; analog control
 	OV8825_write_cmos_sensor(0x3616,0x03);//; analog control
 	OV8825_write_cmos_sensor(0x3617,0xa1);//; analog control
+	
 	OV8825_write_cmos_sensor(0x3618,0x00);//; VCM position & slew rate, slew rate = 0
 	OV8825_write_cmos_sensor(0x3619,0x00);//; VCM position = 0
 	OV8825_write_cmos_sensor(0x361a,0xB0);//; VCM clock divider, VCM clock = 24000000/0x4b0 = 20000
 	OV8825_write_cmos_sensor(0x361b,0x04);//; VCM clock divider
+	OV8825_write_cmos_sensor(0x361c,0x07);//VCM Driver current
+	
 	OV8825_write_cmos_sensor(0x3700,0x20);//
 	OV8825_write_cmos_sensor(0x3701,0x44);//; sensor control
 	OV8825_write_cmos_sensor(0x3702,0x50);//
@@ -1747,7 +1750,7 @@ UINT32 OV8825Capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 
 	// Full size setting
 	OV8825CaptureSetting();
-    //mDELAY(40);
+    mDELAY(20);
 
 	spin_lock(&ov8825mipiraw_drv_lock);
 	ov8825.sensorMode = SENSOR_MODE_CAPTURE;
@@ -1978,9 +1981,9 @@ UINT32 OV8825SetVideoMode(UINT16 u2FrameRate)
 		if((MIN_Frame_length <=OV8825_VIDEO_PERIOD_LINE_NUMS))
 		{
 			MIN_Frame_length = OV8825_VIDEO_PERIOD_LINE_NUMS;
-			OV8825DB("[OV8825SetVideoMode]current fps = %d\n", (ov8825.pvPclk*10000)  /(OV8825_PV_PERIOD_PIXEL_NUMS)/OV8825_PV_PERIOD_LINE_NUMS);
+			OV8825DB("[OV8825SetVideoMode]current fps = %d\n", (ov8825.videoPclk*10000)  /(OV8825_VIDEO_PERIOD_PIXEL_NUMS)/OV8825_VIDEO_PERIOD_LINE_NUMS);
 		}
-		OV8825DB("[OV8825SetVideoMode]current fps (10 base)= %d\n", (ov8825.pvPclk*10000)*10/(OV8825_PV_PERIOD_PIXEL_NUMS + ov8825.DummyPixels)/MIN_Frame_length);
+		OV8825DB("[OV8825SetVideoMode]current fps (10 base)= %d\n", (ov8825.videoPclk*10000)*10/(OV8825_VIDEO_PERIOD_PIXEL_NUMS + ov8825.DummyPixels)/MIN_Frame_length);
 		extralines = MIN_Frame_length - OV8825_VIDEO_PERIOD_LINE_NUMS;
 		
 		spin_lock(&ov8825mipiraw_drv_lock);

@@ -4,6 +4,7 @@
 #include "cust_gpio_usage.h"
 //#include <mach/mt_gpio.h>
 
+#if 0
 
 #ifndef GPIO_SSW_CH_SWAP_PIN
 #define GPIO_SSW_CH_SWAP_PIN GPIO101
@@ -21,6 +22,7 @@
 #define GPIO_SSW_EN_PIN_M_GPIO GPIO_MODE_00
 #endif
 
+#endif
 
 unsigned int ch_swap;
 unsigned int en;
@@ -34,14 +36,14 @@ static int ssw_init(unsigned int mode)
 	SSW_DBG("ssw_init: %s \n", mode?"Single Talk":"Dual Talk");
 
 	unsigned int ch_mode, en_mode;
-	//ch_swap = GPIO_SSW_CH_SWAP_PIN;
-	//en = GPIO_SSW_EN_PIN;
-	//ch_mode = GPIO_SSW_CH_SWAP_PIN_M_GPIO;
-	//en_mode = GPIO_SSW_EN_PIN_M_GPIO;
-	ch_swap = GPIO101;
-	en = GPIO105;
-	ch_mode = GPIO_MODE_00;
-	en_mode = GPIO_MODE_00;
+	ch_swap = GPIO_SSW_CH_SWAP_PIN;
+	en = GPIO_SSW_EN_PIN;
+	ch_mode = GPIO_SSW_CH_SWAP_PIN_M_GPIO;
+	en_mode = GPIO_SSW_EN_PIN_M_GPIO;
+	//ch_swap = GPIO101;
+	//en = GPIO105;
+	//ch_mode = GPIO_MODE_00;
+	//en_mode = GPIO_MODE_00;
 	
 	//initial Ch_Swap pin: 1, host1->sim slot1, host2->sim slot2; 0, host1->sim slot2, host2->sim slot1
 	mt_set_gpio_mode(ch_swap, ch_mode);

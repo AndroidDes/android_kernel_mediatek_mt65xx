@@ -345,7 +345,7 @@ static fm_s32 mt6620_PowerUp(fm_u16 *chip_id, fm_u16 *device_id)
         return ret;;
     }
 #ifdef FM_DIGITAL_INPUT
-  #ifdef MT6573 //for MT6573
+  #if 0//def MT6573 //for MT6573
 		if(get_chip_eco_ver() == CHIP_E1){
 			ret = mt6620_I2s_Setting(MT6620_I2S_ON, MT6620_I2S_MASTER, MT6620_I2S_48K);
 		}else{

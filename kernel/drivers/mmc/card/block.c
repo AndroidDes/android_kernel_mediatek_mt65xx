@@ -50,6 +50,7 @@
 #include <linux/vmalloc.h>
 
 #include <mach/mt_storage_logger.h>
+#include <sd_misc.h>
 #define FEATURE_STORAGE_PERF_INDEX
    
 #ifdef USER_BUILD_KERNEL
@@ -1887,14 +1888,12 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	return ERR_PTR(ret);
 }
 
-#ifdef MTK_EMMC_SUPPORT
-extern int msdc_get_reserve(void);
-#endif
 static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 {
 	sector_t size;
 #ifdef MTK_EMMC_SUPPORT
     unsigned int l_reserve;
+	struct storage_info s_info = {0};
 #endif
 	struct mmc_blk_data *md;
 
@@ -1914,7 +1913,8 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 
 	if(!mmc_card_sd(card)){
 #ifdef MTK_EMMC_SUPPORT
-            l_reserve =  msdc_get_reserve();
+            msdc_get_info(EMMC_CARD_BOOT, EMMC_RESERVE, &s_info);
+            l_reserve =  s_info.emmc_reserve;
             printk("l_reserve = 0x%x\n", l_reserve);
             size -= l_reserve;                         /*reserved for 64MB (emmc otp + emmc combo offset + reserved)*/
 #endif    

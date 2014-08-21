@@ -1,15 +1,12 @@
 #ifndef __DISP_DRV_H__
 #define __DISP_DRV_H__
 
-#ifdef BUILD_UBOOT
-    #include <asm/arch/mt65xx_typedefs.h>
-#else
-///TODO: remove mt65xx_typedefs.h for next chip
-    #include <mach/mt_typedefs.h>
-#endif
-
+#include <mach/mt_typedefs.h>
 
 #include "disp_drv_log.h"
+#include "ddp_path.h"
+#include "lcm_drv.h"
+#include "disp_hal.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,74 +27,10 @@ extern "C" {
 
 // ---------------------------------------------------------------------------
 
-typedef enum
-{	
-   DISP_STATUS_OK = 0,
-
-   DISP_STATUS_NOT_IMPLEMENTED,
-   DISP_STATUS_ALREADY_SET,
-   DISP_STATUS_ERROR,
-} DISP_STATUS;
-
-
-typedef enum {
-   DISP_STATE_IDLE = 0,
-   DISP_STATE_BUSY,
-} DISP_STATE;
-
-
-#define MAKE_PANEL_COLOR_FORMAT(R, G, B) ((R << 16) | (G << 8) | B)
-#define PANEL_COLOR_FORMAT_TO_BPP(x) ((x&0xff) + ((x>>8)&0xff) + ((x>>16)&0xff))
-
-typedef enum {
-    PANEL_COLOR_FORMAT_RGB332 = MAKE_PANEL_COLOR_FORMAT(3, 3, 2),
-    PANEL_COLOR_FORMAT_RGB444 = MAKE_PANEL_COLOR_FORMAT(4, 4, 4),
-    PANEL_COLOR_FORMAT_RGB565 = MAKE_PANEL_COLOR_FORMAT(5, 6, 5),
-    PANEL_COLOR_FORMAT_RGB666 = MAKE_PANEL_COLOR_FORMAT(6, 6, 6),
-    PANEL_COLOR_FORMAT_RGB888 = MAKE_PANEL_COLOR_FORMAT(8, 8, 8),
-} PANEL_COLOR_FORMAT;
-
-typedef enum {
-    DISP_LCD_INTERRUPT_EVENTS_START     = 0x01,
-    DISP_LCD_TRANSFER_COMPLETE_INT      = 0x01,
-    DISP_LCD_REG_COMPLETE_INT           = 0x02,
-    DISP_LCD_CDMQ_COMPLETE_INT          = 0x03,
-    DISP_LCD_HTT_INT                    = 0x04,
-    DISP_LCD_SYNC_INT                   = 0x05,
-    DISP_LCD_INTERRUPT_EVENTS_END       = 0x05,
-
-    
-    DISP_DSI_INTERRUPT_EVENTS_START     = 0x11,
-    DISP_DSI_READ_RDY_INT               = 0x11,
-    DISP_DSI_CMD_DONE_INT               = 0x12,
-    DISP_DSI_VSYNC_INT                  = 0x13,
-    DISP_DSI_TARGET_LINE_INT            = 0x14,
-    DISP_DSI_REG_UPDATE_INT             = 0x15,
-    DISP_DSI_VMDONE_INT                 = 0x16,
-    DISP_DSI_INTERRUPT_EVENTS_END       = 0x16,
-
-    DISP_DPI_INTERRUPT_EVENTS_START     = 0x21,
-    DISP_DPI_FIFO_EMPTY_INT             = 0x21,
-    DISP_DPI_FIFO_FULL_INT              = 0x22,
-    DISP_DPI_OUT_EMPTY_INT              = 0x23,
-    DISP_DPI_CNT_OVERFLOW_INT           = 0x24,
-    DISP_DPI_LINE_ERR_INT               = 0x25,
-    DISP_DPI_VSYNC_INT                  = 0x26,
-    DISP_DPI_TARGET_LINE_INT            = 0x27,
-    DISP_DPI_REG_UPDATE_INT             = 0x28,
-    DISP_DPI_INTERRUPT_EVENTS_END       = 0x28,
-} DISP_INTERRUPT_EVENTS;
-
-#define DISP_LCD_INTERRUPT_EVENTS_NUMBER (DISP_LCD_INTERRUPT_EVENTS_END - DISP_LCD_INTERRUPT_EVENTS_START + 1)
-#define DISP_DSI_INTERRUPT_EVENTS_NUMBER (DISP_DSI_INTERRUPT_EVENTS_END - DISP_DSI_INTERRUPT_EVENTS_START + 1)
-#define DISP_DPI_INTERRUPT_EVENTS_NUMBER (DISP_DPI_INTERRUPT_EVENTS_END - DISP_DPI_INTERRUPT_EVENTS_START + 1)
-
-typedef void (*DISP_INTERRUPT_CALLBACK_PTR)(void *params);
-
-typedef struct{
-    DISP_INTERRUPT_CALLBACK_PTR pFunc;
-    void *pParam;
-}DISP_INTERRUPT_CALLBACK_STRUCT;
+#define ASSERT_LAYER    (DDP_OVL_LAYER_MUN-1)
+extern unsigned int FB_LAYER;    // default LCD layer
+#define DISP_DEFAULT_UI_LAYER_ID (DDP_OVL_LAYER_MUN-1)
+#define DISP_CHANGED_UI_LAYER_ID (DDP_OVL_LAYER_MUN-2)
 
 typedef struct{
     unsigned int id;
@@ -115,6 +48,31 @@ typedef struct{
     int hw_conn_type;
 }DISP_LAYER_INFO;
 
+#if 0
+typedef enum
+{
+	HS_PRPR = 0,
+	HS_ZERO = 1,
+	HS_TRAIL= 2,
+	TA_GO= 3,
+	TA_SURE= 4,
+	TA_GET= 5,
+	DA_HS_EXIT= 6,
+	CLK_ZERO= 7,
+	CLK_TRAIL= 8,
+	CONT_DET= 9,
+	CLK_HS_PRPR= 10,
+	CLK_HS_POST= 11,
+	CLK_HS_EXIT= 12,
+	MAX= 0XFF,	
+} MIPI_SETTING_TYPE;
+
+typedef struct MIPI_TIMING{     
+    MIPI_SETTING_TYPE type;
+	unsigned char value;
+}MIPI_TIMING;
+#endif
+
 // ---------------------------------------------------------------------------
 // Public Functions
 // ---------------------------------------------------------------------------
@@ -123,14 +81,12 @@ DISP_STATUS DISP_Init(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited);
 DISP_STATUS DISP_Deinit(void);
 DISP_STATUS DISP_PowerEnable(BOOL enable);
 DISP_STATUS DISP_PanelEnable(BOOL enable);
-DISP_STATUS DISP_LCDPowerEnable(BOOL enable);   ///only used to power on LCD for memory out
 DISP_STATUS DISP_SetFrameBufferAddr(UINT32 fbPhysAddr);
 DISP_STATUS DISP_EnterOverlayMode(void);
 DISP_STATUS DISP_LeaveOverlayMode(void);
 DISP_STATUS DISP_EnableDirectLinkMode(UINT32 layer);
 DISP_STATUS DISP_DisableDirectLinkMode(UINT32 layer);
 DISP_STATUS DISP_UpdateScreen(UINT32 x, UINT32 y, UINT32 width, UINT32 height);
-DISP_STATUS DISP_SetInterruptCallback(DISP_INTERRUPT_EVENTS eventID, DISP_INTERRUPT_CALLBACK_STRUCT *pCBStruct);
 DISP_STATUS DISP_WaitForLCDNotBusy(void);
 DISP_STATUS DISP_PrepareSuspend(void);
 DISP_STATUS DISP_GetLayerInfo(DISP_LAYER_INFO *pLayer);
@@ -142,36 +98,6 @@ int DISP_RegisterExTriggerSource(DISP_EXTRA_CHECKUPDATE_PTR pCheckUpdateFunc , D
 void DISP_UnRegisterExTriggerSource(int u4ID);
 void GetUpdateMutex(void);
 void ReleaseUpdateMutex(void);
-
-///TODO: implement it and replace LCD_LayerXXX for mtkfb.c
-typedef enum
-{
-    DISP_SET_LAYER_ENABLE = 1,          ///type: BOOL
-    DISP_GET_LAYER_ENABLE,
-    DISP_SET_LAYER_ADDRESS,             ///type: UINT32
-    DISP_GET_LAYER_ADDRESS,
-    DISP_SET_LAYER_FORMAT,              ///type: 
-    DISP_GET_LAYER_FORMAT,
-    DISP_SET_LAYER_ALPHA_BLENDING,
-    DISP_GET_LAYER_ALPHA_BLENDING,
-    DISP_SET_LAYER_SIZE,
-    DISP_GET_LAYER_SIZE,
-    DISP_SET_LAYER_PITCH,
-    DISP_GET_LAYER_PITCH,
-    DISP_SET_LAYER_OFFSET,
-    DISP_GET_LAYER_OFFSET,
-    DISP_SET_LAYER_ROTATION,
-    DISP_GET_LAYER_ROTATION,
-    DISP_SET_LAYER_SOURCE_KEY,
-    DISP_GET_LAYER_SOURCE_KEY,
-    DISP_SET_LAYER_3D,
-    DISP_GET_LAYER_3D,
-    DISP_SET_LAYER_DITHER_EN,
-    DISP_GET_LAYER_DITHER_EN,
-    DISP_SET_LAYER_DITHER_CONFIG,
-    DISP_GET_LAYER_DITHER_CONFIG,    
-}DISP_LAYER_CONTROL_CODE_ENUM;
-DISP_STATUS DISP_LayerControl(DISP_LAYER_CONTROL_CODE_ENUM code, UINT32 layer_id, void *param, UINT32 *param_len);
 
 DISP_STATUS DISP_ConfigDither(int lrs, int lgs, int lbs, int dbr, int dbg, int dbb);
 
@@ -214,40 +140,9 @@ DISP_STATUS DISP_Get_Current_UpdateSpeed(unsigned int *speed);
 DISP_STATUS DISP_Change_Update(unsigned int);
 ///////////////
 
-DISP_STATUS DISP_InitM4U(void);
-DISP_STATUS DISP_ConfigAssertLayerMva(void);
-DISP_STATUS DISP_AllocUILayerMva(unsigned int pa, unsigned int *mva, unsigned int size);
-DISP_STATUS DISP_AllocOverlayMva(unsigned int va, unsigned int *mva, unsigned int size);
-DISP_STATUS DISP_DeallocMva(unsigned int va, unsigned int mva, unsigned int size);
-DISP_STATUS DISP_DumpM4U(void);
-
 // ---------------------------------------------------------------------------
 // Private Functions
 // ---------------------------------------------------------------------------
-
-typedef struct
-{
-    DISP_STATUS (*init)(UINT32 fbVA, UINT32 fbPA, BOOL isLcmInited);
-    DISP_STATUS (*enable_power)(BOOL enable);
-    DISP_STATUS (*update_screen)(BOOL isMuextLocked);
-
-    UINT32 (*get_working_buffer_size)(void);
-    UINT32 (*get_working_buffer_bpp)(void);
-    PANEL_COLOR_FORMAT (*get_panel_color_format)(void);
-    void (*init_te_control)(void);
-	UINT32 (*get_dithering_bpp)(void);
-
-	DISP_STATUS (*capture_framebuffer)(unsigned int pvbuf, unsigned int bpp);
-
-    void (*esd_reset)(void);
-	BOOL (*esd_check)(void);
-} DISP_DRIVER;
-
-
-const DISP_DRIVER *DISP_GetDriverDBI(void);
-const DISP_DRIVER *DISP_GetDriverDPI(void);
-const DISP_DRIVER *DISP_GetDriverDSI(void);
-
 
 BOOL DISP_SelectDevice(const char* lcm_name);
 BOOL DISP_DetectDevice(void);
@@ -258,9 +153,6 @@ BOOL DISP_IsContextInited(void);
 
 DISP_STATUS DISP_Capture_Videobuffer(unsigned int pvbuf, unsigned int bpp, unsigned int video_rotation);
 UINT32 DISP_GetOutputBPPforDithering(void);
-BOOL DISP_IsLCDBusy(void);
-DISP_STATUS DISP_ChangeLCDWriteCycle(void);
-DISP_STATUS DISP_M4U_On(BOOL enable);
 const char* DISP_GetLCMId(void);
 
 BOOL DISP_EsdRecoverCapbility(void);
@@ -273,8 +165,15 @@ DISP_STATUS DISP_Config_Overlay_to_Memory(unsigned int mva, int enable);
 void DISP_StartConfigUpdate(void);
 
 unsigned long DISP_GetLCMIndex(void);
+unsigned int DISP_AutoTest(void);
+unsigned int DISP_BLS_Query(void);
+void DISP_BLS_Enable(BOOL enable);
 // ---------------------------------------------------------------------------
-
+void DISP_Change_LCM_Resolution(unsigned int width, unsigned int height);
+BOOL fbconfig_dsi_vdo_prepare(void);
+void fbconfig_disp_set_mipi_clk(unsigned int clk);
+void fbconfig_disp_set_mipi_lane_num(unsigned int lane_num);
+int fbconfig_get_esd_check(void);
 
 
 #ifdef __cplusplus

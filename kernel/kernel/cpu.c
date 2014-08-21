@@ -311,12 +311,12 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 	while (!idle_cpu(cpu))
 		cpu_relax();
 
-	/* This actually kills the CPU. */
-	__cpu_die(cpu);
-
 #ifdef CONFIG_MT_LOAD_BALANCE_PROFILER
 	mt_lbprof_update_state(cpu, MT_LBPROF_HOTPLUG_STATE);
 #endif
+
+	/* This actually kills the CPU. */
+	__cpu_die(cpu);
 
 	/* CPU is completely dead: tell everyone.  Too late to complain. */
 	cpu_notify_nofail(CPU_DEAD | mod, hcpu);
@@ -377,9 +377,6 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
 
 	/* Now call notifier in preparation. */
 	cpu_notify(CPU_ONLINE | mod, hcpu);
-#ifdef CONFIG_MT_LOAD_BALANCE_PROFILER
-	mt_lbprof_update_state(cpu, MT_LBPROF_NO_TASK_STATE);
-#endif
 
 out_notify:
 	if (ret != 0)

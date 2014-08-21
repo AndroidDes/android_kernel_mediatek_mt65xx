@@ -7,6 +7,7 @@
 #include "ipanic.h"
 #include <linux/delay.h>
 #include <sd_misc.h>
+#include <mach/wd_api.h>
 #define EMMC_BLOCK_SIZE 512
 
 static u8 *emmc_bounce;
@@ -19,6 +20,10 @@ extern int card_dump_func_read(unsigned char* buf, unsigned int len, unsigned lo
 #ifdef MTK_MMPROFILE_SUPPORT
 extern unsigned int MMProfileGetDumpSize(void);
 extern void MMProfileGetDumpBuffer(unsigned int Start, unsigned int *pAddr, unsigned int *pSize);
+#endif
+
+#ifdef CONFIG_MTK_WQ_DEBUG
+extern int mt_dump_wq_debugger();
 #endif
 
 char *emmc_allocate_and_read(int offset, int length)
@@ -40,6 +45,7 @@ char *emmc_allocate_and_read(int offset, int length)
 	}
 	else {
 		xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: Cannot allocate buffer to read(len:%d)\n", __FUNCTION__, length);
+		return NULL;
 	}
 	ipanic_block_scramble(buff, size);
 	return buff;
@@ -111,7 +117,7 @@ static struct aee_oops *emmc_ipanic_oops_copy(void)
             oops->userspace_info = emmc_allocate_and_read(hdr->userspace_info_offset, hdr->userspace_info_length);
             oops->userspace_info_len = hdr->userspace_info_length;
             if (oops->userspace_info == NULL) {
-                xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read usrespace info failed\n", __FUNCTION__);
+	      xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read usrespace info failed, invalid length 0x%x\n", __FUNCTION__, oops->userspace_info_len);
                 goto error_return;
             }
         }
@@ -120,21 +126,20 @@ static struct aee_oops *emmc_ipanic_oops_copy(void)
 		oops->android_main = emmc_allocate_and_read(hdr->android_main_offset, hdr->android_main_length);
 		oops->android_main_len  = hdr->android_main_length;
 		if (oops->android_main == NULL)	{
-			xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read android_main failed\n", __FUNCTION__);
+		  xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read android_main failed, invalid length 0x%x\n", __FUNCTION__, oops->android_main_len);
 			goto error_return;
 		}
 		
 		oops->android_radio  = emmc_allocate_and_read(hdr->android_radio_offset, hdr->android_radio_length);
 		oops->android_radio_len = hdr->android_radio_length;
 		if (oops->android_radio == NULL) {
-			xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read android_radio failed\n", __FUNCTION__);
-			goto error_return;
+		  xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read android_radio failed, invalid length 0x%x\n", __FUNCTION__, oops->android_radio_len);
 		}		    
 		
 		oops->android_system = emmc_allocate_and_read(hdr->android_system_offset, hdr->android_system_length);
 		oops->android_system_len = hdr->android_system_length;
 		if (oops->android_system == NULL) {
-			xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read android_system failed\n", __FUNCTION__);
+		  xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: read android_system failed, invalid length 0x%x\n", __FUNCTION__, oops->android_system_len);
 			goto error_return;
 		}
 
@@ -329,13 +334,14 @@ static void ipanic_write_mmprofile(int offset, struct ipanic_header *hdr)
   unsigned int index = 0;
   unsigned int pbuf = 0;
   unsigned int bufsize = 0;
+  unsigned int mmprofile_dump_size = 0;
 
   offset = ALIGN(offset, EMMC_BLOCK_SIZE);
   hdr->mmprofile_offset = offset;
 
 #ifdef MTK_MMPROFILE_SUPPORT
   
-  unsigned int mmprofile_dump_size = MMProfileGetDumpSize();
+  mmprofile_dump_size = MMProfileGetDumpSize();
   if (mmprofile_dump_size == 0 || mmprofile_dump_size > IPANIC_OOPS_MMPROFILE_LENGTH_LIMIT) {
     xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: ignore INVALID MMProfile dump size 0x%x", mmprofile_dump_size);
     return;
@@ -350,7 +356,7 @@ static void ipanic_write_mmprofile(int offset, struct ipanic_header *hdr)
 
     index += bufsize;
 
-    rc = emmc_ipanic_write(pbuf, offset, bufsize);
+    rc = emmc_ipanic_write((char*)pbuf, offset, bufsize);
     if (rc < 0) {
       xlog_printk(ANDROID_LOG_ERROR, IPANIC_LOG_TAG, "%s: Error writing MMProfile to emmc! (%d)\n", __func__, rc);
       hdr->mmprofile_length = 0;
@@ -369,19 +375,19 @@ static void ipanic_write_mmprofile(int offset, struct ipanic_header *hdr)
 /*XXX Note: 2012/11/19 mtk_wdt_restart prototype is 
 * different on 77 and 89 platform. the owner promise to modify it
 */
-enum wk_wdt_type {
-	WK_WDT_LOC_TYPE,
-	WK_WDT_EXT_TYPE,
-	WK_WDT_LOC_TYPE_NOLOCK,
-	WK_WDT_EXT_TYPE_NOLOCK,
-	
-};
-extern void mtk_wdt_restart(enum wk_wdt_type type);
-
 static void ipanic_kick_wdt(void)
 {
-    mtk_wdt_restart(WK_WDT_LOC_TYPE);
-    mtk_wdt_restart(WK_WDT_EXT_TYPE);
+    int res=0;
+	struct wd_api*wd_api = NULL;
+    res = get_wd_api(&wd_api);
+    if(res)
+	{
+	  //aee_wdt_printf("ipanic_kick_wdt, get wd api error\n");
+	}
+	else
+	{
+	  wd_api->wd_restart(WD_TYPE_NOLOCK);
+	}
 }
 static spinlock_t ipanic_lock;
 extern  void ipanic_save_current_tsk_info(void);
@@ -393,6 +399,10 @@ static int emmc_ipanic(struct notifier_block *this, unsigned long event,
 	struct ipanic_header iheader;
 
     aee_wdt_dump_info();
+
+#ifdef CONFIG_MTK_WQ_DEBUG
+	mt_dump_wq_debugger();
+#endif
 
     /*In case many core run here concurrently*/
     spin_lock(&ipanic_lock);

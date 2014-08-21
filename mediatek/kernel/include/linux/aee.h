@@ -26,6 +26,7 @@ typedef enum {
     AE_EXP_ERR_END,
     AE_ANR, /* Error or Warning or Defect */
     AE_RESMON,  
+    AE_MODEM_WARNING,
     AE_WRN_ERR_END,
     AE_MANUAL, /* Manual Raise */
     AE_EXP_CLASS_END,
@@ -33,6 +34,14 @@ typedef enum {
     AE_KERNEL_PROBLEM_REPORT = 1000,
     AE_PROCESS_PROBLEM_REPORT,
 } AE_EXP_CLASS; /* General Program Exception Class */
+
+typedef enum {
+	AEE_REBOOT_MODE_NORMAL = 0,
+	AEE_REBOOT_MODE_KERNEL_PANIC,
+	AEE_REBOOT_MODE_NESTED_EXCEPTION,
+	AEE_REBOOT_MODE_WDT,
+	AEE_REBOOT_MODE_MANUAL_KDUMP,
+} AEE_REBOOT_MODE;
 
 struct aee_oops
 {
@@ -80,6 +89,7 @@ struct aee_kernel_api {
 struct last_reboot_reason {
 	uint8_t     wdt_status;
 	uint8_t     fiq_step;
+	uint8_t     reboot_mode;
 
 	uint32_t    last_irq_enter[NR_CPUS];
 	uint64_t    jiffies_last_irq_enter[NR_CPUS];
@@ -126,6 +136,12 @@ void aee_oops_free(struct aee_oops *oops);
 #define DB_OPT_DUMPSYS_INPUT            (1<<16)
 #define DB_OPT_MMPROFILE_BUFFER         (1<<17)
 #define DB_OPT_BINDER_INFO              (1<<18)
+#define DB_OPT_WCN_ISSUE_INFO           (1<<19)
+#define DB_OPT_DUMMY_DUMP               (1<<20)
+#define DB_OPT_PID_MEMORY_INFO          (1<<21)
+#define DB_OPT_VM_OOME_HPROF            (1<<22)
+#define DB_OPT_PID_SMAPS                (1<<23)
+#define DB_OPT_PROC_CMDQ_INFO           (1<<24)
 
 #define aee_kernel_exception(module, msg...)	\
 	aee_kernel_exception_api(__FILE__, __LINE__, DB_OPT_DEFAULT, module, msg)
@@ -136,13 +152,15 @@ void aee_oops_free(struct aee_oops *oops);
 #define aee_kernel_dal_show(msg)	\
 	aee_kernel_dal_api(__FILE__, __LINE__, msg)
 
-void aee_kernel_exception_api(const char *file, const int line, const int db_opt, const char *module, const char *msg, ...);
-void aee_kernel_warning_api(const char *file, const int line, const int db_opt, const char *module, const char *msg, ...);
-void aee_kernel_reminding_api(const char *file, const int line, const int db_opt, const char *module, const char *msg, ...);
-void aee_kernel_dal_api(const char *file, const int line, const char *msg);
+__weak void aee_kernel_exception_api(const char *file, const int line, const int db_opt, const char *module, const char *msg, ...);
+__weak void aee_kernel_warning_api(const char *file, const int line, const int db_opt, const char *module, const char *msg, ...);
+__weak void aee_kernel_reminding_api(const char *file, const int line, const int db_opt, const char *module, const char *msg, ...);
+__weak void aee_kernel_dal_api(const char *file, const int line, const char *msg);
 
 void aed_md_exception(const int *log, int log_size, const int *phy, int phy_size, const char* detail);
 void aed_combo_exception(const int *log, int log_size, const int *phy, int phy_size, const char* detail);
+
+void aee_kdump_reboot(AEE_REBOOT_MODE, const char *msg, ...);
 
 #if defined(CONFIG_MTK_AEE_IPANIC)
 /* Begin starting panic record */
@@ -152,5 +170,7 @@ void ipanic_oops_end(void);
 #define ipanic_oops_start()
 #define ipanic_oops_end()
 #endif
+
+__weak void mt_fiq_printf(const char *fmt, ...);
 
 #endif // __AEE_H__

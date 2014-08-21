@@ -1,4 +1,4 @@
-#include "venc_drv_if.h"
+#include "venc_drv_if_private.h"
 #include "vcodec_if.h"
 
 #include <sys/time.h>

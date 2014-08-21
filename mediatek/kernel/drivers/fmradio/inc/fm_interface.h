@@ -121,6 +121,10 @@ struct fm_basic_interface {
     fm_s32(*usdelay)(fm_u32 val);
     fm_s32(*read)(fm_u8 addr, fm_u16 *val);
     fm_s32(*write)(fm_u8 addr, fm_u16 val);
+    fm_s32(*top_read)(fm_u16 addr, fm_u32 *val);
+    fm_s32(*top_write)(fm_u16 addr, fm_u32 val);
+    fm_s32(*host_read)(fm_u32 addr, fm_u32 *val);
+    fm_s32(*host_write)(fm_u32 addr, fm_u32 val);
     fm_s32(*setbits)(fm_u8 addr, fm_u16 bits, fm_u16 msk);
     fm_u16(*chipid_get)(void);
     fm_s32(*mute)(fm_bool mute);
@@ -150,6 +154,8 @@ struct fm_basic_interface {
     fm_s32(*hwinfo_get)(struct fm_hw_info *req);
     fm_s32(*is_dese_chan)(fm_u16 freq);             // check if this is a de-sense channel
     fm_s32(*softmute_tune)(fm_u16 freq,fm_s32 *rssi,fm_bool *valid);
+    fm_s32(*pre_search)(void);
+    fm_s32(*restore_search)(void);
     fm_s32(*desense_check)(fm_u16 freq,fm_s32 rssi);             // check if this is a valid channel
     fm_s32(*get_freq_cqi)(fm_u16 freq,fm_s32 *cqi);
     fm_s32(*cqi_log)(fm_s32 min_freq, fm_s32 max_freq,fm_s32 space, fm_s32 cnt);//cqi log tool
@@ -192,7 +198,7 @@ struct fm_lowlevel_ops {
     struct fm_rds_interface ri;
 };
 
-#if (!defined(MT6620_FM)&&!defined(MT6628_FM))
+#if (!defined(MT6620_FM)&&!defined(MT6628_FM)&&!defined(MT6627_FM))
 extern fm_s32 fm_low_ops_register(struct fm_lowlevel_ops *ops);
 extern fm_s32 fm_low_ops_unregister(struct fm_lowlevel_ops *ops);
 extern fm_s32 fm_rds_ops_register(struct fm_lowlevel_ops *ops);
@@ -210,6 +216,19 @@ extern fm_s32 MT6628fm_low_ops_unregister(struct fm_lowlevel_ops *ops);
 extern fm_s32 MT6628fm_rds_ops_register(struct fm_lowlevel_ops *ops);
 extern fm_s32 MT6628fm_rds_ops_unregister(struct fm_lowlevel_ops *ops);
 #endif
+#ifdef MT6627_FM
+extern fm_s32 MT6627fm_low_ops_register(struct fm_lowlevel_ops *ops);
+extern fm_s32 MT6627fm_low_ops_unregister(struct fm_lowlevel_ops *ops);
+extern fm_s32 MT6627fm_rds_ops_register(struct fm_lowlevel_ops *ops);
+extern fm_s32 MT6627fm_rds_ops_unregister(struct fm_lowlevel_ops *ops);
+#endif
+#ifdef MT6630_FM
+extern fm_s32 MT6630fm_low_ops_register(struct fm_lowlevel_ops *ops);
+extern fm_s32 MT6630fm_low_ops_unregister(struct fm_lowlevel_ops *ops);
+extern fm_s32 MT6630fm_rds_ops_register(struct fm_lowlevel_ops *ops);
+extern fm_s32 MT6630fm_rds_ops_unregister(struct fm_lowlevel_ops *ops);
+#endif
+
 /*
  * fm_get_channel_space - get the spcace of gived channel
  * @freq - value in 760~1080 or 7600~10800

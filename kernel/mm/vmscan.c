@@ -53,6 +53,10 @@
 
 #include "internal.h"
 
+#ifdef CONFIG_ZRAM
+#undef CONFIG_ZRAM
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/vmscan.h>
 
@@ -157,6 +161,7 @@ struct mem_cgroup_zone {
  * From 0 .. 100.  Higher means more swappy.
  */
 int vm_swappiness = 60;
+EXPORT_SYMBOL(vm_swappiness);
 long vm_total_pages;	/* The total number of pages which the VM controls */
 
 static LIST_HEAD(shrinker_list);
@@ -426,10 +431,15 @@ static void set_reclaim_mode(int priority, struct scan_control *sc,
 	 * reclaim/compaction.Depending on the order, we will either set the
 	 * sync mode or just reclaim order-0 pages later.
 	 */
+#ifdef CONFIG_ZRAM
+	// disable lumpy reclaim, see kernel patch: mm: vmscan: remove lumpy reclaim
+	sc->reclaim_mode = 0;
+#else
 	if (COMPACTION_BUILD)
 		sc->reclaim_mode = RECLAIM_MODE_COMPACTION;
 	else
 		sc->reclaim_mode = RECLAIM_MODE_LUMPYRECLAIM;
+#endif
 
 	/*
 	 * Avoid using lumpy reclaim or reclaim/compaction if possible by
@@ -1924,7 +1934,7 @@ static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 	int file = is_file_lru(lru);
 
 	if (is_active_lru(lru)) {
-		if (sc->hibernation_mode || inactive_list_is_low(mz, file))
+		if (inactive_list_is_low(mz, file))
 			shrink_active_list(nr_to_scan, mz, sc, priority, file);
 		return 0;
 	}
@@ -1939,6 +1949,11 @@ static int vmscan_swappiness(struct mem_cgroup_zone *mz,
 		return vm_swappiness;
 	return mem_cgroup_swappiness(mz->mem_cgroup);
 }
+
+#ifdef CONFIG_ZRAM
+static int vmscan_swap_file_ratio = 1;
+module_param_named(swap_file_ratio, vmscan_swap_file_ratio, int, S_IRUGO | S_IWUSR);
+#endif // CONFIG_ZRAM
 
 /*
  * Determine how aggressively the anon and file LRU lists should be
@@ -2006,7 +2021,13 @@ static void get_scan_count(struct mem_cgroup_zone *mz, struct scan_control *sc,
 	 * This scanning priority is essentially the inverse of IO cost.
 	 */
 	anon_prio = vmscan_swappiness(mz, sc);
-	file_prio = 200 - vmscan_swappiness(mz, sc);
+	file_prio = 200 - anon_prio;
+#ifdef CONFIG_ZRAM
+	if (vmscan_swap_file_ratio) {
+	    anon_prio = anon_prio * anon / (anon + file + 1);
+	    file_prio = file_prio * file / (anon + file + 1);
+	}
+#endif // CONFIG_ZRAM
 
 	/*
 	 * OK, so we have swap space and a fair amount of page cache
@@ -2036,10 +2057,10 @@ static void get_scan_count(struct mem_cgroup_zone *mz, struct scan_control *sc,
 	 * each list that were recently referenced and in active use.
 	 */
 	ap = (anon_prio + 1) * (reclaim_stat->recent_scanned[0] + 1);
-	ap /= reclaim_stat->recent_rotated[0] + 1;
-
 	fp = (file_prio + 1) * (reclaim_stat->recent_scanned[1] + 1);
-	fp /= reclaim_stat->recent_rotated[1] + 1;
+        ap /= reclaim_stat->recent_rotated[0] + 1;
+        fp /= reclaim_stat->recent_rotated[1] + 1;
+
 	spin_unlock_irq(&mz->zone->lru_lock);
 
 	fraction[0] = ap;
@@ -2051,7 +2072,9 @@ out:
 		unsigned long scan;
 
 		scan = zone_nr_lru_pages(mz, lru);
-		if ((priority || noswap) && !sc->hibernation_mode) {
+		if (sc->hibernation_mode)
+			scan = SWAP_CLUSTER_MAX;
+		else if ((priority || noswap || !vmscan_swappiness(mz, sc))) {
 			scan >>= priority;
 			if (!scan && force_scan)
 				scan = SWAP_CLUSTER_MAX;
@@ -2076,7 +2099,7 @@ static inline bool should_continue_reclaim(struct mem_cgroup_zone *mz,
 	unsigned long pages_for_compaction;
 	unsigned long inactive_lru_pages;
 
-	if (sc->hibernation_mode && nr_reclaimed && nr_scanned && sc->nr_to_reclaim >= sc->nr_reclaimed)
+	if (nr_reclaimed && nr_scanned && sc->nr_to_reclaim >= sc->nr_reclaimed)
 		return true;
 
 	/* If not in reclaim/compaction mode, stop */

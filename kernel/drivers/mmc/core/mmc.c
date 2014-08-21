@@ -1537,7 +1537,7 @@ int mmc_attach_mmc(struct mmc_host *host)
 	mmc_release_host(host);
 	err = mmc_add_card(host->card);
 #ifdef MTK_EMMC_SUPPORT
-	err = init_pmt();
+	//err = init_pmt();
 	host->card_init_complete(host);
 #endif
 	mmc_claim_host(host);

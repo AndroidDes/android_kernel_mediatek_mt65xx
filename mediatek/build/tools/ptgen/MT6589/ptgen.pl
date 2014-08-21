@@ -1,49 +1,30 @@
 #!/usr/local/bin/perl -w
 #
 #****************************************************************************/
-#*
-#* Filename:
-#* ---------
-#*   ptgen.pl
-#*
-#* Project:
-#* --------
-#*
-#*
-#* Description:
-#* ------------
-#*   This script will generate partition layout files
-#*        
-#*
+#* This script will generate partition layout files
 #* Author: Kai Zhu (MTK81086)
-#* -------
-#*
-#* 
-#*============================================================================
-#*             HISTORY
-#* Below this line, this part is controlled by PVCS VM. DO NOT MODIFY!!
-#*------------------------------------------------------------------------------
-#* $Revision$
-#* $Modtime$
-#* $Log$
-#*
-#*
-#*------------------------------------------------------------------------------
-#* Upper this line, this part is controlled by PVCS VM. DO NOT MODIFY!!
-#*============================================================================
+#* History:
+#* "3.1 AutoDetect eMMC Chip and Set MBR_Start_Address_KB\n";
+#* "3.2 Support OTP\n";
+#* "3.3 Support Shared SD Card\n";
 #****************************************************************************/
 
 #****************************************************************************
 # Included Modules
 #****************************************************************************
 use File::Basename;
-my $Version=3.3;
-#my $ChangeHistory="3.1 AutoDetect eMMC Chip and Set MBR_Start_Address_KB\n";
-#my $ChangeHistory = "3.2 Support OTP\n";
-my $ChangeHistory = "3.3 Support Shared SD Card\n";
+my $Version=4.1;
+#my $ChangeHistory = "4.0 Support UBIFS/Support YAML/Created Files new proper folder\n";
+my $ChangeHistory = "4.1 YAML spec 1.1.1\n";
+#Switcher
+$DebugPrint="yes";
+#Global Value
+@Partition_table;
+
 # Partition_table.xls arrays and columns
-my @PARTITION_FIELD ;
-my @START_FIELD_Byte ;
+my @PARTITION_FIELD;
+my @START_FIELD_Byte;
+my @START_ADDR_PHY_Byte_HEX;
 my @START_FIELD_Byte_HEX;
 my @SIZE_FIELD_KB ;
 my @TYPE_FIELD;
@@ -55,33 +36,11 @@ my @BR_INDEX;
 my @FB_ERASE_FIELD;
 my @FB_DL_FIELD;
 
-my $COLUMN_PARTITION                = 1 ;
-my $COLUMN_TYPE                     = $COLUMN_PARTITION + 1 ;
-my $COLUMN_SIZE                     = $COLUMN_TYPE + 1 ;
-my $COLUMN_SIZEKB                   = $COLUMN_SIZE + 1 ;
-my $COLUMN_SIZE2                    = $COLUMN_SIZEKB + 1 ;
-my $COLUMN_SIZE3                    = $COLUMN_SIZE2 + 1 ;
-my $COLUMN_DL                       = $COLUMN_SIZE3 + 1 ;
-my $COLUMN_FB_ERASE                 = $COLUMN_DL + 1;  # fastboot support
-my $COLUMN_FB_DL                    = $COLUMN_FB_ERASE + 1;  # fastboot support
-# emmc support
-my $COLUMN_REGION		    = $COLUMN_FB_DL + 1;
-my $COLUMN_RESERVED		    = $COLUMN_REGION + 1;
-
 my $PMT_END_NAME;  #PMT_END_NAME
-#eMMC 
-#EXT4 Partition Size
-my $SECRO_SIZE;
-my $USERDATA_SIZE;
-my $SYSTEM_SIZE;
-my $CACHE_SIZE;
-
 my $total_rows = 0 ; #total_rows in partition_table
 my $User_Region_Size_KB; #emmc USER region start_address
 my $MBR_Start_Address_KB;	#KB
 my $Page_Size	=2; # default NAND page_size of nand
-my $AutoModify	=0;
-my $DebugPrint    = 1; # 1 for debug; 0 for non-debug
 my $LOCAL_PATH;
 my $SCAT_NAME;
 my $SHEET_NAME;
@@ -110,11 +69,12 @@ $FULL_PROJECT = $ENV{FULL_PROJECT};
 $LCA_PRJ = $ENV{MTK_LCA_SUPPORT};
 $PAGE_SIZE = $ENV{MTK_NAND_PAGE_SIZE};
 $EMMC_SUPPORT= $ENV{MTK_EMMC_SUPPORT};
-$UBIFS_SUPPORT= $ENV{MTK_NAND_UBI};
 $LDVT_SUPPORT= $ENV{MTK_LDVT_SUPPORT};
 $MTK_EMMC_OTP_SUPPORT= $ENV{MTK_EMMC_SUPPORT_OTP};
 $MTK_SHARED_SDCARD=$ENV{MTK_SHARED_SDCARD};
 $TARGET_BUILD_VARIANT=$ENV{TARGET_BUILD_VARIANT};
+$MTK_NAND_UBIFS_SUPPORT=$ENV{MTK_NAND_UBIFS_SUPPORT};
+$YAML_SUPPORT=$ENV{MTK_YAML_SCATTER_FILE_SUPPORT};
 
 my $PART_TABLE_FILENAME   = "mediatek/build/tools/ptgen/$PLATFORM/partition_table_${PLATFORM}.xls"; # excel file name
 my $REGION_TABLE_FILENAME = "mediatek/build/tools/emigen/$PLATFORM/MemoryDeviceList_${PLATFORM}.xls";  #eMMC region information
@@ -123,9 +83,9 @@ my $EMMC_COMPO	= "mediatek/config/$PROJECT/mbr_addr.pl" ;
 my $CUSTOM_MEMORYDEVICE_H_NAME  = "mediatek/custom/$PROJECT/preloader/inc/custom_MemoryDevice.h";
 my $PARTITION_DEFINE_H_NAME     = "mediatek/custom/$PROJECT/common/partition_define.h"; # 
 my $PARTITION_DEFINE_C_NAME		= "mediatek/platform/$platform/kernel/drivers/dum-char/partition_define.c";
-my $EMMC_PART_SIZE_LOCATION		= "mediatek/config/$PROJECT/configs/EMMC_partition_size.mk" ; # store the partition size for ext4 buil
-
+my $PART_SIZE_LOCATION		= "mediatek/config/$PROJECT/configs/partition_size.mk" ; 
 my $PMT_H_NAME          = "mediatek/custom/$PROJECT/common/pmt.h";
+my $PRODUCT_OUT="out/target/product/$PROJECT/";
 #for autogen uboot preload and kernel partition struct
 my $ProjectConfig		="mediatek/config/$PROJECT/ProjectConfig.mk";
 my $UbootH	="mediatek/custom/$PROJECT/uboot/inc/mt65xx_partition.h";
@@ -152,22 +112,22 @@ if ($LCA_PRJ eq "yes")
     $SCAT_NAME = $SCAT_NAME_DIR . $PLATFORM ."_Android_scatter_LCA.txt" ;
 }
 
-if ($EMMC_SUPPORT eq "yes") 
-{
-     $SCAT_NAME = $SCAT_NAME_DIR . $PLATFORM ."_Android_scatter_emmc.txt" ;
+if($YAML_SUPPORT eq "yes"){
+	$SCAT_NAME = "${SCAT_NAME_DIR}${PLATFORM}_Android_scatter.txt";
 }else{
-     $SCAT_NAME = $SCAT_NAME_DIR . $PLATFORM ."_Android_scatter.txt" ;
+	if ($EMMC_SUPPORT eq "yes") 
+	{
+		$SCAT_NAME = $SCAT_NAME_DIR . $PLATFORM ."_Android_scatter_emmc.txt" ;
+	}else{
+		$SCAT_NAME = $SCAT_NAME_DIR . $PLATFORM ."_Android_scatter.txt" ;
+	}
 }
-
 #Set SHEET_NAME
 if($EMMC_SUPPORT eq "yes"){
 	$SHEET_NAME = "emmc";
 	if($MTK_EMMC_OTP_SUPPORT eq "yes"){
 		$SHEET_NAME = $SHEET_NAME ." otp" ;
 	}
-}elsif($UBIFS_SUPPORT eq "nand_4k_slc_ubi"){
-	$SHEET_NAME = "nand 4k slc ubi";
-	$Page_Size=4;
 }else{
 	$SHEET_NAME = "nand " . $PAGE_SIZE ;
 	if($PAGE_SIZE=~/(\d)K/){
@@ -197,11 +157,13 @@ PROJECT = $ENV{PROJECT};
 LCA_PRJ = $ENV{MTK_LCA_SUPPORT};
 PAGE_SIZE = $ENV{MTK_NAND_PAGE_SIZE};
 EMMC_SUPPORT= $ENV{MTK_EMMC_SUPPORT};
-UBIFS_SUPPORT= $ENV{MTK_NAND_UBI};
 LDVT_SUPPORT= $ENV{MTK_LDVT_SUPPORT};
 TARGET_BUILD_VARIANT= $ENV{TARGET_BUILD_VARIANT};
 MTK_EMMC_OTP_SUPPORT= $ENV{MTK_EMMC_OTP_SUPPORT};
-MTK_SHARED_SDCARD=$ENV{MTK_SHARED_SDCARD};\n";
+MTK_SHARED_SDCARD=$ENV{MTK_SHARED_SDCARD};
+MTK_NAND_UBIFS_SUPPORT=$ENV{MTK_NAND_UBIFS_SUPPORT};
+MTK_YAML_SCATTER_FILE_SUPPORT=$ENV{MTK_YAML_SCATTER_FILE_SUPPORT};
+\n";
 print "SHEET_NAME=$SHEET_NAME\n";
 print "SCAT_NAME=$SCAT_NAME\n" ;
 
@@ -219,16 +181,20 @@ $PartitonBook = Spreadsheet::ParseExcel->new()->Parse($PART_TABLE_FILENAME);
 
 &GenHeaderFile () ;
 
+if($YAML_SUPPORT eq "yes"){
+&GenYAMLScatFile();
+}else{
 &GenScatFile () ;
+}
 
 if ($EMMC_SUPPORT eq "yes"){
 	&GenMBRFile ();
+}
+if ($EMMC_SUPPORT eq "yes" || $MTK_NAND_UBIFS_SUPPORT eq "yes"){
 	&GenPartSizeFile ();
 }
 &GenPerloaderCust_partC();
 &GenPmt_H();
-&GenUboot_PartitionC();
-&GenUboot_Mt65xx_ParitionH();
 &GenLK_PartitionC();
 &GenLK_MT_PartitionH();
 if($EMMC_SUPPORT ne "yes"){
@@ -245,7 +211,7 @@ unless ($EMMC_SUPPORT eq "yes"){
 
 print "**********Ptgen Done********** ^_^\n" ;
 
-print "\n\nPtgen modified or Generated files list:\n$SCAT_NAME\n$PARTITION_DEFINE_H_NAME\n$EMMC_PART_SIZE_LOCATION\n/out/MBR EBR1 EBR2 \n\n\n\n\n";
+print "\n\nPtgen modified or Generated files list:\n$SCAT_NAME\n$PARTITION_DEFINE_H_NAME\n$PART_SIZE_LOCATION\n/out/MBR EBR1 EBR2 \n\n\n\n\n";
 
 exit ;
 
@@ -400,6 +366,18 @@ sub InitAlians(){
 
 sub ReadExcelFile()
 {
+	my $COLUMN_PARTITION                = 1 ;
+	my $COLUMN_TYPE                     = $COLUMN_PARTITION + 1 ;
+	my $COLUMN_SIZE                     = $COLUMN_TYPE + 1 ;
+	my $COLUMN_SIZEKB                   = $COLUMN_SIZE + 1 ;
+	my $COLUMN_SIZE2                    = $COLUMN_SIZEKB + 1 ;
+	my $COLUMN_SIZE3                    = $COLUMN_SIZE2 + 1 ;
+	my $COLUMN_DL                       = $COLUMN_SIZE3 + 1 ;
+	my $COLUMN_FB_ERASE                 = $COLUMN_DL + 1;  # fastboot support
+	my $COLUMN_FB_DL                    = $COLUMN_FB_ERASE + 1;  # fastboot support
+	my $COLUMN_REGION		    = $COLUMN_FB_DL + 1;
+	my $COLUMN_RESERVED		    = $COLUMN_REGION + 1;
+
     my $sheet = get_sheet($SHEET_NAME,$PartitonBook) ;
 
     unless ($sheet)
@@ -435,7 +413,7 @@ sub ReadExcelFile()
 	my $tmp_index=1;
 	while($pt_name ne "END"){
 		if($pt_name eq "FAT" && $MTK_SHARED_SDCARD eq "yes"){
-			print "Skip FAT because of $MTK_SHARED_SDCARD On\n";
+			print "Skip FAT because of MTK_SHARED_SDCARD On\n";
 		}else{
 		$PARTITION_FIELD[$row_t -1] = $pt_name;
 		$SIZE_FIELD_KB[$row_t -1]    = &xls_cell_value($sheet, $row, $COLUMN_SIZEKB,$SHEET_NAME) ;
@@ -560,17 +538,28 @@ if(0){
 }
 #convert dec start_address to hex start_address
 	$START_FIELD_Byte_HEX[0]=0;
-	for($row=1;$row < @PARTITION_FIELD;$row++){
+my $InUser=0;
+	for($row=0;$row < @PARTITION_FIELD;$row++){
 		if($PARTITION_FIELD[$row] eq "BMTPOOL" || $PARTITION_FIELD[$row] eq "OTP"){
-			$START_FIELD_Byte_HEX[$row] = sprintf("FFFF%04x",$START_FIELD_Byte[$row]/(64*$Page_Size*1024));#$START_FIELD_Byte[$row];
+			$START_FIELD_Byte_HEX[$row] = sprintf("0xFFFF%04x",$START_FIELD_Byte[$row]/(64*$Page_Size*1024));#$START_FIELD_Byte[$row];
+			$START_ADDR_PHY_Byte_DEC[$row]=hex($START_FIELD_Byte_HEX[$row]);
 		}else{
-			$START_FIELD_Byte_HEX[$row] = sprintf("%x",$START_FIELD_Byte[$row]);
+			$START_FIELD_Byte_HEX[$row] = sprintf("0x%x",$START_FIELD_Byte[$row]);
+			if($PARTITION_FIELD[$row] eq "MBR"){
+				$InUser=1;
+			}
+			if($InUser == 1){
+			$START_ADDR_PHY_Byte_DEC[$row]=$START_FIELD_Byte[$row]-$MBR_Start_Address_KB*1024;
+			}else{
+			$START_ADDR_PHY_Byte_DEC[$row]=$START_FIELD_Byte[$row];
+			}
+			
 		}
 	}
 	
 	if($DebugPrint eq 1){
 		for($row=0;$row < @PARTITION_FIELD;$row++){
-			print "START=0x$START_FIELD_Byte_HEX[$row],		Partition=$PARTITION_FIELD[$row],		SIZE=$SIZE_FIELD_KB[$row],	DL_=$DL_FIELD[$row]" ;
+			print "START=$START_FIELD_Byte_HEX[$row],		Partition=$PARTITION_FIELD[$row],		SIZE=$SIZE_FIELD_KB[$row],	DL_=$DL_FIELD[$row]" ;
 			if ($EMMC_SUPPORT eq "yes"){
             	print ", 	Partition_Index=$PARTITION_IDX_FIELD[$row],	REGION =$REGION_FIELD[$row],RESERVE = $RESERVED_FIELD[$row]";
         	} 
@@ -648,7 +637,7 @@ sub GenHeaderFile ()
 			print PARTITION_DEFINE_H_NAME $temp ;
         }
 	if($PARTITION_FIELD[$iter] eq "SECCFG" || $PARTITION_FIELD[$iter] eq "SEC_RO"){
-		$temp = "#define PART_OFFSET_$PARTITION_FIELD[$iter]\t\t\t(0x$START_FIELD_Byte_HEX[$iter])\n"; 
+		$temp = "#define PART_OFFSET_$PARTITION_FIELD[$iter]\t\t\t($START_FIELD_Byte_HEX[$iter])\n"; 
 		print PARTITION_DEFINE_H_NAME $temp ;
 	}
         
@@ -722,7 +711,7 @@ __TEMPLATE
     	$t = lc($PARTITION_FIELD[$iter]);
 		$temp = "\t\t\t{\"$t\",";
 		$t = ($SIZE_FIELD_KB[$iter])*1024;
-		$temp .= "$t,0x$START_FIELD_Byte_HEX[$iter]";
+		$temp .= "$t,$START_FIELD_Byte_HEX[$iter]";
 		
 		if($EMMC_SUPPORT eq "yes"){
 			$temp .= ", EMMC, $PARTITION_IDX_FIELD[$iter],$REGION_FIELD[$iter]";
@@ -796,7 +785,7 @@ sub GenScatFile ()
 		$PMT_END_NAME = "$temp";	
 	}
 
-	$temp .= " 0x$START_FIELD_Byte_HEX[$iter]\n{\n}\n";
+	$temp .= " $START_FIELD_Byte_HEX[$iter]\n{\n}\n";
 
 
         print SCAT_NAME $temp ;
@@ -805,7 +794,175 @@ sub GenScatFile ()
     print SCAT_NAME "\n\n" ;
     close SCAT_NAME ;
 }
+sub GenYAMLScatFile(){
+	my $iter = 0 ;
+	if(!-e $SCAT_NAME_DIR)
+	{
+		`mkdir -p $SCAT_NAME_DIR `;
+	}
+	if(-e $SCAT_NAME)
+	{
+		`chmod 777 $SCAT_NAME`;
+	}
+    open (SCAT_NAME, ">$SCAT_NAME") or &error_handler("Ptgen open $SCAT_NAME Fail!", __FILE__, __LINE__) ;
+	my %fileHash=(
+		PRELOADER=>"preloader_$PROJECT.bin",
+		DSP_BL=>"DSP_BL",
+		UBOOT=>"lk.bin",
+		BOOTIMG=>"boot.img",
+		RECOVERY=>"recovery.img",
+		SEC_RO=>"secro.img",
+		LOGO=>"logo.bin",
+		ANDROID=>"system.img",
+		CACHE=>"cache.img",
+		USRDATA=>"userdata.img"
+	);
 
+	my %sepcial_operation_type=(
+		PRELOADER=>"BOOTLOADERS",
+		DSP_BL=>"BOOTLOADERS",
+		NVRAM=>"BINREGION",
+		PRO_INFO=>"PROTECTED",
+		PROTECT_F=>"PROTECTED",
+		PROTECT_S=>"PROTECTED",
+		PMT=>"RESERVED",
+		BMTPOOL=>"RESERVED",
+	);
+	my %protect=(PRO_INFO=>"TRUE",NVRAM=>"TRUE",PROTECT_F=>"TRUE",PROTECT_S=>"TRUE",FAT=>"KEEPVISIBLE",FAT=>"INVISIBLE",BMTPOOL=>"INVISIBLE");
+	my %Scatter_Info={};
+	for ($iter=0; $iter<$total_rows; $iter++){
+		$Scatter_Info{$PARTITION_FIELD[$iter]}={partition_index=>$iter,physical_start_addr=>sprintf("0x%x",$START_ADDR_PHY_Byte_DEC[$iter]),linear_start_addr=>$START_FIELD_Byte_HEX[$iter],partition_size=>sprintf("0x%x",${SIZE_FIELD_KB[$iter]}*1024)};
+	
+		if(exists $fileHash{$PARTITION_FIELD[$iter]}){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{file_name}=$fileHash{$PARTITION_FIELD[$iter]};
+		}else{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{file_name}="NONE";
+		}
+		
+		if($PARTITION_FIELD[$iter]=~/MBR/ || $PARTITION_FIELD[$iter]=~/EBR/){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{file_name}=$PARTITION_FIELD[$iter];
+		}
+		
+		if($DL_FIELD[$iter] == 0){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{type}="NONE";
+		}else{
+			if($EMMC_SUPPORT eq "yes" || $TYPE_FIELD[$iter] eq "Raw data"){
+				$Scatter_Info{$PARTITION_FIELD[$iter]}{type}="NORMAL_ROM";
+			}else{
+				if($MTK_NAND_UBIFS_SUPPORT eq "yes"){
+					$Scatter_Info{$PARTITION_FIELD[$iter]}{type}="UBI_IMG";
+				}else{
+					$Scatter_Info{$PARTITION_FIELD[$iter]}{type}="YAFFS_IMG";
+				}
+			}
+		}
+		if($PARTITION_FIELD[$iter]=~/MBR/ || $PARTITION_FIELD[$iter]=~/EBR/){
+			#$Scatter_Info{$PARTITION_FIELD[$iter]}{type}="MBR_BIN";
+		}
+		if($PARTITION_FIELD[$iter]=~/PRELOADER/ || $PARTITION_FIELD[$iter]=~/DSP_BL/)
+		{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{type}="SV5_BL_BIN";
+		}
+		if(exists $sepcial_operation_type{$PARTITION_FIELD[$iter]}){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{operation_type}=$sepcial_operation_type{$PARTITION_FIELD[$iter]};
+		}else{
+			if($DL_FIELD[$iter] == 0){
+				$Scatter_Info{$PARTITION_FIELD[$iter]}{operation_type}="INVISIBLE";
+			}else{
+				$Scatter_Info{$PARTITION_FIELD[$iter]}{operation_type}="UPDATE";
+			}	
+		}
+		if($EMMC_SUPPORT eq "yes"){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{region}="EMMC_$REGION_FIELD[$iter]";
+		}else{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{region}="NONE";
+		}
+		
+		if($EMMC_SUPPORT eq "yes"){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{storage}="HW_STORAGE_EMMC";
+		}else{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{storage}="HW_STORAGE_NAND";
+		}
+		
+		if($PARTITION_FIELD[$iter]=~/BMTPOOL/ || $PARTITION_FIELD[$iter]=~/OTP/){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{boundary_check}="false";
+		}else{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{boundary_check}="true";
+		}
+		
+		if ($DL_FIELD[$iter] == 0){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{is_download}="false";
+		}else{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{is_download}="true";
+		}
+	
+		if($PARTITION_FIELD[$iter]=~/BMTPOOL/ || $PARTITION_FIELD[$iter]=~/OTP/){
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{is_reserved}="true";
+		}else{
+			$Scatter_Info{$PARTITION_FIELD[$iter]}{is_reserved}="false";
+		}
+
+		if($MTK_SHARED_SDCARD eq "yes" && $PARTITION_FIELD[$iter] =~ /USRDATA/){
+			$PMT_END_NAME = $PARTITION_FIELD[$iter];
+		}elsif($PARTITION_FIELD[$iter] =~ /FAT/){
+			$PMT_END_NAME = $PARTITION_FIELD[$iter];	
+		}
+	}
+my $Head1 = <<"__TEMPLATE";
+############################################################################################################
+#
+#  General Setting 
+#    
+############################################################################################################
+__TEMPLATE
+
+my $Head2=<<"__TEMPLATE";
+############################################################################################################
+#
+#  Layout Setting
+#
+############################################################################################################
+__TEMPLATE
+
+	my ${FirstDashes}="- ";
+	my ${FirstSpaceSymbol}="  ";
+	my ${SecondSpaceSymbol}="      ";
+	my ${SecondDashes}="    - ";
+	my ${colon}=": ";
+	print SCAT_NAME $Head1;
+	print SCAT_NAME "${FirstDashes}general${colon}MTK_PLATFORM_CFG\n";
+	print SCAT_NAME "${FirstSpaceSymbol}info${colon}\n";
+	print SCAT_NAME "${SecondDashes}config_version${colon}V1.1.1\n";
+	print SCAT_NAME "${SecondSpaceSymbol}platform${colon}${PLATFORM}\n";
+	print SCAT_NAME "${SecondSpaceSymbol}project${colon}${FULL_PROJECT}\n";
+	if($EMMC_SUPPORT eq "yes"){
+		print SCAT_NAME "${SecondSpaceSymbol}storage${colon}EMMC\n";
+		print SCAT_NAME "${SecondSpaceSymbol}boot_channel${colon}MSDC_0\n";
+		printf SCAT_NAME ("${SecondSpaceSymbol}block_size${colon}0x%x\n",2*64*1024);
+	}else{
+		print SCAT_NAME "${SecondSpaceSymbol}storage${colon}NAND\n";
+		print SCAT_NAME "${SecondSpaceSymbol}boot_channel${colon}NONE\n";
+		printf SCAT_NAME ("${SecondSpaceSymbol}block_size${colon}0x%x\n",${Page_Size}*64*1024);
+	}
+	print SCAT_NAME $Head2;
+	for ($iter=0; $iter<$total_rows; $iter++){
+		print SCAT_NAME "${FirstDashes}partition_index${colon}SYS$Scatter_Info{$PARTITION_FIELD[$iter]}{partition_index}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}partition_name${colon}${PARTITION_FIELD[$iter]}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}file_name${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{file_name}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}is_download${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{is_download}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}type${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{type}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}linear_start_addr${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{linear_start_addr}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}physical_start_addr${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{physical_start_addr}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}partition_size${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{partition_size}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}region${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{region}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}storage${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{storage}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}boundary_check${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{boundary_check}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}is_reserved${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{is_reserved}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}operation_type${colon}$Scatter_Info{$PARTITION_FIELD[$iter]}{operation_type}\n";
+		print SCAT_NAME "${FirstSpaceSymbol}reserve${colon}0x00\n\n";
+	}
+	close SCAT_NAME;	
+}
 #****************************************************************************************
 # subroutine:  GenMBRFile 
 # return:
@@ -1090,41 +1247,94 @@ foreach my $sBR (@BR){
 
 sub GenPartSizeFile
 {
-	`chmod 777 $EMMC_PART_SIZE_LOCATION` if (-e $EMMC_PART_SIZE_LOCATION);
-        open (EMMC_PART_SIZE_LOCATION, ">$EMMC_PART_SIZE_LOCATION") or &error_handler("CAN NOT open $EMMC_PART_SIZE_LOCATION", __FILE__, __LINE__) ;
-	print EMMC_PART_SIZE_LOCATION "\#!/usr/local/bin/perl\n";
-	print EMMC_PART_SIZE_LOCATION &copyright_file_header_for_shell();
-	print EMMC_PART_SIZE_LOCATION "\nifeq (\$(MTK_EMMC_SUPPORT),yes)\n";
-	
+	`chmod 777 $PART_SIZE_LOCATION` if (-e $PART_SIZE_LOCATION);
+        open (PART_SIZE_LOCATION, ">$PART_SIZE_LOCATION") or &error_handler("CAN NOT open $PART_SIZE_LOCATION\n", __FILE__, __LINE__) ;	
+	my $Total_Size=512*1024*1024; #Hard Code 512MB for 4+2 project FIX ME!!!!!
 	my $temp;
 	my $index=0;
+	my $vol_size;
+	my $min_ubi_vol_size;
 	my %PSalias=(
 		SEC_RO=>SECRO,
 		ANDROID=>SYSTEM,
 		USRDATA=>USERDATA,
 	);
+	my %ubialias=(
+		SEC_RO=>SECRO,
+		ANDROID=>SYSTEM,
+		USRDATA=>USERDATA,
+	);
+	my $PEB;
+	my $LEB;
+	my $IOSIZE;
+	if($MTK_NAND_UBIFS_SUPPORT eq "yes"){
+		$IOSIZE=${Page_Size}*1024;
+		$PEB=$IOSIZE*64;
+		$LEB=$IOSIZE*62;
+		$min_ubi_vol_size = $PEB*28;
+		printf PART_SIZE_LOCATION ("BOARD_UBIFS_MIN_IO_SIZE:=%d\n",$IOSIZE);
+		printf PART_SIZE_LOCATION ("BOARD_FLASH_BLOCK_SIZE:=%d\n",$PEB);
+		printf PART_SIZE_LOCATION ("BOARD_UBIFS_VID_HDR_OFFSET:=%d\n",$IOSIZE);
+		printf PART_SIZE_LOCATION ("BOARD_UBIFS_LOGICAL_ERASEBLOCK_SIZE:=%d\n",$LEB);
+	}
 
-
+	for($index=0;$index < $total_rows;$index++){
+		$Total_Size-=$SIZE_FIELD_KB[$index]*1024;
+	}
 	for($index=0;$index < $total_rows;$index++){
 		if($TYPE_FIELD[$index] eq "EXT4" || $TYPE_FIELD[$index] eq "FAT"){
 			$temp = $SIZE_FIELD_KB[$index]/1024;
-			#if($PARTITION_FIELD[$index] eq "ANDROID" || $PARTITION_FIELD[$index] eq "CACHE" || $PARTITION_FIELD[$index] eq "SEC_RO"){
-			#	$temp -=1;
-			#}
 			if($PARTITION_FIELD[$index] eq "USRDATA"){
 				$temp -=1;	
 			}
-				#print "$PSalias{$PARTITION_FIELD[$index]} $PARTITION_FIELD[$index]\n";
 			if(exists($PSalias{$PARTITION_FIELD[$index]})){
-				print EMMC_PART_SIZE_LOCATION "BOARD_$PSalias{$PARTITION_FIELD[$index]}IMAGE_PARTITION_SIZE:=$temp". "M\n" ;
+				print PART_SIZE_LOCATION "BOARD_$PSalias{$PARTITION_FIELD[$index]}IMAGE_PARTITION_SIZE:=$temp". "M\n" ;
 			}else{
-				print EMMC_PART_SIZE_LOCATION "BOARD_$PARTITION_FIELD[$index]IMAGE_PARTITION_SIZE:=$temp". "M\n" ;
+				print PART_SIZE_LOCATION "BOARD_$PARTITION_FIELD[$index]IMAGE_PARTITION_SIZE:=$temp". "M\n" ;
 			}
+		}
+		
+		if($MTK_NAND_UBIFS_SUPPORT eq "yes" && $TYPE_FIELD[$index] eq "UBIFS/YAFFS2"){
+			my $part_name=lc($PARTITION_FIELD[$index]);
+			my $INIFILE="${PRODUCT_OUT}ubi_${part_name}.ini";
+			if($SIZE_FIELD_KB[$index] == 0){
+				$SIZE_FIELD_KB[$index]=$Total_Size/1024;
+			}	
+			$vol_size = (int(($SIZE_FIELD_KB[$index]*1024/${PEB})*(0.99))-4)*$LEB;
+			if($min_ubi_vol_size > $SIZE_FIELD_KB[$index]*1024){
+				&error_handler("$PARTITION_FIELD[$index] is too small, UBI partition is at least $min_ubi_vol_size byte, Now it is $SIZE_FIELD_KB[$index] KiB", __FILE__, __LINE__);
+			}
+			if(!-e $PRODUCT_OUT)
+			{
+				`mkdir -p $PRODUCT_OUT `;
+			}
+			if(-e $INIFILE)
+			{
+				`chmod 777 $INIFILE`;
+			}
+			open (INIFILE, ">$INIFILE") or &error_handler("CAN NOT open $INIFILE\n", __FILE__, __LINE__);
+			print INIFILE "[ubifs]\n";
+			print INIFILE "mode=ubi\n";
+			print INIFILE "image=${PRODUCT_OUT}ubifs.${part_name}.img\n";
+			print INIFILE "vol_id=0\n";
+			print INIFILE "vol_size=$vol_size\n";
+			print INIFILE "vol_type=dynamic\n";
+			if(exists $kernel_alias{$PARTITION_FIELD[$index]}){
+				print INIFILE "vol_name=$kernel_alias{$PARTITION_FIELD[$index]}\n";
+			}else{
+				print INIFILE "vol_name=${part_name}\n";
+			}
+			if($PARTITION_FIELD[$index] ne "SEC_RO"){
+				print INIFILE "vol_flags=autoresize\n";
+			}
+			print INIFILE "vol_alignment=1\n";
+			close INIFILE;
+			printf PART_SIZE_LOCATION ("BOARD_UBIFS_%s_MAX_LOGICAL_ERASEBLOCK_COUNT:=%d\n",$PARTITION_FIELD[$index],int((${vol_size}/$LEB)*1.1));
 		}
 	}
 
- 	print EMMC_PART_SIZE_LOCATION "endif \n" ;
-    close EMMC_PART_SIZE_LOCATION ;
+ 	#print PART_SIZE_LOCATION "endif \n" ;
+    close PART_SIZE_LOCATION ;
 }
 
 #****************************************************************************
@@ -1739,10 +1949,6 @@ sub GenPmt_H(){
 #define _PMT_H
 
 #include "partition_define.h"
-
-//mt6516_partition.h has defination
-//mt6516_download.h define again, both is 20
-
 #define MAX_PARTITION_NAME_LEN 64
 #ifdef MTK_EMMC_SUPPORT
 /*64bit*/
@@ -2008,7 +2214,15 @@ sub GenLK_PartitionC(){
 	print SOURCE "\n\nstruct part_name_map g_part_name_map[PART_MAX_COUNT] = {\n";
 	for ($iter=0; $iter< $total_rows; $iter++){
 		last if($PARTITION_FIELD[$iter] eq "BMTPOOL" || $PARTITION_FIELD[$iter] eq "OTP");
-		$temp_t = lc($TYPE_FIELD[$iter]);
+		if($TYPE_FIELD[$iter] eq "UBIFS/YAFFS2"){
+			if($MTK_NAND_UBIFS_SUPPORT eq "yes"){
+				$temp_t = "ubifs";
+			}else{
+				$temp_t = "yaffs2";			
+			}
+		}else{
+			$temp_t = lc($TYPE_FIELD[$iter]);
+		}
 		if($lk_alias{$PARTITION_FIELD[$iter]}){
 			if($uboot_alias{$PARTITION_FIELD[$iter]}){
 				$temp = "\t{\"$lk_alias{$PARTITION_FIELD[$iter]}\",\tPART_$uboot_alias{$PARTITION_FIELD[$iter]},\t\"$temp_t\",\t$iter,\t$FB_ERASE_FIELD[$iter],\t$FB_DL_FIELD[$iter]},\n";
@@ -2136,6 +2350,14 @@ struct part_dev {
     int (*write) (part_dev_t *dev, uchar *src, ulong dst, int size);
 #endif
 };
+enum{
+	RAW_DATA_IMG,
+	YFFS2_IMG,
+	UBIFS_IMG,
+	EXT4_IMG,	
+	FAT_IMG,
+	UNKOWN_IMG,
+};
 extern struct part_name_map g_part_name_map[];
 extern int mt_part_register_device(part_dev_t *dev);
 extern part_t* mt_part_get_partition(char *name);
@@ -2182,14 +2404,16 @@ sub get_sheet {
 # input:       $row:    Specified row number
 # input:       $col:    Specified column number
 #****************************************************************************************
-sub xls_cell_value {
-	my ($Sheet, $row, $col,$SheetName) = @_;
-	my $cell = $Sheet->get_cell($row, $col);
-	if(defined $cell){
-		return  $cell->Value();
-  	}else{
-		my $error_msg="ERROR in ptgen.pl: (row=$row,col=$col) undefine in $SheetName!\n";
-		print $error_msg;
-		die $error_msg;
-	}
+sub xls_cell_value()
+{
+    my($Sheet, $row, $col) = @_;
+    my $cell = $Sheet->get_cell($row, $col);
+    if (defined $cell)
+    {
+        return $cell->Value();
+    } else
+    {
+        print "$Sheet: row=$row, col=$col undefined\n";
+        return;
+    }
 }

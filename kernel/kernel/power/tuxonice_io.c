@@ -765,7 +765,7 @@ int toi_start_other_threads(void)
 		atomic_inc(&toi_num_other_threads);
 	}
 
-    hib_log("[%s] Started %ld threads.", __func__, num_started);
+    hib_warn("Started %ld threads.", num_started);
 
 	toi_message(TOI_IO, TOI_LOW, 0, "Started %d threads.", num_started);
 	return num_started;

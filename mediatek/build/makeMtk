@@ -32,13 +32,14 @@
 # RELATED THERETO SHALL BE SETTLED BY ARBITRATION IN SAN FRANCISCO, CA, UNDER
 # THE RULES OF THE INTERNATIONAL CHAMBER OF COMMERCE (ICC).
 # 
-
+use Sys::Hostname;
 my $DEBUG = 0; # enable/disable script debugging message
 
 # Set environment variable for current Android version building
 # such as, JDK version, arm-eabi version etc.
 # If anymore, you can specify them in ./mbldenv.sh
 setBuildEnvVars("./mbldenv.sh");
+setCacheEnvVars() if (uc($ENV{"MTK_INTERNAL"}) eq "TRUE");
 # End
 
 $myCmd = "makeMtk"; #$0
@@ -52,7 +53,17 @@ $result \
 Please move your source tree to a path that does not contain any spaces.        \
 ******************************************************************************  \
 Directory names containing spaces not supported\n" if($#number != 0);
-
+@keywords = ('\[','\]','\(','\)','\{','\}');
+foreach $k (@keywords)
+{
+@number = split($k,$result);
+die "******************************************************************************  \
+You are building in a directory whose absolute path contains a special character: \
+$result \
+Please move your source tree to a path that does not contain \"$k\".        \
+******************************************************************************  \
+Directory names containing spaces not supported\n" if($#number != 0);
+}
 $performanceChk = 0;
 ($performanceChk == 1) && print &CurrTimeStr . " Enter $myCmd\n";
 
@@ -69,7 +80,7 @@ $action = "";
 @mOpts = ();
 $ini = "makeMtk.ini";
 $enINI = (-e $ini) ? 1 : 0;
-(($#ARGV < 0) || (($#ARGV < 1) && (($enINI == 0) && (lc($ARGV[0]) !~ /^[listp|banyan_addon]/)))) && &Usage;
+(($#ARGV < 0) || (($#ARGV < 1) && (($enINI == 0) && (lc($ARGV[0]) !~ /^[listp|banyan_addon|banyan_addon_x86]/)))) && &Usage;
 
 $tee = "FALSE";
 
@@ -95,15 +106,15 @@ qw(
 
 my @ABSNativeActions = 
 qw(
-   bootimage systemimage recoveryimage secroimage cacheimage factoryimage
+   customimage bootimage systemimage recoveryimage secroimage cacheimage factoryimage
    userdataimage userdataimage-nodeps target-files-package
-   sdk win_sdk banyan_addon cts otapackage dist updatepackage
+   sdk win_sdk banyan_addon banyan_addon_x86 cts otapackage dist updatepackage
    update-api mm snod dump-comp-build-info
   );
 
 push(@actions, @ABSNativeActions);
 
-@modules = qw(android uboot kernel dr ub k preloader pl lk);
+@modules = qw(android kernel dr k preloader pl lk);
 @orgARGV = @ARGV;
 
 while ($#ARGV != -1)
@@ -119,6 +130,10 @@ while ($#ARGV != -1)
   elsif ($ARGV[0] =~ /^-(o|op|opt)=(.*)$/)
   {
     @mOpts = split(",", $2);
+  }
+  elsif ($ARGV[0] =~ /^-smart$/)
+  {
+    unshift(@mOpts, "MTK_DEPENDENCY_AUTO_CHECK=true");
   }
   elsif ($ARGV[0] =~ /^(listp|listproject)/)
   {
@@ -183,12 +198,6 @@ foreach $prj ("mediatek/config/${project}/ProjectConfig.mk", "mediatek/config/co
   close FILE_HANDLE;
 }
 
-if($project ne "banyan_addon") {
-  die "Lack off the action.\nIt should be one of (@actions)\nOr try $myCmd -h\n" if ($action eq "");
-}
-#p_system("perl mediatek/build/tools/flavor_configuration.pl $project $ENV{\"CUSTOM_KERNEL_LCM\"}");
-#&writeINI;
-
 my $flavor = "";
 if ( $project =~ /\[(.*)\]/ )
 {
@@ -200,6 +209,10 @@ if ($project =~ /^(tablet)/ || $project =~ /_(ph|tb|tv|phone|tablet)$/)
 {
   my $key = (defined $1)? $1 : "default";
   $product = $products->{$key};
+}
+
+if (($project ne "banyan_addon") && ($project ne "banyan_addon_x86")) {
+  die "Lack off the action.\nIt should be one of (@actions)\nOr try $myCmd -h\n" if ($action eq "");
 }
 
 @acts = split(",", $action);
@@ -229,9 +242,10 @@ foreach $uAct (@acts)
   }
   ($uAct = "new") if ($uAct eq "n");
   ($uAct = "clean") if ($uAct eq "c");
-  ($uAct = "remake") if ($uAct eq "r");  
+  ($uAct = "remake") if ($uAct eq "r");
   if (($uAct eq "remake") || ($uAct eq "bm_remake"))
   {
+     unshift(@mOpts, "MTK_DEPENDENCY_AUTO_CHECK=true");
      if (-e $ini)
      {   
         open (FILE_HANDLE, "<$ini") or die "cannot open $ini\n";
@@ -294,7 +308,6 @@ else
         . "It should be one of (@modules)\nOr try $myCmd -h\n"
       if ( ($isFound == 0) && ($arguments[$i - 1] !~ /[k|kernel|dr|android]/) );
       ($uMod = "preloader") if ($uMod eq "pl");
-      ($uMod = "uboot") if ($uMod eq "ub");
       ($uMod = "kernel") if ($uMod eq "k");  
       ($uMod = "android") if ($uMod eq "dr");
       if (($uMod eq "kernel") && ($arguments[$i + 1] =~ /^(.*)\//))
@@ -313,14 +326,14 @@ else
   }
   else
   {
-    @default_arguments = qw(preloader lk uboot kernel android);
+    @default_arguments = qw(preloader lk kernel android);
   }
 }
 
 #logdir should sync with Makefile.yusu
 $ENV{"MTK_PROJECT"} = $project;
 my $actPttn = join('|', @actions);
-if (join(' ', @acts) =~ /($actPttn)/ || $project eq "banyan_addon")
+if (join(' ', @acts) =~ /($actPttn)/ || $project eq "banyan_addon" || $project eq "banyan_addon_x86")
 {
   ($performanceChk == 1) && print &CurrTimeStr . " run pwd\n";
   chomp($mktopdir = `pwd`);
@@ -376,6 +389,7 @@ if ($action eq "gen-relkey")
 }
 
 $result += &p_system("$makeCmd banyan_addon") if($#acts == -1 && $project eq "banyan_addon");
+$result += &p_system("$makeCmd banyan_addon_x86") if($#acts == -1 && $project eq "banyan_addon_x86");
 
 foreach $uAct (@acts)
 {
@@ -493,6 +507,7 @@ Actions:
   sdk           : Build sdk package.
   win_sdk       : Build sdk package with a few Windows tools.
   banyan_addon  : Build MTK sdk addon.
+  banyan_addon_x86 :Build MTK sdk x86 addon.
   cts           : Build cts package.
   bootimage     : Build boot image(boot.img).
   cacheimage    : Build cache image(cache.img).
@@ -517,7 +532,6 @@ Actions:
 Modules:
   pl, preloader : Specify to build preloader.
   lk            : Specify to build little kernel.
-  ub, uboot     : Specify to build uboot.
   k,  kernel    : Specify to build kernel.
   dr, android   : Specify to build android.
   NULL          : Specify to build all components/modules in default.
@@ -525,6 +539,10 @@ Modules:
                 : Specify to build kernel component/module with the source path.
   dr <module name>
                 : Specify to build android component/module with module name.
+
+Other tools:
+  prebuilts/misc/linux-x86/ccache/ccache -M 10G
+                : Set CCACHE pool size to 10GB
 
 Example:
   ./mk -t e1k emigen
@@ -536,8 +554,8 @@ Example:
                 : Build bootimage for e1k project.
   ./mk e1k bm_new k
                 : Build kernel for e1k project.
-  ./makeMtk e1k c,bm_remake ub k
-                : Clean & Build uboot and kernel for e1k project. 
+  ./makeMtk e1k c,bm_remake pl k
+                : Clean & Build preloader and kernel for e1k project. 
   ./makeMtk e1k n k kernel/xxx/xxx
                 : Build(full build) kernel component/module 
                   under the path "kernel/xxx/xxx" for e1k project.
@@ -661,6 +679,38 @@ sub setBuildEnvVars
     print "PYTHONPATH=$ENV{PYTHONPATH}\n";
     print "[END LOGGING]\n";
   }
+}
+
+sub setCacheEnvVars
+{
+	my $host_server;
+	if ($ENV{"LSB_SUB_HOST"} ne "")
+	{
+		$host_server = $ENV{"LSB_SUB_HOST"};
+	}
+	else
+	{
+		$host_server = hostname;
+	}
+	print "Server = " . $host_server . "\n" if ($DEBUG);
+	if (($host_server =~ /m\w\wswgbm/i) || ($ENV{"USER"} =~ /wcxbm/i))
+	{
+		# ignore for special server/user
+	}
+	elsif ((exists $ENV{"USE_CCACHE"}) && ($ENV{"USE_CCACHE"} eq ""))
+	{
+		# print "CCACHE: ignore for special setting\n";
+	}
+	elsif (-d $ENV{"HOME"} . "/.ccache")
+	{
+		# default cache is turned on
+		$ENV{"USE_CCACHE"} = 1;
+	}
+	else
+	{
+		print "Warning: CCACHE is disabled due to it has not been initialized before\n";
+		print "Please run \"prebuilts/misc/linux-x86/ccache/ccache -M 10G\" to set CCACHE pool size first\n";
+	}
 }
 
 # interactive mode for inputting signature subject

@@ -48,8 +48,8 @@
 
 #if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 #include <cust_eint.h>
-extern void mt65xx_eint_unmask(unsigned int line);
-extern void mt65xx_eint_mask(unsigned int line);
+extern void mt_eint_unmask(unsigned int line);
+extern void mt_eint_mask(unsigned int line);
 #endif
 
 /* MUSB HOST status 22-mar-2006
@@ -2039,7 +2039,7 @@ static int musbfsh_bus_suspend(struct usb_hcd *hcd)
     WARNING("musbfsh_bus_suspend++,power=0x%x\r\n",power);
 #if defined(MTK_DT_SUPPORT) && !defined(EVDO_DT_SUPPORT)
 	// Edge triggered EINT interrupt will be hold after masked (only one), and reported after unmasked
-	mt65xx_eint_unmask(CUST_EINT_DT_EXT_MD_WK_UP_USB_NUM);
+	mt_eint_unmask(CUST_EINT_DT_EXT_MD_WK_UP_USB_NUM);
 #endif
 #if 0 //wx, let child port do the job
     power |= MUSBFSH_POWER_SUSPENDM|MUSBFSH_POWER_ENSUSPEND;
@@ -2068,15 +2068,10 @@ static int musbfsh_bus_resume(struct usb_hcd *hcd)
 	return 0;
 }
 
-const struct hc_driver musbfsh_hc_driver = {
+struct hc_driver musbfsh_hc_driver = {
 	.description		= "musbfsh-hcd",
 	.product_desc		= "MUSBFSH HDRC host driver",
 	.hcd_priv_size		= sizeof(struct musbfsh),
-#ifdef CONFIG_ARCH_MT6589
-	.flags			= HCD_USB2 | HCD_MEMORY,
-#else
-	.flags			= HCD_USB11 | HCD_MEMORY,
-#endif
 
 	/* not using irq handler or reset hooks from usbcore, since
 	 * those must be shared with peripheral code for OTG configs

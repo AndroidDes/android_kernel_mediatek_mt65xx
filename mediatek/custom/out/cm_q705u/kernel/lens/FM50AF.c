@@ -46,10 +46,11 @@ static unsigned long g_u4CurrPosition   = 0;
 
 static int g_sr = 3;
 
+#if 0
 extern s32 mt_set_gpio_mode(u32 u4Pin, u32 u4Mode);
 extern s32 mt_set_gpio_out(u32 u4Pin, u32 u4PinOut);
 extern s32 mt_set_gpio_dir(u32 u4Pin, u32 u4Dir);
-
+#endif
 
 static int s4FM50AF_ReadReg(unsigned short * a_pu2Result)
 {

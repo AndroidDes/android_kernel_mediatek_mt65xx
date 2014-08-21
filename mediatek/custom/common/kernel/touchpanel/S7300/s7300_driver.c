@@ -106,11 +106,13 @@ static u8 boot_mode;
 /* Function extern */
 static void tpd_eint_handler(void);
 static int touch_event_handler(void *unused);
+#if 0
 extern void mt65xx_eint_unmask(unsigned int line);
 extern void mt65xx_eint_mask(unsigned int line);
 extern void mt65xx_eint_set_hw_debounce(kal_uint8 eintno, kal_uint32 ms);
 extern kal_uint32 mt65xx_eint_set_sens(kal_uint8 eintno, kal_bool sens);
 extern void mt65xx_eint_registration(kal_uint8 eintno, kal_bool Dbounce_En, kal_bool ACT_Polarity, void (EINT_FUNC_PTR)(void), kal_bool auto_umask);
+#endif
 static int __devinit tpd_probe(struct i2c_client *client, const struct i2c_device_id *id);
 static int tpd_detect(struct i2c_client *client, struct i2c_board_info *info);
 static int __devexit tpd_remove(struct i2c_client *client);
@@ -625,10 +627,10 @@ static int tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	
 
-	mt65xx_eint_set_sens(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_SENSITIVE);
-	mt65xx_eint_set_hw_debounce(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_DEBOUNCE_CN);
-	mt65xx_eint_registration(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_DEBOUNCE_EN, CUST_EINT_TOUCH_PANEL_POLARITY, tpd_eint_handler, 1); 
-	mt65xx_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
+	//mt65xx_eint_set_sens(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_SENSITIVE);
+	//mt65xx_eint_set_hw_debounce(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_DEBOUNCE_CN);
+	mt_eint_registration(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_TYPE, tpd_eint_handler, 1);
+	mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
 
 
 	tpd_load_status = 1;
@@ -1130,12 +1132,12 @@ static ssize_t update_firmware_store(struct kobject *kobj, struct kobj_attribute
 		ret = i2c_smbus_read_byte_data(ts->client, fd_01.queryBase);
 		printk("The if of synaptics device is : %d\n",ret);
 
-		mt65xx_eint_mask(CUST_EINT_TOUCH_PANEL_NUM);
+		mt_eint_mask(CUST_EINT_TOUCH_PANEL_NUM);
 
 		/*update firmware*/
 		ret = i2c_update_firmware(ts->client);
 		
-		mt65xx_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
+		mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
  
 		if( 0 != ret )
 		{
@@ -1224,14 +1226,14 @@ static void tpd_resume( struct early_suspend *h )
 	tpd_power(ts->client, 1);
 	tpd_clear_interrupt(ts->client);
 
-	mt65xx_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);  	
+	mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);  	
 }
  
 //static int tpd_suspend(struct i2c_client *client, pm_message_t message)
 static void tpd_suspend( struct early_suspend *h )
 {
 	TPD_DEBUG("TPD enter sleep\n");
-	mt65xx_eint_mask(CUST_EINT_TOUCH_PANEL_NUM);
+	mt_eint_mask(CUST_EINT_TOUCH_PANEL_NUM);
 
 	tpd_power(ts->client, 0);
 

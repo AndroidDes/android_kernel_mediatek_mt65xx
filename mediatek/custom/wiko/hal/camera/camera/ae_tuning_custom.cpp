@@ -77,6 +77,9 @@ getAEParam()
         TRUE,                // bSkipAEinBirghtRange;    
         TRUE,                // bPreAFLockAE
         TRUE,                // bStrobeFlarebyCapture
+        TRUE,                // bEnableFaceAE
+        TRUE,                // bEnableMeterAE
+        TRUE,                // b4FlarMaxStepGapLimitEnable
         256,                  // u4BackLightStrength : strength of backlight condtion
         256,                  // u4OverExpStrength : strength of anti over exposure
         256,                  // u4HistStretchStrength : strength of  histogram stretch
@@ -90,7 +93,7 @@ getAEParam()
         0,                      // uHist0StartBlockYRatio : Histogram 0 window config start block Y ratio (0~100)
         100,                   // uHist0EndBlockYRatio : Histogram 0 window config end block Y ratio (0~100) 
         3,                      // uHist0OutputMode : Histogram 0 output source mode
-        2,                      // uHist0BinMode : Histogram 0 bin mode range
+        0,                      // uHist0BinMode : Histogram 0 bin mode range
         0,                      // uHist1StartBlockXRatio : Histogram 1 window config start block X ratio (0~100)
         100,                   // uHist1EndBlockXRatio : Histogram 1 window config end block X ratio (0~100) 
         0,                      // uHist1StartBlockYRatio : Histogram 1 window config start block Y ratio (0~100)
@@ -116,10 +119,18 @@ getAEParam()
  
         40,                     // uMeteringYLowBound;
         50,                     // uMeteringYHighBound;
+        40,                     // uFaceYLowBound
+        50,                     // uFaceYHighBound
+          0,                     //uFaceCentralWeight
         80,                     // uMeteringYLowSkipRatio : metering area min Y value to skip AE
         120,                   // uMeteringYHighSkipRatio : metering area max Y value to skip AE
         120,                   // u4MeteringStableMax;    // for metering stable using. 100 means the stable point.
         80,                    // u4MeteringStableMin;    // for metering stable using. 100 means the stable point.
+        79,                     // u4MinYLowBound;        // metering and face boundary min Y value
+      256,                     // u4MaxYHighBound;      // metering and face boundary max Y value
+        10,                     // u4MinCWRecommend;    // mini target value
+      235,                     // u4MaxCWRecommend;    // max target value
+      -50,                     // iMiniBVValue;               // mini BV value.
         2,                      // uAEShutterDelayCycle;         // for AE smooth used.
         2,                      // uAESensorGainDelayCycleWShutter;
         1,                      // uAESensorGainDelayCycleWOShutter;
@@ -129,6 +140,10 @@ getAEParam()
         96,                   // u4FlareStdThrHigh             // flare std high
         48,                     // u4FlareStdThrLow             // flare std low
         0,                     // u4PrvCapFlareDiff
+        9,                      // u4FlareMaxStepGap_Fast
+        1,                      // u4FlareMaxStepGap_Slow
+        1800,                 // u4FlarMaxStepGapLimitBV
+        2,                     //u4FlareAEStableCount
     };
 
     static strWeightTable  g_Weight_Matrix =
@@ -308,24 +323,24 @@ getAEParam()
         {-20,   17,    20}, //   mean below -2.5  move increase 25 index
         {-20,   25,    15}, //   -2.5~-2  move increase 20 index
         {-15,   33,    10}, //   -2~-1.6
-        {-15,   40,    6}, //   -1.6~-1.3
-        {-10,   50,    4}, //   -1.3~-1
-        { -8,   57,     3}, //   -1~-0.8
-        { -5,   71,     2}, //   -0.8~-0.5
-        { -4,   75,     1}, //   -0.5~-0.4
-        { -3,   81,     1}, //   -0.4~-0.3
-        { -1,   90,     1}, //   -0.3~-0.1
+        {-15,   40,    1}, //   -1.6~-1.3
+        {-10,   50,    1}, //   -1.3~-1
+        { -8,   57,     1}, //   -1~-0.8
+        { -5,   71,     1}, //   -0.8~-0.5
+        { -4,   75,     0}, //   -0.5~-0.4
+        { -3,   81,     0}, //   -0.4~-0.3
+        { -1,   90,      0}, //   -0.3~-0.1
         {   0,  100,     0}, //   -0.1~0
         {   1,  110,     0}, //     0~0.1
-        {   2,  114,    -1}, //    0.1~0.2       move decrease 1 index
-        {   3,  123,    -1}, //    0.2~0.3
-        {   4,  131,    -1}, //    0.3~0.4    
-        {   5,  141,    -2}, //    0.4~0.5    
-        {   7,  162,    -2}, //    0.5~0.7    
-        {   9,  186,    -3}, //    0.7~0.9    
-        { 10,  200,   -4}, //    0.9~1.0
-        { 13,  246,   -4}, //    1.0~1.3
-        { 16,  303,   -6}, //    1.3~1.6
+        {   2,  114,     0}, //    0.1~0.2       move decrease 1 index
+        {   3,  123,    0}, //    0.2~0.3
+        {   4,  131,    0}, //    0.3~0.4    
+        {   5,  141,    0}, //    0.4~0.5    
+        {   7,  162,    -1}, //    0.5~0.7    
+        {   9,  186,    -1}, //    0.7~0.9    
+        { 10,  200,   -1}, //    0.9~1.0
+        { 13,  246,   -1}, //    1.0~1.3
+        { 16,  303,   -1}, //    1.3~1.6
         { 20,  400,   -7}, //    1.6~2       move decrease 10  index
         { 25,  566,   -9}, //    2~2.5       move decrease 20  index
         { 30,  800,   -11}, //    2.5~3      move decrease 30  index

@@ -5,19 +5,27 @@
 #include <asm/io.h>
 #include <linux/fs.h>
 #include <linux/semaphore.h>
+#include <ccci_chrdev.h>
 #include <ccci.h>
-#include <ccci_common.h>
 
 extern unsigned long long lg_ch_tx_debug_enable[];
 extern unsigned long long lg_ch_rx_debug_enable[];
 //extern unsigned int md_ex_type;
 //unsigned int push_data_fail = 0;
 
+
+static chr_ctl_block_t *chr_ctlb[MAX_MD_NUM];
+static struct wake_lock	chrdev_wakelock[MAX_MD_NUM];
+static struct wake_lock	chrdev_wakelock_mdlogger[MAX_MD_NUM];
+char chrdev_wakelock_name[MAX_MD_NUM][32];
+char chrdev_wakelock_mdlog_name[MAX_MD_NUM][32];
+unsigned int		md_img_exist[MD_IMG_MAX_CNT] = {0};
+unsigned int		md_type_saving = 0;
+
+
 //==============================================================
 // CCCI Standard charactor device function
 //==============================================================
-static chr_ctl_block_t *chr_ctlb[MAX_MD_NUM];
-static struct wake_lock	chrdev_wake_lock[MAX_MD_NUM];
 static void ccci_client_init(struct ccci_dev_client *client,int ch,pid_t pid)
 {
 	WARN_ON(client==NULL);
@@ -58,7 +66,10 @@ static void ccci_chrdev_callback(void *private)
 
 	client->wakeup_waitq = 1;
 	wake_up_interruptible(&client->wait_q);
-	wake_lock_timeout(&chrdev_wake_lock[client->md_id], HZ/2);
+	if(client->ch_num != CCCI_MD_LOG_RX)
+		wake_lock_timeout(&chrdev_wakelock[client->md_id], HZ/2);
+	else
+		wake_lock_timeout(&chrdev_wakelock_mdlogger[client->md_id], HZ); // MD logger using 1s wake lock
 
 	kill_fasync(&client->fasync, SIGIO, POLL_IN);
 	return ;
@@ -412,7 +423,7 @@ static int ccci_dev_mmap(struct file *file, struct vm_area_struct *vma)
 	pfn = addr;
 	pfn >>= PAGE_SHIFT;
 	/* ensure that memory does not get swapped to disk */
-	vma->vm_flags |= VM_RESERVED;
+	vma->vm_flags |= VM_IO;
 	/* ensure non-cacheable */
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	if (remap_pfn_range(vma, vma->vm_start, pfn,len, vma->vm_page_prot)) {
@@ -442,7 +453,6 @@ int ccci_chrdev_init(int md_id)
 	int  ret=0;
 	int  major,minor;
 	char name[16];
-  char wakelockname[30];
 	chr_ctl_block_t *ctlb;
 
 	ctlb = (chr_ctl_block_t *)kmalloc(sizeof(chr_ctl_block_t), GFP_KERNEL);
@@ -479,8 +489,12 @@ int ccci_chrdev_init(int md_id)
 		CCCI_MSG_INF(md_id, "chr", "cdev_add fail\n");
 		goto out_err0;
 	}
-  sprintf(wakelockname,"ccci chrdev%d",md_id);
-	wake_lock_init(&chrdev_wake_lock[md_id], WAKE_LOCK_SUSPEND, wakelockname);      
+	
+	sprintf(chrdev_wakelock_name[md_id], "ccci%d_chr", (md_id+1));
+	wake_lock_init(&chrdev_wakelock[md_id], WAKE_LOCK_SUSPEND, chrdev_wakelock_name[md_id]);
+	
+	sprintf(chrdev_wakelock_mdlog_name[md_id], "ccci%d_chr_mdlog", (md_id+1));
+	wake_lock_init(&chrdev_wakelock_mdlogger[md_id], WAKE_LOCK_SUSPEND, chrdev_wakelock_mdlog_name[md_id]);  
   
   ctlb->major = major;
 	ctlb->minor = minor;
@@ -507,7 +521,8 @@ void ccci_chrdev_exit(int md_id)
 		kfree(chr_ctlb[md_id]);
 		chr_ctlb[md_id] = NULL;
 	}
-  wake_lock_destroy(&chrdev_wake_lock[md_id]);
+	wake_lock_destroy(&chrdev_wakelock[md_id]);
+	wake_lock_destroy(&chrdev_wakelock_mdlogger[md_id]);
 }
 
 
@@ -796,6 +811,9 @@ static long ccci_vir_chr_ioctl( struct file *file, unsigned int cmd, unsigned lo
 	int 				md_id = client->md_id;
 	int					idx = client->index;
 	unsigned int		sim_mode;
+	unsigned int 		md_type;
+	unsigned int		sim_type;
+	unsigned int		enable_sim_type;
 
 	switch (cmd) 
 	{
@@ -900,6 +918,73 @@ static long ccci_vir_chr_ioctl( struct file *file, unsigned int cmd, unsigned lo
 			send_battery_info(md_id);
 			break;
 
+		case CCCI_IOC_RELOAD_MD_TYPE:
+			if(copy_from_user(&md_type, (void __user *)arg, sizeof(unsigned int))) {
+				CCCI_MSG_INF(md_id, "chr", "IOC_RELOAD_MD_TYPE: copy_from_user fail!\n");
+				ret = -EFAULT;
+			} else {
+				CCCI_MSG_INF(md_id, "chr", "IOC_RELOAD_MD_TYPE: storing md type(%d)!\n", md_type);
+				set_modem_support(md_id, md_type);
+				ccci_set_reload_modem(md_id);
+			}
+			break;
+
+		case CCCI_IOC_GET_SIM_TYPE:			//for regional phone boot animation
+			if (get_sim_type(md_id, &sim_type))
+			{
+				CCCI_MSG_INF(md_id, "chr", "sim type may not be correct\n");
+			}
+			ret = put_user((unsigned int)sim_type, (unsigned int __user *)arg);
+			break;
+
+		case CCCI_IOC_ENABLE_GET_SIM_TYPE:	//for regional phone boot animation
+			if(copy_from_user(&enable_sim_type, (void __user *)arg, sizeof(unsigned int))) {
+				CCCI_MSG_INF(md_id, "chr", "CCCI_IOC_ENABLE_GET_SIM_TYPE: copy_from_user fail!\n");
+				ret = -EFAULT;
+			} else {
+				enable_get_sim_type(md_id, enable_sim_type);
+			}
+			break;
+
+		case CCCI_IOC_SET_MD_IMG_EXIST:
+			if(copy_from_user(&md_img_exist, (void __user *)arg, sizeof(md_img_exist))) {
+				CCCI_MSG_INF(md_id, "chr", "CCCI_IOC_ENABLE_GET_SIM_TYPE: copy_from_user fail!\n");
+				ret = -EFAULT;
+			}
+			break;
+		case CCCI_IOC_GET_MD_IMG_EXIST:
+			if (copy_to_user((void __user *)arg, &md_img_exist, sizeof(md_img_exist))) {
+				CCCI_MSG_INF(md_id, "chr", "CCCI_IOC_GET_MD_IMG_EXIST: copy_to_user fail\n");
+				ret= -EFAULT;
+			}
+			break;
+		case CCCI_IOC_GET_MD_TYPE:
+			md_type = get_modem_support(md_id);
+			ret = put_user((unsigned int)md_type, (unsigned int __user *)arg);
+			break;
+
+		case CCCI_IOC_STORE_MD_TYPE:
+			CCCI_DBG_MSG(md_id, "chr", "store md type ioctl called by %s!\n",  current->comm);
+			if(copy_from_user(&md_type_saving, (void __user *)arg, sizeof(unsigned int))) {
+				CCCI_MSG_INF(md_id, "chr", "store md type fail: copy_from_user fail!\n");
+				ret = -EFAULT;
+			}
+			else {
+				CCCI_MSG_INF(md_id, "chr", "storing md type(%d) in kernel space!\n", md_type_saving);
+				if (0x1 <= md_type_saving && md_type_saving <= 0x4){
+					if (md_type_saving != get_modem_support(md_id))
+						CCCI_MSG_INF(md_id, "chr", "Maybe Wrong: md type storing not equal with current setting!(%d %d)\n", md_type, get_modem_support(md_id));
+					//Notify md_init daemon to store md type in nvram
+					ccci_system_message(md_id, CCCI_MD_MSG_STORE_NVRAM_MD_TYPE, 0);
+				}
+				else {
+					CCCI_MSG_INF(md_id, "chr", "store md type fail: invalid md type(0x%x)\n", md_type_saving);
+				}
+			}
+			break;
+		case CCCI_IOC_GET_MD_TYPE_SAVING:
+			ret = put_user(md_type_saving, (unsigned int __user *)arg);
+			break;
 		default:
 			ret = -ENOTTY;
 			break;

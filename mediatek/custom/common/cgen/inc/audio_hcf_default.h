@@ -33,7 +33,7 @@
  ****************************************************************************/
 #ifndef AUDIO_HCF_DEFAULT_H
 #define AUDIO_HCF_DEFAULT_H
-#if defined(MTK_AUDIO_BLOUD_CUSTOMPARAMETER_V4)
+#if 1//defined(MTK_AUDIO_BLOUD_CUSTOMPARAMETER_V4)
     /* Compensation Filter HSF coeffs: default all pass filter       */
     /* BesLoudness also uses this coeffs    */ 
 #if 0

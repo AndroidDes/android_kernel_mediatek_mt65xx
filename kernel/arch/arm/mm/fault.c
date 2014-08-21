@@ -154,18 +154,56 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
 }
-
 /*
  * Something tried to access memory that isn't in our memory map..
  * User mode accesses just cause a SIGSEGV
  */
+static unsigned int count = 0;
+static unsigned int last_pc = 0;
+
 static void
 __do_user_fault(struct task_struct *tsk, unsigned long addr,
 		unsigned int fsr, unsigned int sig, int code,
 		struct pt_regs *regs)
 {
 	struct siginfo si;
-
+        struct thread_info *thread = current_thread_info();
+//
+        printk("[TRAP] Current,pc:0x%x,tid:0x%x,CP10:0x%x,CP11:0x%x,vfpstate:%x\n",regs->ARM_pc,thread,thread->used_cp[10],thread->used_cp[11],thread->vfpstate);
+                
+        printk("[TRAP] r0:0x%x  r1:0x%x  r2:0x%x  r3:0x%x\n",regs->ARM_r0,regs->ARM_r1,regs->ARM_r2,regs->ARM_r3);
+        printk("[TRAP] r4:0x%x  r5:0x%x  r6:0x%x  r7:0x%x\n",regs->ARM_r4,regs->ARM_r5,regs->ARM_r6,regs->ARM_r7);
+        printk("[TRAP] r8:0x%x  r9:0x%x r10:0x%x r11:0x%x\n",regs->ARM_r8,regs->ARM_r9,regs->ARM_r10,regs->ARM_fp);
+        printk("[TRAP]r12:0x%x r13:0x%x r14:0x%x r15:0x%x\n",regs->ARM_ip,regs->ARM_sp,regs->ARM_lr,regs->ARM_pc);
+//
+        if (thumb_mode(regs)){
+            unsigned int curr_pc_fixup = regs->ARM_pc - 2;
+            unsigned int curr_instr_fixup = 0;
+            get_user(curr_instr_fixup, (u16 __user *)curr_pc_fixup);
+            if (is_wide_instruction(curr_instr_fixup)) {
+                unsigned int instr2;
+                get_user(instr2, (u16 __user *)curr_pc_fixup+1);
+                curr_instr_fixup <<= 16;
+                curr_instr_fixup |= instr2;
+                if (curr_pc_fixup != last_pc){
+                    last_pc = curr_pc_fixup;
+                    count = 0;
+                }
+                printk("[TRAP] curr_instr_fixup:0x%x,count:%d\n",curr_instr_fixup,count);
+                if (count <= 3)
+                {
+                      if ((curr_instr_fixup & 0xffbf0000) == 0xed2d0000  || (curr_instr_fixup & 0xffbf0000) == 0xecbd0000 || (curr_instr_fixup & 0xffff0000) == 0xee080000 || (curr_instr_fixup & 0xffff0000) == 0xed5f0000)
+ 
+                    {
+                        regs->ARM_pc -= 2; 
+                        count ++;
+                        printk("[TRAP] fixup new PC:0x%x, count:%d\n",regs->ARM_pc,count);
+                        return;
+                    }
+                }
+            }
+        }
+                
 #ifdef CONFIG_DEBUG_USER
 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
 	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
@@ -278,10 +316,10 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 		local_irq_enable();
 
 	/*
-	 * If we're in an interrupt or have no user
+	 * If we're in an interrupt, or have no irqs, or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_atomic() || !mm)
+	if (in_atomic() || irqs_disabled() || !mm)
 		goto no_context;
 
 	/*

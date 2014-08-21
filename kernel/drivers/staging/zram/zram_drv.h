@@ -26,22 +26,14 @@
  */
 static const unsigned max_num_devices = 32;
 
-/*
- * Stored at beginning of each compressed object.
- *
- * It stores back-reference to table entry which points to this
- * object. This is required to support memory defragmentation.
- */
-struct zobj_header {
-#if 0
-	u32 table_idx;
-#endif
-};
-
 /*-- Configurable parameters */
 
-/* Default zram disk size: 25% of total RAM */
-static const unsigned default_disksize_perc_ram = 25;
+/* Default zram disk size: 50% of total RAM */
+static const unsigned default_disksize_perc_ram = 50;	/* 25 */
+/* Let disk size be DISKSIZE_ALIGNMENT */
+#define	DISKSIZE_ALIGNMENT	0x8000000		/* 128MB */
+/* Is totalram_bytes less than SUPPOSED_TOTALRAM? */
+#define SUPPOSED_TOTALRAM	0x20000000		/* 512MB */
 
 /*
  * Pages that compress to size greater than this are stored
@@ -68,9 +60,6 @@ static const size_t max_zpage_size = PAGE_SIZE / 4 * 3;
 
 /* Flags for zram pages (table[page_no].flags) */
 enum zram_pageflags {
-	/* Page is stored uncompressed */
-	ZRAM_UNCOMPRESSED,
-
 	/* Page consists entirely of zeros */
 	ZRAM_ZERO,
 
@@ -81,11 +70,11 @@ enum zram_pageflags {
 
 /* Allocated for each disk page */
 struct table {
-	void *handle;
+	unsigned long handle;
 	u16 size;	/* object size (excluding header) */
 	u8 count;	/* object ref count (not yet used) */
 	u8 flags;
-} __attribute__((aligned(4)));
+} __aligned(4);
 
 struct zram_stats {
 	u64 compr_size;		/* compressed size of pages stored */
@@ -98,7 +87,7 @@ struct zram_stats {
 	u32 pages_zero;		/* no. of zero filled pages */
 	u32 pages_stored;	/* no. of pages currently stored */
 	u32 good_compress;	/* % of pages with compression ratio<=50% */
-	u32 pages_expand;	/* % of incompressible pages */
+	u32 bad_compress;	/* % of pages with compression ratio>=75% */
 };
 
 struct zram {

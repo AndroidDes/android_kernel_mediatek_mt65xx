@@ -84,6 +84,7 @@ static unsigned int low_rst_max = 3;
 
 static unsigned int tm_pid = 0;
 static unsigned int tm_input_pid = 0;
+static unsigned int tm_wfd_stat = 0;
 static struct task_struct g_task;
 static struct task_struct *pg_task = &g_task;
 
@@ -518,6 +519,16 @@ static int wmt_send_signal(int level)
 #define LOW_STAT 0
 #define MID_STAT 1
 #define HIGH_STAT 2
+#define WFD_STAT 3
+
+static inline unsigned long thro(unsigned long a, unsigned int b, unsigned int c) {
+
+	unsigned long tmp;
+
+	tmp = (a << 10) * b / c;
+
+	return tmp >> 10;
+}
 
 static int wmt_judge_throttling(int index, int is_on, int interval)
 {
@@ -545,30 +556,50 @@ static int wmt_judge_throttling(int index, int is_on, int interval)
 
 	if (mail_box[0] >= 0 && mail_box[1] >= 0) {
 		cur_wifi_stat = mail_box[0] + mail_box[1];
+
+		/*
+		 * If Wifi-display is on, go to WFD_STAT state, and reset the throttling.
+		 */
+		if (tm_wfd_stat == 2)
+			cur_wifi_stat = WFD_STAT;
+
 		switch(cur_wifi_stat) {
+			case WFD_STAT:
+				if (throttling_pre_stat != WFD_STAT) {
+					/*
+					 * Enter Wifi-Display status, reset all throttling. Dont affect the performance of Wifi-Display.
+					 */
+					wmt_send_signal(-1);
+					below_low_time = 0;
+					over_up_time = 0;
+					throttling_pre_stat = WFD_STAT;
+					wmt_tm_printk("WFD is on, reset everything!");
+				}
+			break;
+
 			case HIGH_STAT:
-				if (throttling_pre_stat < HIGH_STAT) {
+				if (throttling_pre_stat < HIGH_STAT || throttling_pre_stat == WFD_STAT) {
 					if (cur_thro > 0) /*Wifi is working!!*/
-						thro_constraint = (cur_thro * up_numerator) / up_denominator;
-					else /*At this moment, current throughput i*/
-						thro_constraint = (thro_constraint * up_numerator) / up_denominator;
+						thro_constraint = thro(cur_thro, up_numerator, up_denominator);
+					else /*At this moment, current throughput is none. Use the previous constraint.*/
+						thro_constraint = thro(thro_constraint, up_numerator, up_denominator);
 
-					wmt_tm_printk("LOW/MID-->HIGH:%lu <- (%d / %d)", thro_constraint, up_numerator, up_denominator);
+					wmt_tm_printk("LOW/MID-->HIGH:%lu <- (%d / %d) %lu", thro_constraint, up_numerator, up_denominator, cur_thro);
 
-					wmt_send_signal( thro_constraint/1000 );
+					wmt_send_signal( thro_constraint / 1000);
 					throttling_pre_stat = HIGH_STAT;
 					over_up_time = 0;
 				} else if (throttling_pre_stat == HIGH_STAT) {
 					over_up_time++;
 					if ( (over_up_time * interval) >= up_duration) {
-						if (cur_thro > 0)
-							thro_constraint = (cur_thro * up_numerator) / up_denominator;
-						else
-							thro_constraint = (thro_constraint * up_numerator) / up_denominator;
+						if (cur_thro < thro_constraint) /*real throughput may have huge variant*/
+							thro_constraint = thro(cur_thro, up_numerator, up_denominator);
+						else /* current throughput is large than constraint. WHAT!!!*/
+							thro_constraint = thro(thro_constraint, up_numerator, up_denominator);
 
-						wmt_tm_printk("HIGH-->HIGH:%lu <- (%d / %d)", thro_constraint, up_numerator, up_denominator);
+						wmt_tm_printk("HIGH-->HIGH:%lu <- (%d / %d) %lu", thro_constraint, up_numerator, up_denominator, cur_thro);
 
-						wmt_send_signal( thro_constraint/1000 );
+						wmt_send_signal( thro_constraint / 1000);
 						over_up_time = 0;
 					}
 				} else {
@@ -587,20 +618,26 @@ static int wmt_judge_throttling(int index, int is_on, int interval)
 					throttling_pre_stat = MID_STAT;
 					wmt_tm_printk("[%s] Go down!!\n", __func__);
 				} else {
+					throttling_pre_stat = MID_STAT;
 					wmt_tm_dprintk("[%s] pre_stat=%d!!\n", __func__, throttling_pre_stat);
 				}
 			break;
 
-			case 0:
-				if (throttling_pre_stat > LOW_STAT) {
-					if (cur_thro > 0)
-						thro_constraint = (cur_thro * low_numerator) / low_denominator;
-					else
-						thro_constraint = (thro_constraint * low_numerator) / low_denominator;
+			case LOW_STAT:
+				if (throttling_pre_stat == WFD_STAT) {
+					throttling_pre_stat = LOW_STAT;
+					wmt_tm_dprintk("[%s] pre_stat=%d!!\n", __func__, throttling_pre_stat);
+				} else if (throttling_pre_stat > LOW_STAT) {
+					if (cur_thro < 5000 && cur_thro > 0) {
+						thro_constraint = cur_thro * 3;
+					} else if (cur_thro >= 5000) {
+						thro_constraint = thro(cur_thro, low_numerator, low_denominator);
+					} else {
+						thro_constraint = thro(thro_constraint, low_numerator, low_denominator);
+					}
 
-					wmt_tm_printk("MID/HIGH-->LOW:%lu <- (%d / %d)", thro_constraint, low_numerator, low_denominator);
-
-					wmt_send_signal( thro_constraint/1000 );
+					wmt_tm_printk("MID/HIGH-->LOW:%lu <- (%d / %d) %lu", thro_constraint, low_numerator, low_denominator, cur_thro);
+					wmt_send_signal( thro_constraint / 1000);
 					throttling_pre_stat = LOW_STAT;
 					below_low_time = 0;
 					low_rst_time = 0;
@@ -615,16 +652,20 @@ static int wmt_judge_throttling(int index, int is_on, int interval)
 							low_rst_time = low_rst_max;
 							is_reset = true;
 						} else if(!is_reset) {
-							if (cur_thro > 0)
-								thro_constraint = (cur_thro * low_numerator) / low_denominator;
-							else
-								thro_constraint = (thro_constraint * low_numerator) / low_denominator;
+							if (cur_thro < 5000 && cur_thro > 0) {
+								thro_constraint = cur_thro * 3;
+							} else if (cur_thro >= 5000) {
+								thro_constraint = thro(cur_thro, low_numerator, low_denominator);
+								low_rst_time++;
+							} else {
+								thro_constraint = thro(thro_constraint, low_numerator, low_denominator);
+								low_rst_time++;
+							}
 
-							wmt_tm_printk("LOW-->LOW:%lu <-(%d / %d)", thro_constraint, low_numerator, low_denominator);
+							wmt_tm_printk("LOW-->LOW:%lu <-(%d / %d) %lu", thro_constraint, low_numerator, low_denominator, cur_thro);
 
-							wmt_send_signal( thro_constraint/1000 );
+							wmt_send_signal( thro_constraint / 1000);
 							below_low_time = 0;
-							low_rst_time++;
 						} else {
 							wmt_tm_dprintk("Have reset, no control!!");
 						}
@@ -864,6 +905,39 @@ int wmt_wifi_algo_read( char *buf, char **start, off_t offset, int count, int *e
 }
 /*New Wifi throttling Algo-*/
 
+ssize_t wmt_tm_wfd_write( struct file *filp, const char __user *buf, unsigned long len, void *data )
+{
+	int ret = 0;
+	char tmp[MAX_LEN] = {0};
+
+	/* write data to the buffer */
+	if (copy_from_user(tmp, buf, len)) {
+		return -EFAULT;
+	}
+
+	ret = sscanf(tmp, "%d", &tm_wfd_stat);
+
+	wmt_tm_printk("[%s] %s = %d, len=%d, ret=%d\n", __func__, tmp, tm_wfd_stat, len, ret);
+
+	return len;
+}
+
+int wmt_tm_wfd_read( char *buf, char **start, off_t offset , int count, int *eof, void *data )
+{
+	int len;
+	int ret = 0;
+	char tmp[MAX_LEN] = {0};
+
+	ret = sprintf(tmp, "%d", tm_wfd_stat);
+	len = strlen(tmp);
+
+	memcpy(buf, tmp, ret*sizeof(char));
+
+	wmt_tm_printk("[%s] %s = %d, len=%d, ret=%d\n", __func__, tmp, tm_wfd_stat, len, ret);
+
+	return ret;
+}
+
 ssize_t wmt_tm_pid_write( struct file *filp, const char __user *buf, unsigned long len, void *data )
 {
 	int ret = 0;
@@ -1095,6 +1169,12 @@ static int wmt_tm_proc_register(void)
         entry = create_proc_entry("tx_thro", S_IRUGO | S_IWUSR, wmt_tm_proc_dir);
         if (entry) {
             entry->read_proc = wmt_wifi_tx_thro_read;
+        }
+
+        entry = create_proc_entry("wfd_stat", S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP, wmt_tm_proc_dir);
+        if (entry) {
+            entry->read_proc = wmt_tm_wfd_read;
+            entry->write_proc = wmt_tm_wfd_write;
         }
     }
     return 0;

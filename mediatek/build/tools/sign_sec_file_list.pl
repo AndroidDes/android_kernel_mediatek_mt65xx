@@ -1,5 +1,9 @@
 #!/usr/bin/perl
 
+use lib "mediatek/build/tools";
+use pack_dep_gen;
+PrintDependModule($0);
+
 ##########################################################
 # Initialize Variables
 ##########################################################
@@ -26,6 +30,9 @@ if (-e "$and_secfl")
 		system("rm -f $s_andro_fl");
 	}
 					
+	PrintDependency("$key_dir/IMG_AUTH_KEY.ini");
+	PrintDependency("$cfg_dir/SFL_CFG.ini");
+	PrintDependency($and_secfl);
 	system("./$sign_tool $key_dir/IMG_AUTH_KEY.ini $cfg_dir/SFL_CFG.ini $and_secfl $s_andro_fl");
 	
 	if (! -e "$s_andro_fl")
@@ -62,6 +69,9 @@ if (-e "$secro_secfl")
 		system("rm -f $s_secro_fl_o2");
 	}
 
+	PrintDependency("$key_dir/IMG_AUTH_KEY.ini");
+	PrintDependency("$cfg_dir/SFL_CFG.ini");
+	PrintDependency($secro_secfl);
 	system("./$sign_tool $key_dir/IMG_AUTH_KEY.ini $cfg_dir/SFL_CFG.ini $secro_secfl $s_secro_fl_o1");
 
 	if (! -e "$s_secro_fl_o1")

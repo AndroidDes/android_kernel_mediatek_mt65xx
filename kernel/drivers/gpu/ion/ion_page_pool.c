@@ -45,13 +45,19 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
            but no better way to flush a page for dma exist at this time */
         __dma_page_cpu_to_dev(page, 0, PAGE_SIZE << pool->order,
                               DMA_BIDIRECTIONAL);
+        //we split_page because gpu driver uses vm_insert_page() to map pa to user va
+        //but vm_insert_page() can only insert indivitual page
+        split_page(page, pool->order);
         return page;
 }
 
 static void ion_page_pool_free_pages(struct ion_page_pool *pool,
                                      struct page *page)
 {
-        __free_pages(page, pool->order);
+        int i;
+        //we split_pages in allocate (see ion_page_pool_alloc_pages)
+        for (i = 0; i < (1 << pool->order); i++)
+            __free_page(page + i);
 }
 
 static int ion_page_pool_add(struct ion_page_pool *pool, struct page *page)
@@ -203,8 +209,7 @@ static int ion_page_pool_shrink(struct shrinker *shrinker,
         bool high;
         int nr_to_scan = sc->nr_to_scan;
 
-        if (sc->gfp_mask & __GFP_HIGHMEM)
-                high = true;
+        high = sc->gfp_mask & __GFP_HIGHMEM;
 
         if (nr_to_scan == 0)
                 return ion_page_pool_total(high);

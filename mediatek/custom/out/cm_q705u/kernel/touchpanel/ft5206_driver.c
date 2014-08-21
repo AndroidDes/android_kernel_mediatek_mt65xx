@@ -14,13 +14,12 @@
 #include <mach/mt_pm_ldo.h>
 #include <mach/mt_typedefs.h>
 #include <mach/mt_boot.h>
-
+#include <mach/eint.h>
 #include "cust_gpio_usage.h"
 
  
  
-extern struct tpd_device *tpd;
- 
+extern struct tpd_device *tpd; 
 struct i2c_client *i2c_client = NULL;
 struct task_struct *thread = NULL;
  
@@ -30,36 +29,22 @@ static DEFINE_MUTEX(i2c_access);
  
 static void tpd_eint_interrupt_handler(void);
  
-#ifdef MT6575 
- extern void mt65xx_eint_unmask(unsigned int line);
- extern void mt65xx_eint_mask(unsigned int line);
- extern void mt65xx_eint_set_hw_debounce(kal_uint8 eintno, kal_uint32 ms);
- extern kal_uint32 mt65xx_eint_set_sens(kal_uint8 eintno, kal_bool sens);
- extern void mt65xx_eint_registration(kal_uint8 eintno, kal_bool Dbounce_En,
-									  kal_bool ACT_Polarity, void (EINT_FUNC_PTR)(void),
-									  kal_bool auto_umask);
-#endif
-#ifdef MT6577
-	extern void mt65xx_eint_unmask(unsigned int line);
-	extern void mt65xx_eint_mask(unsigned int line);
-	extern void mt65xx_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms);
-	extern unsigned int mt65xx_eint_set_sens(unsigned int eint_num, unsigned int sens);
-	extern void mt65xx_eint_registration(unsigned int eint_num, unsigned int is_deb_en, unsigned int pol, void (EINT_FUNC_PTR)(void), unsigned int is_auto_umask);
-#endif
 
  
-static int __devinit tpd_probe(struct i2c_client *client, const struct i2c_device_id *id);
+static int  tpd_probe(struct i2c_client *client, const struct i2c_device_id *id);
 static int tpd_detect (struct i2c_client *client, struct i2c_board_info *info);
-static int __devexit tpd_remove(struct i2c_client *client);
+static int  tpd_remove(struct i2c_client *client);
 static int touch_event_handler(void *unused);
  
-
+#ifdef VELOCITY_CUSTOM
+extern int tpd_v_magnify_x;
+extern int tpd_v_magnify_y;
+#endif
 static int tpd_flag = 0;
 static int tpd_halt=0;
 static int point_num = 0;
 static int p_point_num = 0;
 
-//#define TPD_CLOSE_POWER_IN_SLEEP
 
 #define TPD_OK 0
 //register define
@@ -101,140 +86,12 @@ static int tpd_calmat_local[8]     = TPD_CALIBRATION_MATRIX;
 static int tpd_def_calmat_local[8] = TPD_CALIBRATION_MATRIX;
 #endif
 
-#define VELOCITY_CUSTOM_FT5206
-#ifdef VELOCITY_CUSTOM_FT5206
-#include <linux/device.h>
-#include <linux/miscdevice.h>
-#include <asm/uaccess.h>
-
-// for magnify velocity********************************************
-
-#ifndef TPD_VELOCITY_CUSTOM_X
-#define TPD_VELOCITY_CUSTOM_X 10
-#endif
-#ifndef TPD_VELOCITY_CUSTOM_Y
-#define TPD_VELOCITY_CUSTOM_Y 10
-#endif
-
-#define TOUCH_IOC_MAGIC 'A'
-
-#define TPD_GET_VELOCITY_CUSTOM_X _IO(TOUCH_IOC_MAGIC,0)
-#define TPD_GET_VELOCITY_CUSTOM_Y _IO(TOUCH_IOC_MAGIC,1)
-
-int g_v_magnify_x =TPD_VELOCITY_CUSTOM_X;
-int g_v_magnify_y =TPD_VELOCITY_CUSTOM_Y;
-static int tpd_misc_open(struct inode *inode, struct file *file)
-{
-/*
-	file->private_data = adxl345_i2c_client;
-
-	if(file->private_data == NULL)
-	{
-		printk("tpd: null pointer!!\n");
-		return -EINVAL;
-	}
-	*/
-	return nonseekable_open(inode, file);
-}
-/*----------------------------------------------------------------------------*/
-static int tpd_misc_release(struct inode *inode, struct file *file)
-{
-	//file->private_data = NULL;
-	return 0;
-}
-/*----------------------------------------------------------------------------*/
-//static int adxl345_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-//       unsigned long arg)
-static long tpd_unlocked_ioctl(struct file *file, unsigned int cmd,
-       unsigned long arg)
-{
-	//struct i2c_client *client = (struct i2c_client*)file->private_data;
-	//struct adxl345_i2c_data *obj = (struct adxl345_i2c_data*)i2c_get_clientdata(client);	
-	//char strbuf[256];
-	void __user *data;
-	
-	long err = 0;
-	
-	if(_IOC_DIR(cmd) & _IOC_READ)
-	{
-		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
-	}
-	else if(_IOC_DIR(cmd) & _IOC_WRITE)
-	{
-		err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
-	}
-
-	if(err)
-	{
-		printk("tpd: access error: %08X, (%2d, %2d)\n", cmd, _IOC_DIR(cmd), _IOC_SIZE(cmd));
-		return -EFAULT;
-	}
-
-	switch(cmd)
-	{
-		case TPD_GET_VELOCITY_CUSTOM_X:
-			data = (void __user *) arg;
-			if(data == NULL)
-			{
-				err = -EINVAL;
-				break;	  
-			}			
-			
-			if(copy_to_user(data, &g_v_magnify_x, sizeof(g_v_magnify_x)))
-			{
-				err = -EFAULT;
-				break;
-			}				 
-			break;
-
-	   case TPD_GET_VELOCITY_CUSTOM_Y:
-			data = (void __user *) arg;
-			if(data == NULL)
-			{
-				err = -EINVAL;
-				break;	  
-			}			
-			
-			if(copy_to_user(data, &g_v_magnify_y, sizeof(g_v_magnify_y)))
-			{
-				err = -EFAULT;
-				break;
-			}				 
-			break;
-
-
-		default:
-			printk("tpd: unknown IOCTL: 0x%08x\n", cmd);
-			err = -ENOIOCTLCMD;
-			break;
-			
-	}
-
-	return err;
-}
-
-
-static struct file_operations tpd_fops = {
-//	.owner = THIS_MODULE,
-	.open = tpd_misc_open,
-	.release = tpd_misc_release,
-	.unlocked_ioctl = tpd_unlocked_ioctl,
-};
-/*----------------------------------------------------------------------------*/
-static struct miscdevice tpd_misc_device = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "touch",
-	.fops = &tpd_fops,
-};
-
-//**********************************************
-#endif
 
 struct touch_info {
-    int y[3];
-    int x[3];
-    int p[3];
-    int id[3];
+    int y[5];
+    int x[5];
+    int p[5];
+    int id[5];
     int count;
 };
  
@@ -251,7 +108,7 @@ struct touch_info {
 //	 .owner = THIS_MODULE,
   },
   .probe = tpd_probe,
-  .remove = __devexit_p(tpd_remove),
+  .remove = tpd_remove,
   .id_table = ft5206_tpd_id,
   .detect = tpd_detect,
 //  .address_data = &addr_data,
@@ -271,18 +128,13 @@ static  void tpd_down(int x, int y, int p) {
 	 input_report_abs(tpd->dev, ABS_MT_POSITION_Y, y);
 	 //printk("D[%4d %4d %4d] ", x, y, p);
 	 /* track id Start 0 */
-   //    input_report_abs(tpd->dev, ABS_MT_TRACKING_ID, p); 
+       input_report_abs(tpd->dev, ABS_MT_TRACKING_ID, p); 
 	 input_mt_sync(tpd->dev);
      if (FACTORY_BOOT == get_boot_mode()|| RECOVERY_BOOT == get_boot_mode())
      {   
        tpd_button(x, y, 1);  
      }
-	 if(y > TPD_RES_Y) //virtual key debounce to avoid android ANR issue
-	 {
-         msleep(50);
-		 printk("D virtual key \n");
-	 }
-	 TPD_EM_PRINT(x, y, x, y, p-1, 1);
+	 TPD_EM_PRINT(x, y, x, y, p, 1);
  }
  
 static  void tpd_up(int x, int y,int *count) {
@@ -308,7 +160,7 @@ static  void tpd_up(int x, int y,int *count) {
 
 	int i = 0;
 	
-	char data[30] = {0};
+	char data[35] = {0};
 
     u16 high_byte,low_byte;
 	u8 report_rate =0;
@@ -324,14 +176,18 @@ static  void tpd_up(int x, int y,int *count) {
 	i2c_smbus_read_i2c_block_data(i2c_client, 0x00, 8, &(data[0]));
 	i2c_smbus_read_i2c_block_data(i2c_client, 0x08, 8, &(data[8]));
 	i2c_smbus_read_i2c_block_data(i2c_client, 0x10, 8, &(data[16]));
-	i2c_smbus_read_i2c_block_data(i2c_client, 0xa6, 1, &(data[24]));
+	i2c_smbus_read_i2c_block_data(i2c_client, 0x18, 8, &(data[24]));
+	//i2c_smbus_read_i2c_block_data(i2c_client, 0xa6, 1, &(data[24]));
 	i2c_smbus_read_i2c_block_data(i2c_client, 0x88, 1, &report_rate);
 	//TPD_DEBUG("FW version=%x]\n",data[24]);
 	
-	//TPD_DEBUG("received raw data from touch panel as following:\n");
-	//TPD_DEBUG("[data[0]=%x,data[1]= %x ,data[2]=%x ,data[3]=%x ,data[4]=%x ,data[5]=%x]\n",data[0],data[1],data[2],data[3],data[4],data[5]);
-	//TPD_DEBUG("[data[9]=%x,data[10]= %x ,data[11]=%x ,data[12]=%x]\n",data[9],data[10],data[11],data[12]);
-	//TPD_DEBUG("[data[15]=%x,data[16]= %x ,data[17]=%x ,data[18]=%x]\n",data[15],data[16],data[17],data[18]);
+	//TPD_DMESG("received raw data from touch panel as following:\n");
+	//TPD_DMESG("[data[0]=%x,data[1]= %x ,data[2]=%x]\n",data[0],data[1],data[2]);
+	//TPD_DMESG("[data[3]=%x,data[4]= %x ,data[5]=%x ,data[6]=%x ,data[7]=%x ,data[8]=%x]\n",data[3],data[4],data[5],data[6],data[7],data[8]);
+	//TPD_DMESG("[data[9]=%x,data[10]= %x ,data[11]=%x ,data[12]=%x ,data[13]=%x ,data[14]=%x]\n",data[9],data[10],data[11],data[12],data[13],data[14]);
+	//TPD_DMESG("[data[15]=%x,data[16]= %x ,data[17]=%x ,data[18]=%x ,data[19]=%x ,data[20]=%x]\n",data[15],data[16],data[17],data[18],data[19],data[20]);
+	//TPD_DMESG("[data[21]=%x,data[22]= %x ,data[23]=%x ,data[24]=%x ,data[25]=%x ,data[26]=%x]\n",data[21],data[22],data[23],data[24],data[25],data[26]);
+	//TPD_DMESG("[data[27]=%x,data[28]= %x ,data[29]=%x ,data[30]=%x ,data[31]=%x ,data[32]=%x]\n",data[27],data[28],data[29],data[30],data[31],data[32]);
 
 
     //    
@@ -353,7 +209,7 @@ static  void tpd_up(int x, int y,int *count) {
 	/*get the number of the touch points*/
 	point_num= data[2] & 0x0f;
 	
-	//TPD_DEBUG("point_num =%d\n",point_num);
+	//TPD_DMESG("point_num =%d\n",point_num);
 	
 //	if(point_num == 0) return false;
 
@@ -362,7 +218,7 @@ static  void tpd_up(int x, int y,int *count) {
 		
 		for(i = 0; i < point_num; i++)
 		{
-			cinfo->p[i] = data[3+6*i] >> 6; //event flag 
+			//cinfo->p[i] = data[3+6*i] >> 6; //event flag 
                    cinfo->id[i] = data[3+6*i+2]>>4; //touch id
 	       /*get the X coordinate, 2 bytes*/
 			high_byte = data[3+6*i];
@@ -405,7 +261,7 @@ static  void tpd_up(int x, int y,int *count) {
  
 	 do
 	 {
-	  mt65xx_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM); 
+	  mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM); 
 		 set_current_state(TASK_INTERRUPTIBLE); 
 		  wait_event_interruptible(waiter,tpd_flag!=0);
 						 
@@ -420,7 +276,7 @@ static  void tpd_up(int x, int y,int *count) {
 			TPD_DEBUG_SET_TIME;
 			if(point_num >0) 
 			{
-			    for(i =0; i<point_num && i<3; i++)//only support 3 point
+			    for(i =0; i<point_num ; i++)//only support 3 point
 			    {
 
 			         tpd_down(cinfo.x[i], cinfo.y[i], cinfo.id[i]);
@@ -467,25 +323,28 @@ static  void tpd_up(int x, int y,int *count) {
  
  static void tpd_eint_interrupt_handler(void)
  {
-	 //TPD_DEBUG("TPD interrupt has been triggered\n");
+	 //TPD_DMESG("TPD interrupt has been triggered\n");
 	 TPD_DEBUG_PRINT_INT;
 	 tpd_flag = 1;
 	 wake_up_interruptible(&waiter);
 	 
  }
- static int __devinit tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ static int  tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
  {	 
 	int retval = TPD_OK;
 	char data;
 	u8 report_rate=0;
-	int err=0;
 	int reset_count = 0;
 
 reset_proc:   
 	i2c_client = client;
+		
+	mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
+	mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
+	mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ZERO);  
+	msleep(1);
 
-   
-		//power on, need confirm with SA
+	//power on, need confirm with SA
 #ifdef TPD_POWER_SOURCE_CUSTOM
 	hwPowerOn(TPD_POWER_SOURCE_CUSTOM, VOL_2800, "TP");
 #else
@@ -493,34 +352,19 @@ reset_proc:
 #endif
 #ifdef TPD_POWER_SOURCE_1800
 	hwPowerOn(TPD_POWER_SOURCE_1800, VOL_1800, "TP");
-#endif 
-
-
-#ifdef TPD_CLOSE_POWER_IN_SLEEP	 
-	hwPowerDown(TPD_POWER_SOURCE,"TP");
-	hwPowerOn(TPD_POWER_SOURCE,VOL_3300,"TP");
-	msleep(100);
-#else
-	
+#endif 	
+	TPD_DMESG(" ft5206 reset\n");
 	mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
-    mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
-    mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ZERO);  
-	msleep(1);
-	TPD_DMESG(" ft5306 reset\n");
-	mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
-    mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
-    mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ONE);
-#endif
+	mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
+	mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ONE);
 
 	mt_set_gpio_mode(GPIO_CTP_EINT_PIN, GPIO_CTP_EINT_PIN_M_EINT);
-    mt_set_gpio_dir(GPIO_CTP_EINT_PIN, GPIO_DIR_IN);
-    mt_set_gpio_pull_enable(GPIO_CTP_EINT_PIN, GPIO_PULL_ENABLE);
-    mt_set_gpio_pull_select(GPIO_CTP_EINT_PIN, GPIO_PULL_UP);
+	mt_set_gpio_dir(GPIO_CTP_EINT_PIN, GPIO_DIR_IN);
+	mt_set_gpio_pull_enable(GPIO_CTP_EINT_PIN, GPIO_PULL_ENABLE);
+	mt_set_gpio_pull_select(GPIO_CTP_EINT_PIN, GPIO_PULL_UP);
  
-	  mt65xx_eint_set_sens(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_SENSITIVE);
-	  mt65xx_eint_set_hw_debounce(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_DEBOUNCE_CN);
-	  mt65xx_eint_registration(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_DEBOUNCE_EN, CUST_EINT_TOUCH_PANEL_POLARITY, tpd_eint_interrupt_handler, 1); 
-	  mt65xx_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
+	mt_eint_registration(CUST_EINT_TOUCH_PANEL_NUM, CUST_EINT_TOUCH_PANEL_TYPE, tpd_eint_interrupt_handler, 1); 
+	mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
  
 	msleep(100);
  
@@ -547,30 +391,25 @@ reset_proc:
 	    }
 		   
 	}
-
-	tpd_load_status = 1;
-
-	#ifdef VELOCITY_CUSTOM_FT5206
-	if((err = misc_register(&tpd_misc_device)))
-	{
-		printk("mtk_tpd: tpd_misc_device register failed\n");
-		
-	}
-	#endif
+	
+#ifdef VELOCITY_CUSTOM
+	tpd_v_magnify_x = TPD_VELOCITY_CUSTOM_X;
+	tpd_v_magnify_y = TPD_VELOCITY_CUSTOM_Y;	
+#endif
 
 	thread = kthread_run(touch_event_handler, 0, TPD_DEVICE);
 	 if (IS_ERR(thread))
-		 { 
+	{ 
 		  retval = PTR_ERR(thread);
 		  TPD_DMESG(TPD_DEVICE " failed to create kernel thread: %d\n", retval);
-		}
-
+	}
 	TPD_DMESG("ft5206 Touch Panel Device Probe %s\n", (retval < TPD_OK) ? "FAIL" : "PASS");
-   return 0;
-   
+	tpd_load_status = 1;
+	
+   	return 0;   
  }
 
- static int __devexit tpd_remove(struct i2c_client *client)
+ static int  tpd_remove(struct i2c_client *client)
  
  {
    
@@ -623,21 +462,22 @@ reset_proc:
   //int retval = TPD_OK;
   //char data;
  
-   TPD_DMESG("TPD wake up\n");
+	TPD_DMESG("TPD wake up\n");
 #ifdef TPD_CLOSE_POWER_IN_SLEEP	
-	hwPowerOn(TPD_POWER_SOURCE,VOL_3300,"TP");
-
+#ifdef TPD_POWER_SOURCE_CUSTOM
+	hwPowerOn(TPD_POWER_SOURCE_CUSTOM, VOL_2800, "TP");
 #else
-
-	mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
-    mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
-    mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ZERO);  
-    msleep(1);  
-    mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
-    mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
-    mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ONE);
+	hwPowerOn(MT65XX_POWER_LDO_VGP2, VOL_2800, "TP");
 #endif
-	mt65xx_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);  
+#ifdef TPD_POWER_SOURCE_1800
+	hwPowerOn(TPD_POWER_SOURCE_1800, VOL_1800, "TP");
+#endif 	
+
+#endif
+	mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
+	mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
+	mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ONE);
+	mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);  
 	msleep(30);
 	tpd_halt = 0;
 	/* for resume debug
@@ -656,16 +496,31 @@ reset_proc:
  static void tpd_suspend( struct early_suspend *h )
  {
 	// int retval = TPD_OK;
-	 static char data = 0x3;
+#ifndef TPD_CLOSE_POWER_IN_SLEEP
+	 char data = 0x3;
+#endif
  	 tpd_halt = 1;
 	 TPD_DMESG("TPD enter sleep\n");
-	 mt65xx_eint_mask(CUST_EINT_TOUCH_PANEL_NUM);
+	 mt_eint_mask(CUST_EINT_TOUCH_PANEL_NUM);
 	 mutex_lock(&i2c_access);
+	 
+	mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
+	mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
+	mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ZERO);  
+	msleep(1);	
 #ifdef TPD_CLOSE_POWER_IN_SLEEP	
-	hwPowerDown(TPD_POWER_SOURCE,"TP");
+	
+#ifdef TPD_POWER_SOURCE_CUSTOM
+	hwPowerDown(TPD_POWER_SOURCE_CUSTOM, "TP");
 #else
-i2c_smbus_write_i2c_block_data(i2c_client, 0xA5, 1, &data);  //TP enter sleep mode
+	hwPowerDown(MT65XX_POWER_LDO_VGP2, "TP");
+#endif
+#ifdef TPD_POWER_SOURCE_1800
+	hwPowerDown(TPD_POWER_SOURCE_1800, "TP");
+#endif 	
 
+#else
+	i2c_smbus_write_i2c_block_data(i2c_client, 0xA5, 1, &data);  //TP enter sleep mode
 #endif
 	mutex_unlock(&i2c_access);
         TPD_DMESG("TPD enter sleep done\n");
@@ -686,7 +541,7 @@ i2c_smbus_write_i2c_block_data(i2c_client, 0xA5, 1, &data);  //TP enter sleep mo
  };
  /* called when loaded into kernel */
  static int __init tpd_driver_init(void) {
-	 printk("MediaTek FT5206 touch panel driver init\n");
+	 TPD_DMESG("MediaTek FT5206 touch panel driver init\n");
 	   i2c_register_board_info(0, &ft5206_i2c_tpd, 1);
 		 if(tpd_driver_add(&tpd_device_driver) < 0)
 			 TPD_DMESG("add FT5206 driver failed\n");

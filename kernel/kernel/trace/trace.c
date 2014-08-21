@@ -345,7 +345,7 @@ static DECLARE_WAIT_QUEUE_HEAD(trace_wait);
 #ifdef CONFIG_MTK_SCHED_TRACERS
 unsigned long trace_flags = TRACE_ITER_PRINT_PARENT | TRACE_ITER_PRINTK |
 	TRACE_ITER_ANNOTATE | TRACE_ITER_CONTEXT_INFO | TRACE_ITER_SLEEP_TIME |
-	TRACE_ITER_GRAPH_TIME | TRACE_ITER_RECORD_CMD ;
+	TRACE_ITER_GRAPH_TIME ;
     //mtk04259: remove TRACE_ITER_OVERWRITE by default for boot-time ftrace
     //          it will be resotred after collecting is done
 #else
@@ -406,7 +406,6 @@ void tracing_off(void)
 }
 EXPORT_SYMBOL_GPL(tracing_off);
 
-#ifdef CONFIG_MTK_SCHED_TRACERS
 // ftrace's switch function for MTK solution
 void mt_ftrace_enable_disable(int enable){
     if (enable) {
@@ -423,10 +422,8 @@ void mt_ftrace_enable_disable(int enable){
         tracing_off();
         trace_set_clr_event(NULL, NULL, 0);
     }
-
 }
 EXPORT_SYMBOL(mt_ftrace_enable_disable);
-#endif
 
 /**
  * tracing_is_on - show state of ring buffers enabled
@@ -516,6 +513,7 @@ static const char *trace_options[] = {
 	"overwrite",
 	"disable_on_free",
 	"irq-info",
+	"print-tgid",
 	NULL
 };
 
@@ -970,6 +968,7 @@ void tracing_reset(struct trace_array *tr, int cpu)
 	synchronize_sched();
 	__tracing_reset(buffer, cpu);
 
+    printk("[ftrace]cpu %d trace reset\n", cpu);
 	ring_buffer_record_enable(buffer);
 }
 
@@ -988,6 +987,7 @@ void tracing_reset_online_cpus(struct trace_array *tr)
 	for_each_online_cpu(cpu)
 		__tracing_reset(buffer, cpu);
 
+    printk("[ftrace]all cpu trace reset\n");
 	ring_buffer_record_enable(buffer);
 }
 
@@ -1004,9 +1004,21 @@ void tracing_reset_current_online_cpus(void)
 // #define SAVED_CMDLINES 128
 #define SAVED_CMDLINES 512
 #define NO_CMDLINE_MAP UINT_MAX
+
+#define SIZEOF_MAP_PID_TO_CMDLINE (sizeof(unsigned)*(PID_MAX_DEFAULT+1))
+#define SIZEOF_MAP_CMDLINE_TO_PID (sizeof(unsigned)*(SAVED_CMDLINES))
+
+#ifdef MTK_USE_RESERVED_EXT_MEM
+extern void* extmem_malloc_page_align(size_t bytes);
+static unsigned * map_pid_to_cmdline = NULL;
+static unsigned * map_cmdline_to_pid = NULL;
+#else
 static unsigned map_pid_to_cmdline[PID_MAX_DEFAULT+1];
 static unsigned map_cmdline_to_pid[SAVED_CMDLINES];
+#endif
+
 static char saved_cmdlines[SAVED_CMDLINES][TASK_COMM_LEN];
+static unsigned saved_tgids[SAVED_CMDLINES];
 static int cmdline_idx;
 static arch_spinlock_t trace_cmdline_lock = __ARCH_SPIN_LOCK_UNLOCKED;
 
@@ -1015,8 +1027,22 @@ static atomic_t trace_record_cmdline_disabled __read_mostly;
 
 static void trace_init_cmdlines(void)
 {
+#ifdef MTK_USE_RESERVED_EXT_MEM
+	map_pid_to_cmdline = (unsigned *) extmem_malloc_page_align(SIZEOF_MAP_PID_TO_CMDLINE);
+	if(map_pid_to_cmdline == NULL)
+		panic("%s[%s] memory alloc failed!!!\n", __FILE__, __FUNCTION__);
+
+	map_cmdline_to_pid = (unsigned *) extmem_malloc_page_align(SIZEOF_MAP_CMDLINE_TO_PID);
+	if(map_pid_to_cmdline == NULL)
+		panic("%s[%s] memory alloc failed!!!\n", __FILE__, __FUNCTION__);
+	
+	memset(map_pid_to_cmdline, NO_CMDLINE_MAP, SIZEOF_MAP_PID_TO_CMDLINE);
+	memset(map_cmdline_to_pid, NO_CMDLINE_MAP, SIZEOF_MAP_CMDLINE_TO_PID);	
+#else    
 	memset(&map_pid_to_cmdline, NO_CMDLINE_MAP, sizeof(map_pid_to_cmdline));
 	memset(&map_cmdline_to_pid, NO_CMDLINE_MAP, sizeof(map_cmdline_to_pid));
+#endif
+
 	cmdline_idx = 0;
 }
 
@@ -1050,12 +1076,10 @@ void tracing_start(void)
 {
 	struct ring_buffer *buffer;
 	unsigned long flags;
+    int reset_ftrace = 0;
 
 	if (tracing_disabled)
 		return;
-
-    // reset ring buffer
-    tracing_reset_current_online_cpus();
 
 	raw_spin_lock_irqsave(&tracing_start_lock, flags);
 	if (--trace_stop_count) {
@@ -1063,9 +1087,12 @@ void tracing_start(void)
 			/* Someone screwed up their debugging */
 			WARN_ON_ONCE(1);
 			trace_stop_count = 0;
+            reset_ftrace = 1;
 		}
 		goto out;
-	}
+	}else
+        reset_ftrace = 1;
+
 
 	/* Prevent the buffers from switching */
 	arch_spin_lock(&ftrace_max_lock);
@@ -1083,6 +1110,10 @@ void tracing_start(void)
 	ftrace_start();
  out:
 	raw_spin_unlock_irqrestore(&tracing_start_lock, flags);
+    
+    // reset ring buffer when all readers left
+    if(reset_ftrace == 1 && trace_stop_count == 0)
+        tracing_reset_current_online_cpus();
 }
 
 /**
@@ -1158,6 +1189,7 @@ static void trace_save_cmdline(struct task_struct *tsk)
 	}
 
 	memcpy(&saved_cmdlines[idx], tsk->comm, TASK_COMM_LEN);
+	saved_tgids[idx] = tsk->tgid;
 
 	arch_spin_unlock(&trace_cmdline_lock);
 }
@@ -1191,6 +1223,25 @@ void trace_find_cmdline(int pid, char comm[])
 
 	arch_spin_unlock(&trace_cmdline_lock);
 	preempt_enable();
+}
+
+int trace_find_tgid(int pid)
+{
+	unsigned map;
+	int tgid;
+
+	preempt_disable();
+	arch_spin_lock(&trace_cmdline_lock);
+	map = map_pid_to_cmdline[pid];
+	if (map != NO_CMDLINE_MAP)
+		tgid = saved_tgids[map];
+	else
+		tgid = -1;
+
+	arch_spin_unlock(&trace_cmdline_lock);
+	preempt_enable();
+
+	return tgid;
 }
 
 #ifdef CONFIG_MTK_SCHED_TRACERS
@@ -2044,6 +2095,13 @@ static void print_func_help_header(struct trace_array *tr, struct seq_file *m)
 	seq_puts(m, "#              | |       |          |         |\n");
 }
 
+static void print_func_help_header_tgid(struct trace_array *tr, struct seq_file *m)
+{
+	print_event_info(tr, m);
+	seq_puts(m, "#           TASK-PID    TGID   CPU#      TIMESTAMP  FUNCTION\n");
+	seq_puts(m, "#              | |        |      |          |         |\n");
+}
+
 static void print_func_help_header_irq(struct trace_array *tr, struct seq_file *m)
 {
 	print_event_info(tr, m);
@@ -2054,6 +2112,18 @@ static void print_func_help_header_irq(struct trace_array *tr, struct seq_file *
 	seq_puts(m, "#                            ||| /     delay\n");
 	seq_puts(m, "#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION\n");
 	seq_puts(m, "#              | |       |   ||||       |         |\n");
+}
+
+static void print_func_help_header_irq_tgid(struct trace_array *tr, struct seq_file *m)
+{
+	print_event_info(tr, m);
+	seq_puts(m, "#                                      _-----=> irqs-off\n");
+	seq_puts(m, "#                                     / _----=> need-resched\n");
+	seq_puts(m, "#                                    | / _---=> hardirq/softirq\n");
+	seq_puts(m, "#                                    || / _--=> preempt-depth\n");
+	seq_puts(m, "#                                    ||| /     delay\n");
+	seq_puts(m, "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\n");
+	seq_puts(m, "#              | |        |      |   ||||       |         |\n");
 }
 
 void
@@ -2348,8 +2418,14 @@ void trace_default_header(struct seq_file *m)
 	} else {
 		if (!(trace_flags & TRACE_ITER_VERBOSE)) {
 			if (trace_flags & TRACE_ITER_IRQ_INFO)
+				if (trace_flags & TRACE_ITER_TGID)
+					print_func_help_header_irq_tgid(iter->tr, m);
+				else
 				print_func_help_header_irq(iter->tr, m);
 			else
+				if (trace_flags & TRACE_ITER_TGID)
+					print_func_help_header_tgid(iter->tr, m);
+				else
 				print_func_help_header(iter->tr, m);
 		}
 	}
@@ -2561,7 +2637,6 @@ static int tracing_open(struct inode *inode, struct file *file)
 	    (file->f_flags & O_TRUNC)) {
 		long cpu = (long) inode->i_private;
 
-        printk("[ftrace]reset trace file\n");
 		if (cpu == TRACE_PIPE_ALL_CPU)
 			tracing_reset_online_cpus(&global_trace);
 		else
@@ -2991,6 +3066,50 @@ static const struct file_operations tracing_saved_cmdlines_fops = {
 };
 
 static ssize_t
+tracing_saved_tgids_read(struct file *file, char __user *ubuf,
+				size_t cnt, loff_t *ppos)
+{
+	char *file_buf;
+	char *buf;
+	int len = 0;
+	int pid;
+	int i;
+
+	file_buf = kmalloc(SAVED_CMDLINES*(16+1+16), GFP_KERNEL);
+	if (!file_buf)
+		return -ENOMEM;
+
+	buf = file_buf;
+
+	for (i = 0; i < SAVED_CMDLINES; i++) {
+		int tgid;
+		int r;
+
+		pid = map_cmdline_to_pid[i];
+		if (pid == -1 || pid == NO_CMDLINE_MAP)
+			continue;
+
+		tgid = trace_find_tgid(pid);
+		r = sprintf(buf, "%d %d\n", pid, tgid);
+		buf += r;
+		len += r;
+	}
+
+	len = simple_read_from_buffer(ubuf, cnt, ppos,
+				      file_buf, len);
+
+	kfree(file_buf);
+
+	return len;
+}
+
+static const struct file_operations tracing_saved_tgids_fops = {
+	.open	= tracing_open_generic,
+	.read	= tracing_saved_tgids_read,
+	.llseek	= generic_file_llseek,
+};
+
+static ssize_t
 tracing_ctrl_read(struct file *filp, char __user *ubuf,
 		  size_t cnt, loff_t *ppos)
 {
@@ -3027,8 +3146,10 @@ tracing_ctrl_write(struct file *filp, const char __user *ubuf,
 			if (current_trace->start)
 				current_trace->start(tr);
 			tracing_start();
+            trace_printk("tracing_enabled is toggled to %lu\n", val);
 		} else {
 			tracer_enabled = 0;
+            trace_printk("tracing_enabled is toggled to %lu\n", val);
 			tracing_stop();
 			if (current_trace->stop)
 				current_trace->stop(tr);
@@ -4903,10 +5024,13 @@ rb_simple_write(struct file *filp, const char __user *ubuf,
 
 	if (buffer) {
         printk("[ftrace]tracing_on is toggled to %lu\n", val);
-		if (val)
+		if (val){
 			ring_buffer_record_on(buffer);
-		else
+            trace_printk("tracing_on is toggled to %lu\n", val);
+        }else{
+            trace_printk("tracing_on is toggled to %lu\n", val);
 			ring_buffer_record_off(buffer);
+        }
 	}
 
 	(*ppos)++;
@@ -5014,6 +5138,9 @@ static __init int tracer_init_debugfs(void)
 
 	trace_create_file("saved_cmdlines", 0444, d_tracer,
 			NULL, &tracing_saved_cmdlines_fops);
+
+	trace_create_file("saved_tgids", 0444, d_tracer,
+			NULL, &tracing_saved_tgids_fops);
 
 	trace_create_file("trace_clock", 0644, d_tracer, NULL,
 			  &trace_clock_fops);
@@ -5331,7 +5458,7 @@ __init static int clear_boot_tracer(void)
 
 #ifdef CONFIG_MTK_KERNEL_MARKER
 static unsigned long __read_mostly tracing_mark_write_addr = 0;
-static void inline __mt_update_tracing_mark_write_addr(){
+static void inline __mt_update_tracing_mark_write_addr(void){
     if(unlikely(tracing_mark_write_addr == 0))
         tracing_mark_write_addr = kallsyms_lookup_name("tracing_mark_write");
 }
@@ -5340,7 +5467,7 @@ void inline mt_kernel_trace_begin(char *name){
     if(mt_kernel_marker_enabled){
         __mt_update_tracing_mark_write_addr();
         event_trace_printk(tracing_mark_write_addr,
-                "B|%d|%s\n", current->pid, name);
+                "B|%d|%s\n", pid_vnr(task_tgid(current)), name);
     }
 }
 EXPORT_SYMBOL(mt_kernel_trace_begin);
@@ -5349,12 +5476,12 @@ void inline mt_kernel_trace_counter(char *name, int count){
     if(mt_kernel_marker_enabled){
         __mt_update_tracing_mark_write_addr();
         event_trace_printk(tracing_mark_write_addr,
-                "C|%d|%s|%d\n", current->pid, name, count);
+                "C|%d|%s|%d\n", pid_vnr(task_tgid(current)), name, count);
     }
 }
 EXPORT_SYMBOL(mt_kernel_trace_counter);
 
-void inline mt_kernel_trace_end(){
+void inline mt_kernel_trace_end(void){
     if(mt_kernel_marker_enabled){
         __mt_update_tracing_mark_write_addr();
         event_trace_printk(tracing_mark_write_addr,
@@ -5362,6 +5489,10 @@ void inline mt_kernel_trace_end(){
     }
 }
 EXPORT_SYMBOL(mt_kernel_trace_end);
+#else
+void inline mt_kernel_trace_begin(char *name){}
+void inline mt_kernel_trace_end(void){}
+void inline mt_kernel_trace_counter(char *name, int count){}
 #endif
 
 

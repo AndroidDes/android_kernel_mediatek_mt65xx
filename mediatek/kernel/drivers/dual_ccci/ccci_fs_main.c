@@ -29,11 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <asm/dma-mapping.h>
-
-#include "ccci.h"
-#include "ccci_fs.h"
-#include "ccci_common.h"
-
+#include <ccci.h>
 #define CCCI_FS_DEVNAME  "ccci_fs"
 
 extern unsigned long long lg_ch_tx_debug_enable[];
@@ -54,6 +50,7 @@ typedef struct _fs_ctl_block
 	int					reset_handle;
 	wait_queue_head_t	fs_waitq;
 	struct wake_lock	fs_wake_lock;
+	char                fs_wakelock_name[16];
 	int					fs_smem_size;
 }fs_ctl_block_t;
 
@@ -216,7 +213,7 @@ static int ccci_fs_mmap(struct file *file, struct vm_area_struct *vma)
 
 	off += start & PAGE_MASK;
 	vma->vm_pgoff  = off >> PAGE_SHIFT;
-	vma->vm_flags |= VM_RESERVED;
+	vma->vm_flags |= VM_IO;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
     
 	CCCI_FS_MSG(md_id, "mmap--\n");
@@ -373,7 +370,6 @@ int __init ccci_fs_init(int md_id)
 {
 	int				ret;
 	int				major, minor;
-	char			buf[16];
 	fs_ctl_block_t	*ctl_b;
 
 	ret = get_dev_id_by_md_id(md_id, "fs", &major, &minor);
@@ -394,10 +390,10 @@ int __init ccci_fs_init(int md_id)
 	spin_lock_init(&ctl_b->fs_spinlock);
 	init_waitqueue_head(&ctl_b->fs_waitq);
 	ctl_b->fs_dev_num = MKDEV(major, minor);
-	snprintf(buf, 16, "%s%d", CCCI_FS_DEVNAME, md_id);	
-	wake_lock_init(&ctl_b->fs_wake_lock, WAKE_LOCK_SUSPEND, buf); 
-	ret = register_chrdev_region(ctl_b->fs_dev_num, 1, buf);
+	snprintf(ctl_b->fs_wakelock_name, sizeof(ctl_b->fs_wakelock_name), "ccci%d_fs", (md_id+1));	
+	wake_lock_init(&ctl_b->fs_wake_lock, WAKE_LOCK_SUSPEND, ctl_b->fs_wakelock_name); 
 
+	ret = register_chrdev_region(ctl_b->fs_dev_num, 1, ctl_b->fs_wakelock_name);
 	if (ret) {
 		CCCI_MSG_INF(md_id, "fs ", "ccci_fs_init: Register char device failed(%d)\n", ret);
 		goto _REG_CHR_REGION_FAIL;

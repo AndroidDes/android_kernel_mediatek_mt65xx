@@ -236,7 +236,7 @@ FTABLE_SCENE_INDEP()
     )
 #endif
     //==========================================================================
-#if 0
+#if 1
     //	Video Hdr
     FTABLE_CONFIG_AS_TYPE_OF_DEFAULT_VALUES(
         KEY_AS_(MtkCameraParameters::KEY_VIDEO_HDR), 

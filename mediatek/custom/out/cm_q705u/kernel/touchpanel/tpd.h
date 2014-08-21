@@ -9,40 +9,14 @@
 #include <linux/list.h>
 #include <linux/proc_fs.h> 
 
-#ifdef MT6589
-    #include <mach/mt_gpio.h>
-    #include <mach/mt_reg_base.h>
-    #include <mach/mt_typedefs.h>
-#endif
-#ifdef MT6577
-    #include <mach/mt_gpio.h>
-    #include <mach/mt_devs.h>
-    #include <mach/mt_reg_base.h>
-    #include <mach/mt_typedefs.h>
-#endif
-#ifdef MT6575
-    #include <mach/mt_gpio.h>
-    #include <mach/mt_devs.h>
-    #include <mach/mt_reg_base.h>
-    #include <mach/mt_typedefs.h>
-#endif
-#ifdef MT6573
-    #include <mach/mt6573_pll.h>
-    #include <mach/mt6573_gpio.h>
-    #include <mach/mt6573_devs.h>
-    #include <mach/mt6573_reg_base.h>
-    #include <mach/mt6573_typedefs.h>
-#endif
-#ifdef MT6516
-    #include <mach/mt6516_pll.h>
-    #include <mach/mt6516_gpio.h>
-    #include <mach/mt6516_devs.h>
-    #include <mach/mt6516_boot.h>
-    #include <mach/mt6516_reg_base.h>
-    #include <mach/mt6516_typedefs.h>
-#endif
+#include <mach/mt_gpio.h>
+#include <mach/mt_reg_base.h>
+#include <mach/mt_typedefs.h>
+
 #include <mach/board.h>
 #include <mach/irqs.h>
+#include <mach/eint.h>
+
 #include <asm/io.h>
 #include <linux/platform_device.h>
 #include <linux/autoconf.h>
@@ -51,27 +25,16 @@
 //#include "tpd_custom.h"
 
 /* debug macros */
-//#define TPD_DEBUG
+////#define TPD_DEBUG
 #define TPD_DEBUG_CODE
 //#define TPD_DEBUG_TRACK
 #define TPD_DMESG(a,arg...) printk(TPD_DEVICE ": " a,##arg)
-
-//edit by Magnum 2013-3-27  CTP log control ...
-#if 0
 #if defined(TPD_DEBUG)
 #undef TPD_DEBUG
 #define TPD_DEBUG(a,arg...) printk(TPD_DEVICE ": " a,##arg)
 #else
 #define TPD_DEBUG(arg...) 
 #endif
-#endif
-
-extern size_t ctp_log_on;
-#define TPD_DEBUG(fmt, arg...) \
-    do { \
-        if (ctp_log_on)printk(TPD_DEVICE ": " fmt, ##arg); \
-    }while (0)
-
 
 /* register, address, configurations */
 #define TPD_DEVICE            "mtk-tpd"
@@ -114,7 +77,7 @@ extern int tpd_def_calmat[];
 extern int TPD_DO_WARP;
 extern int tpd_wb_start[];
 extern int tpd_wb_end[];
-#define TPD_KEY_COUNT           3
+
 struct tpd_device
 {
     struct input_dev *dev;
@@ -124,6 +87,11 @@ struct tpd_device
     int btn_state;
 };
 
+struct tpd_attrs
+{
+	struct device_attribute **attr;
+	int num;
+};
 struct tpd_driver_t
 {
 		char *tpd_device_name;
@@ -131,11 +99,10 @@ struct tpd_driver_t
  		void (*suspend)(struct early_suspend *h);
  		void (*resume)(struct early_suspend *h);
  		int tpd_have_button;
-//Ivan added
-		int tpd_x_res;
-		int tpd_y_res;
-        int (*tpd_get_fw_version)(void);
-		int (*tpd_get_vendor_version)(void);  //edit by Magnum
+		struct tpd_attrs attrs;
+    //LINE <tp> <DATE20130422> tp version> zhangxiaofei
+    int (*tpd_get_fw_version)(void);
+    void (*tpd_get_fw_vendor_name)(char * fw_vendor_name);
 };
 
 #if 1 //#ifdef TPD_HAVE_BUTTON

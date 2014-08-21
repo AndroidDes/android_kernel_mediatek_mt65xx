@@ -158,6 +158,8 @@ typedef enum
     AP_CFG_RDCL_FILE_AUDIO_HD_REC_PAR_LID,
     AP_CFG_RDCL_FILE_AUDIO_HD_REC_SCENE_LID,
     AP_CFG_RDCL_FILE_AUDIO_HD_REC_48K_PAR_LID,
+    AP_CFG_RDCL_FILE_AUDIO_BUFFER_DC_CALIBRATION_PAR_LID,
+    AP_CFG_RDEB_STS_CUSTOM_LID,//add by renbin.wei for sts 43 ¡§¡ã??2??¡§2??¡§o?¨¤?¨º????¨¢?¨¦¡§¡ãa?¨º?2?¡§a?|¨¬???¡§??¡ì???|¨¬?¡§|?¡§1?¡§¡é2?¡§a??¨º?¡§|?2???¡ì¡§¡ã?lid¡§o?¨¤¡§¡ã???¡ì¡§¡ãao¡§a?a???|¨¬?¡§¡è¡§a??¨º??¡è??¡§¡ã?T?¡è?¡ì?¡è??¡§onvram|¨¬???¡§?|????
     AP_CFG_CUSTOM_FILE_MAX_LID,
 } CUSTOM_CFG_FILE_LID;
 
@@ -186,7 +188,7 @@ typedef enum
 #define AP_CFG_RDCL_FILE_AUDIO_VER1_VOLUME_CUSTOM_LID_VERNO  "001"
 
 /* dual mic custom file version */
-#define AP_CFG_RDCL_FILE_DUAL_MIC_CUSTOM_LID_VERNO  "001"
+#define AP_CFG_RDCL_FILE_DUAL_MIC_CUSTOM_LID_VERNO  "002"
 
 /* audio wb specch param custom file version */
 #define AP_CFG_RDCL_FILE_AUDIO_WB_PARAM_LID_VERNO "001"
@@ -199,7 +201,8 @@ typedef enum
 #define AP_CFG_RDCL_FILE_AUDIO_HD_REC_SCENE_LID_VERNO "001"
 #define AP_CFG_RDCL_FILE_AUDIO_HD_REC_48K_PAR_LID_VERNO "001"
 
-
+/* audio buffer dc calibration custom file version*/
+#define AP_CFG_RDCL_FILE_AUDIO_BUFFER_DC_CALIBRATION_PAR_LID_VERNO "000"
 
 /* META log and com port config file version */
 #define AP_CFG_RDCL_FILE_META_LID_VERNO			    "000"
@@ -216,4 +219,6 @@ typedef enum
 #define AP_CFG_RDEB_WIFI_CUSTOM_LID_VERNO				"000"
 #define AP_CFG_REEB_PRODUCT_INFO_LID_VERNO      "000"
 
+/* add by renbin.wei for sts */
+#define AP_CFG_RDEB_STS_CUSTOM_LID_VERNO "000"
 #endif /* CFG_FILE_LID_H */

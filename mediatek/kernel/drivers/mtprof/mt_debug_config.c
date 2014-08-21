@@ -19,6 +19,8 @@
 #include <linux/ftrace.h>
 #include <linux/debug_locks.h>
 #include <linux/printk.h>
+#include <mach/mtk_memcfg.h>
+
 /* Some utility macro*/
 #define SEQ_printf(m, x...)	    \
  do {			    \
@@ -77,7 +79,6 @@ static unsigned long nsec_low(unsigned long long nsec)
 /* --------------------------------------------------- */
 /*                     Define Proc entry               */
 /* --------------------------------------------------- */
-extern unsigned long mtk_memcfg_set_bypass_slub_debug_flag(unsigned long);
 MT_DEBUG_ENTRY(debug_config);
 static int mt_debug_config_show(struct seq_file *m, void *v)
 {

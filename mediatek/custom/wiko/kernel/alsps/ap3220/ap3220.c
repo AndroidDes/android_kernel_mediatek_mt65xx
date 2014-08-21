@@ -30,7 +30,6 @@
 #include <mach/mt_gpio.h>
 #include <mach/mt_pm_ldo.h>
 
-
 #define POWER_NONE_MACRO MT65XX_POWER_NONE
 
 #include <linux/hwmsensor.h>
@@ -40,8 +39,8 @@
 #include <cust_eint.h>
 #include <cust_alsps.h>
 #include "ap3220.h"
-#include <mach/mt_boot.h>
-
+//<Line> <add wakelock include> <20131113> <mickal.ma>
+#include <linux/wakelock.h>
 /******************************************************************************
  * configuration
 *******************************************************************************/
@@ -56,33 +55,18 @@
 #define APS_DBG(fmt, args...)    printk(KERN_INFO APS_TAG fmt, ##args)         
 
 //Ivan
-#define ALS_AUTO_RANGE
-//#define ALS_RANGE_DEBUG		//Ivan
-
 #define ALS_QUEUE_LEN	3
-
-#define TINNO_PS_STARTUP_IRQ	//Ivan
-
-//Ivan
-#ifdef TINNO_PS_STARTUP_IRQ	
-static struct delayed_work ps_startup_irq_work;
-static struct workqueue_struct * ps_startup_irq_workqueue = NULL;
-static void ps_startup_irq_func(struct work_struct *);
-#define STARTUP_IRQ_DELAY 10
-#endif
 
 /******************************************************************************
 * extern functions 
 *******************************************************************************/
 
-		extern void mt65xx_eint_unmask(unsigned int line);
-		extern void mt65xx_eint_mask(unsigned int line);
-		extern void mt65xx_eint_set_polarity(unsigned int eint_num, unsigned int pol);
-		extern void mt65xx_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms);
-		extern unsigned int mt65xx_eint_set_sens(unsigned int eint_num, unsigned int sens);
-		extern void mt65xx_eint_registration(unsigned int eint_num, unsigned int is_deb_en, unsigned int pol, void (EINT_FUNC_PTR)(void), unsigned int is_auto_umask);
-		extern void mt_eint_soft_set(unsigned int eint_num);
-		extern void mt_eint_soft_clr(unsigned int eint_num);
+extern void mt_eint_unmask(unsigned int line);
+extern void mt_eint_mask(unsigned int line);
+extern void mt_eint_set_polarity(unsigned int eint_num, unsigned int pol);
+extern void mt_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms);
+extern unsigned int mt_eint_set_sens(unsigned int eint_num, unsigned int sens);
+extern void mt_eint_registration(unsigned int eint_num, unsigned int is_deb_en,  void (EINT_FUNC_PTR)(void), unsigned int is_auto_umask);
 
 /*----------------------------------------------------------------------------*/
 static int ap3220_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id); 
@@ -95,6 +79,9 @@ static int ap3220_i2c_resume(struct i2c_client *client);
 static const struct i2c_device_id ap3220_i2c_id[] = {{AP3220_DEV_NAME,0},{}};
 static struct i2c_board_info __initdata i2c_ap3220={ I2C_BOARD_INFO(AP3220_DEV_NAME, 0x1C)};
 /*----------------------------------------------------------------------------*/
+
+//<Line> <add p-sensor wake_lock> <20131113> <mickal.ma>
+struct wake_lock psensor_timer_lock;
 struct ap3220_priv {
 	struct alsps_hw  *hw;
 	struct i2c_client *client;
@@ -117,11 +104,11 @@ struct ap3220_priv {
 	
 	/*data*/
 //Ivan	u8			als;
-	u32			als;
-	u32 			ps;
+	u16			als;
+	u16 			ps;
 //	u8			_align;
-	u32			als_level_num;
-	u32			als_value_num;
+	u16			als_level_num;
+	u16			als_value_num;
 	u32			als_level[C_CUST_ALS_LEVEL-1];
 	u32			als_value[C_CUST_ALS_LEVEL];
 	
@@ -171,23 +158,8 @@ static struct ap3220_priv *ap3220_obj = NULL;
 static struct platform_driver ap3220_alsps_driver;
 static struct PS_CALI_DATA_STRUCT ps_cali={0,0,0};
 //Ivan added
-static u32 g_als_value_queue[ALS_QUEUE_LEN]={0,0,0};
-static u32 g_als_value_previous = 0;
-#ifdef ALS_AUTO_RANGE
-static int g_als_range = AP3220_ALS_SETTING_RANGE_16383;
-static u32 g_als_previous_data = 0xFFFF;
-static u32 g_als_previous_level = 0xFFFF;
-#endif
-static u32 g_als_previous_value = 0xFFFF;
-//Ivan added
-#ifdef TINNO_PS_STARTUP_IRQ	
-static int g_emu_int = 0;
-static int g_first_int = 0;
-#endif
-#ifdef ALS_RANGE_DEBUG
-int currentBootMode = 0;
-#endif
-
+static u16 g_als_value_queue[ALS_QUEUE_LEN]={0,0,0};
+static u16 g_als_value_previous = 0;
 
 /*----------------------------------------------------------------------------*/
 
@@ -210,17 +182,6 @@ typedef enum {
 } CMC_TRC;
 
 
-#ifdef TINNO_PS_STARTUP_IRQ	
-static void ps_startup_irq_func(struct work_struct *work)
-{   
-    if (g_emu_int == 0)
-    {
-	mt_eint_soft_set(CUST_EINT_ALS_NUM);
-	APS_ERR("debug ps_startup_irq_func!");	
-	g_emu_int = 1;
-    }
-}
-#endif
 /* 
  * #########
  * ## I2C ##
@@ -333,9 +294,6 @@ int ap3220_enable_ps(struct i2c_client *client, int enable)
 			
 			atomic_set(&obj->ps_deb_on, 1);
 			atomic_set(&obj->ps_deb_end, jiffies+atomic_read(&obj->ps_debounce)/(1000/HZ));
-#ifdef TINNO_PS_STARTUP_IRQ						
-			g_first_int = 0;
-#endif			
 		}
 	else{
 			APS_LOG("ap3220_enable_ps disable_ps\n");
@@ -414,13 +372,10 @@ int ap3220_enable_als(struct i2c_client *client, int enable)
 	return res;
 }
 /********************************************************************/
-long ap3220_read_ps(struct i2c_client *client, u32 *data)
+long ap3220_read_ps(struct i2c_client *client, u16 *data)
 {
 	long res;
 	u8 databuf[2];
-	u8 ps_l, ps_h;
-	u32 ps_val;
-	
 //	APS_FUN(f);
 	res = ap3220_i2c_read_reg(AP3220_REG_SYS_PS_DATA_LOW,&databuf[0]);
 	res = ap3220_i2c_read_reg(AP3220_REG_SYS_PS_DATA_HIGH,&databuf[1]);
@@ -431,30 +386,18 @@ long ap3220_read_ps(struct i2c_client *client, u32 *data)
 	}
 	
 //	APS_LOG("AP3220_REG_PS_DATA value value_low = %x, value_high = %x\n",databuf[0],databuf[1]);
-	*data = ((databuf[1]<<8)|databuf[0]);
-	
-	ps_l = *data & 0x00FF;
-	ps_h = *data >> 8;
-	ps_val = ps_h << 2 | ps_l & 0x03;
-//Ivan
-	printk("ALSPS Ivan ps_val = %x \n",ps_val);
-	
-	APS_LOG("ALSPS Ivan AP3220_REG_PS_DATA value %d\n",*data);	
+	*data = ((databuf[1] & 0x3f) << 4 |(databuf[0] & 0x0f));
+	//*data = ((databuf[1]<<8)|databuf[0]);
+//	APS_LOG("AP3220_REG_PS_DATA value %d\n",*data);	
 	return 0;
 READ_PS_EXIT_ERR:
 	return res;
 }
-
-
 /********************************************************************/
-long ap3220_read_als(struct i2c_client *client, u32 *value)
+long ap3220_read_als(struct i2c_client *client, u16 *data)
 {
 	long res;
 	u8 databuf[2];
-#ifdef ALS_AUTO_RANGE	
-	u32 temp_data,temp_data2;
-	u8 data, data2, data3;
-#endif
 //	APS_FUN(f);
 	
 	res = ap3220_i2c_read_reg(AP3220_REG_SYS_ALS_DATA_LOW,&databuf[0]);
@@ -466,85 +409,25 @@ long ap3220_read_als(struct i2c_client *client, u32 *value)
 	}
 	
 //	APS_LOG("AP3220_REG_ALS_DATA value value_low = %x, value_high = %x\n",databuf[0],databuf[1]);
-#ifdef ALS_AUTO_RANGE
-	temp_data = ((databuf[1]<<8)|databuf[0]);
-	if (temp_data < 0x100 && g_als_range == AP3220_ALS_SETTING_RANGE_16383)		//Ivan Switch sensor range...get better resolution on low light condition
-	{
-	    data = (AP3220_ALS_SETTING_RANGE_4095 << AP3220_ALS_RANGE_SHIFT) & AP3220_ALS_RANGE_MASK;
-	    data2 = (AP3220_ALS_SETTING_PERSIST_1 << AP3220_ALS_PERSIST_SHIFT) & AP3220_ALS_PERSIST_MASK;
-	    data |= data2;
-	    res = ap3220_i2c_write_reg(AP3220_REG_ALS_CONF,data);
-	    
-	    g_als_range = AP3220_ALS_SETTING_RANGE_4095;
-	    
-	    if (g_als_previous_data != 0xFFFF)		//Ivan use previous data if switching range
-		*value = g_als_previous_data;
-	    else
-		*value = temp_data;
-	}
-	else if (temp_data > 0xD00 && g_als_range > AP3220_ALS_SETTING_RANGE_16383)	//Range order <
-	{
-	    data = (AP3220_ALS_SETTING_RANGE_16383 << AP3220_ALS_RANGE_SHIFT) & AP3220_ALS_RANGE_MASK;
-	    data2 = (AP3220_ALS_SETTING_PERSIST_1 << AP3220_ALS_PERSIST_SHIFT) & AP3220_ALS_PERSIST_MASK;
-	    data |= data2;
-	    res = ap3220_i2c_write_reg(AP3220_REG_ALS_CONF,data);
-	    
-	    g_als_range = AP3220_ALS_SETTING_RANGE_16383;
-	    
-	    if (g_als_previous_data != 0xFFFF)		//Ivan use previous data if switching range
-		*value = g_als_previous_data;	    
-	    else
-		*value = temp_data;	    
-	}
-	else
-	{
-	    if (g_als_range == AP3220_ALS_SETTING_RANGE_4095)
-	    {
-		temp_data2 = temp_data >> 2;
-		if (temp_data >= 0 && temp_data < 0x0A)
-		{
-//		    if (temp_data2 == 0)
-			temp_data2 = 0;
-		}
-		else if (temp_data >= 0xA && temp_data < 0x20)		//Keep previous value
-		    temp_data2 = g_als_previous_data;
-		
-		*value = temp_data2;
-	    }
-	    else
-		*value = temp_data;
-	}
-#else
-	*value = ((databuf[1]<<8)|databuf[0]);
-#endif
+	*data = ((databuf[1]<<8)|databuf[0]);
+//	APS_LOG("AP3220_REG_ALS_DATA value %d\n",*data);
 	
-#ifdef ALS_AUTO_RANGE
-#ifdef ALS_RANGE_DEBUG
-	if (FACTORY_BOOT == currentBootMode)
-	{
-	    *value = ((databuf[1]<<8)|databuf[0]);
-	    *value += g_als_range << 28;
-	}
-	    
-#endif
-//	APS_LOG("AP3220_REG_ALS_DATA value %d\n",*value);
-	g_als_previous_data = *value;
-#endif
 	return 0;
 READ_ALS_EXIT_ERR:
 	return res;
 }
 /********************************************************************/
-static int ap3220_get_ps_value(struct ap3220_priv *obj, u32 ps)
+static int ap3220_get_ps_value(struct ap3220_priv *obj, u16 ps)
 {
 	int val, mask = atomic_read(&obj->ps_mask);
 	int invalid = 0;
 	u8 ps_l, ps_h;
-	u32 ps_val;
+	u16 ps_val;
 	
-	ps_l = ps & 0x00FF;
-	ps_h = ps >> 8;
-	ps_val = ps_h << 2 | ps_l & 0x03;
+	//ps_l = ps & 0x00FF;
+	//ps_h = ps >> 8;
+	//ps_val = (ps_h & 0x3f) << 4 | (ps_l & 0x0f);
+	ps_val =ps;
 	if(ps_val > atomic_read(&obj->ps_thd_val_high))
 	{
 		val = 0;  /*close*/
@@ -607,16 +490,13 @@ static int ap3220_get_ps_value(struct ap3220_priv *obj, u32 ps)
 	}	
 }
 /********************************************************************/
-static int ap3220_get_als_value(struct ap3220_priv *obj, u32 als)
+static int ap3220_get_als_value(struct ap3220_priv *obj, u16 als)
 {
 		int idx;
 		int invalid = 0;
 		u32 als_sum;
-		u32 als_level1 = 0;
-		u32 als_level2 = 0;
 //Ivan added SW LOW PASS FILTER
 		als_sum = 0;
-		
 		
 		for (idx = 0; idx < (ALS_QUEUE_LEN - 1); idx++)
 		    g_als_value_queue[idx] = g_als_value_queue[idx+1];
@@ -645,28 +525,6 @@ static int ap3220_get_als_value(struct ap3220_priv *obj, u32 als)
 			APS_ERR("exceed range\n"); 
 			idx = obj->als_value_num - 1;
 		}
-//Ivan added threshold to keep level stable
-		if (idx > 0 && g_als_previous_value != 0xFFFF)
-		{
-		    if (idx > g_als_previous_value)
-		    {
-			als_level1 = obj->hw->als_level[idx];
-			als_level2 = obj->hw->als_level[idx+1];
-			als_level1 = (als_level1 + als_level2)/2;
-			if (als_sum < als_level1)
-			    idx--;
-		    }
-		    if (idx < g_als_previous_value)
-		    {
-			als_level1 = obj->hw->als_level[idx];
-			als_level2 = obj->hw->als_level[idx-1];
-			als_level1 = (als_level1 + als_level2)/2;
-			if (als_sum > als_level1)
-			    idx++;			
-		    }
-		}
-		
-		g_als_previous_value = idx;
 		
 		if(1 == atomic_read(&obj->als_deb_on))
 		{
@@ -826,10 +684,10 @@ static ssize_t ap3220_show_reg(struct device_driver *ddri, char *buf)
 		APS_ERR("ap3220_obj is null!!\n");
 		return 0;
 	}
-	
-	
-	return 0;
+
+        return 0;
 }
+
 /*----------------------------------------------------------------------------*/
 static ssize_t ap3220_show_send(struct device_driver *ddri, char *buf)
 {
@@ -1085,9 +943,7 @@ static int ap3220_check_intr(struct i2c_client *client)
 	u8 databuf[2];
 	u8 intr_status;
 	u8 intr;
-	U8 ret = 0;
 	
-	ret= 0;
 	res = ap3220_i2c_read_reg(AP3220_REG_SYS_ISTATUS,&intr_status);
 	if(res < 0)
 	{
@@ -1104,7 +960,7 @@ static int ap3220_check_intr(struct i2c_client *client)
 	    if(res < 0)
 	    {
 		    APS_ERR("i2c_master_send function err\n");
-//		    goto EXIT_ERR;
+		    goto EXIT_ERR;
 	    }
 	    
 //thrown away the data????	    
@@ -1122,7 +978,8 @@ static int ap3220_check_intr(struct i2c_client *client)
 		    APS_ERR("i2c_master_send function err\n");
 		    goto EXIT_ERR;
 	    }
-	    if (!(databuf[0] & AP3220_SYSTEM_PS_IR_OVERFLOW) && !(databuf[1] & AP3220_SYSTEM_PS_IR_OVERFLOW))
+//	    if (!(databuf[0] & AP3220_SYSTEM_PS_IR_OVERFLOW) && !(databuf[1] & AP3220_SYSTEM_PS_IR_OVERFLOW))
+	    if (1)//LINE<DATE2013123><screen cant resume on under sunshine>zhuxiankun
 	    {
 		if (databuf[0] & AP3220_SYSTEM_PS_OBJ_CLOSE)
 		    intr_flag = 0;//for close
@@ -1131,19 +988,17 @@ static int ap3220_check_intr(struct i2c_client *client)
 	    }
 	    else
 	    {
-		intr_flag = 1;//for away
-//		res = -1;		
-//		goto EXIT_ERR;
+		res = -1;		
+		goto EXIT_ERR;
 	    }
-	    ret = 1;
 	}
 
 //	APS_LOG("AP3220_REG_INT_FLAG value value_low = %x, value_high = %x\n",databuf[0],databuf[1]);
 	
-	return ret;
+	return 0;
 EXIT_ERR:
 	APS_ERR("ap3220_check_intr dev: %d\n", res);
-	return -1;
+	return res;
 }
 /*----------------------------------------------------------------------------*/
 static void ap3220_eint_work(struct work_struct *work)
@@ -1155,39 +1010,29 @@ static void ap3220_eint_work(struct work_struct *work)
 
 #if 1
 	res = ap3220_check_intr(obj->client);
-	if(res < 0){
+	if(res != 0){
 		goto EXIT_INTR_ERR;
 	}else{
 		sensor_data.values[0] = intr_flag;
 		sensor_data.value_divide = 1;
 		sensor_data.status = SENSOR_STATUS_ACCURACY_MEDIUM;	
-#ifdef TINNO_PS_STARTUP_IRQ			
-		if (g_emu_int)
-		{
-		    g_emu_int = 0;
-		    mt_eint_soft_clr(CUST_EINT_ALS_NUM);
-		    if (g_first_int == 0)
-		    {
-			intr_flag = 1;
-			sensor_data.values[0] = intr_flag;
-		    }
-		    g_first_int = 1;
-		}
-		if (res >= 1)
-		    g_first_int = 1;
-#endif		
+
 	}
 	APS_LOG("AP3220_eint_work intr_flag = %x\n",intr_flag);		
+	//<Begin> <fix problem when phone talking> <20131113> <mickal.ma>
+	if(intr_flag==1)//far away
+		wake_lock_timeout(&psensor_timer_lock, 1*HZ);
+	//<End>	<fix problem when phone talking> <20131113> <mickal.ma>
 	if((res = hwmsen_get_interrupt_data(ID_PROXIMITY, &sensor_data)))
 		{
 		  APS_ERR("call hwmsen_get_interrupt_data fail = %d\n", res);
 		  goto EXIT_INTR_ERR;
 		}
 #endif
-	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);
+	mt_eint_unmask(CUST_EINT_ALS_NUM);
 	return;
 	EXIT_INTR_ERR:
-	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);
+	mt_eint_unmask(CUST_EINT_ALS_NUM);
 	APS_ERR("ap3220_eint_work err: %d\n", res);
 }
 /*----------------------------------------------------------------------------*/
@@ -1198,10 +1043,7 @@ static void ap3220_eint_func(void)
 	{
 		return;
 	}	
-//	APS_ERR("debug ap3220_eint_func!");
-//Ivan	
-	if (g_emu_int == 1)
-	    mt65xx_eint_mask(CUST_EINT_ALS_NUM);	
+	APS_ERR("debug ap3220_eint_func!");
 	schedule_work(&obj->eint_work);
 }
 
@@ -1215,13 +1057,13 @@ int ap3220_setup_eint(struct i2c_client *client)
 	mt_set_gpio_mode(GPIO_ALS_EINT_PIN, GPIO_ALS_EINT_PIN_M_EINT);
 	mt_set_gpio_pull_enable(GPIO_ALS_EINT_PIN, TRUE);
 	mt_set_gpio_pull_select(GPIO_ALS_EINT_PIN, GPIO_PULL_UP);
-
-	mt65xx_eint_set_sens(CUST_EINT_ALS_NUM, CUST_EINT_ALS_SENSITIVE);
-	mt65xx_eint_set_polarity(CUST_EINT_ALS_NUM, CUST_EINT_ALS_POLARITY);
-	mt65xx_eint_set_hw_debounce(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_CN);
-	mt65xx_eint_registration(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_EN, CUST_EINT_ALS_POLARITY, ap3220_eint_func, 0);
-
-	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);  
+	//LINE <alsps> <DATE20130701> <ap3220> zhangxiaofei removed
+	//mt_eint_set_sens(CUST_EINT_ALS_NUM, CUST_EINT_ALS_SENSITIVE); 
+	//mt_eint_set_polarity(CUST_EINT_ALS_NUM, CUST_EINT_ALS_POLARITY); 
+	mt_eint_set_hw_debounce(CUST_EINT_ALS_NUM, CUST_EINT_ALS_DEBOUNCE_CN);
+	mt_eint_registration(CUST_EINT_ALS_NUM, CUST_EINT_ALS_TYPE, ap3220_eint_func, 0);
+	
+	mt_eint_unmask(CUST_EINT_ALS_NUM);  
     return 0;
 }
 /*-------------------------------MISC device related------------------------------------------*/
@@ -1316,6 +1158,17 @@ static long ap3220_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned 
 				}
 				
 				dat = obj->ps;
+			    #if 1
+                            //LINE<JIRA_ID><DATE20130115><for ftm>zenghaihui
+                            if(obj->ps > atomic_read(&obj->ps_thd_val_high))
+                            {
+                                dat = 0;  /*close*/
+                            }
+                            else
+                            {
+                                dat = 1;  /*far*/
+                            }
+                            #endif
 				if(copy_to_user(ptr, &dat, sizeof(dat)))
 				{
 					err = -EFAULT;
@@ -1405,26 +1258,23 @@ static long ap3220_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned 
 					goto err_out;
 				}			   
 				break;
-			/*------------------------------------------------------------------------------------------*/
-			case ALSPS_GET_PS_THRESHOLD_HIGH:
+			/*case ALSPS_GET_PS_THRESHOLD_HIGH:
 				dat = atomic_read(&obj->ps_thd_val_high);
 				if(copy_to_user(ptr, &dat, sizeof(dat)))
 				{
 					err = -EFAULT;
 					goto err_out;
-				}			   			    
+				}		    
 			    break;
-			    
-			    
 			case ALSPS_GET_PS_THRESHOLD_LOW:
 				dat = atomic_read(&obj->ps_thd_val_low);
 				if(copy_to_user(ptr, &dat, sizeof(dat)))
 				{
 					err = -EFAULT;
 					goto err_out;
-				}			   			    
-			    break;
-			
+				}   			    
+			    break;*/
+			/*------------------------------------------------------------------------------------------*/
 			
 			default:
 				APS_ERR("%s not supported = 0x%04x", __FUNCTION__, cmd);
@@ -1494,6 +1344,145 @@ static void ap3220_late_resume(struct early_suspend *h)
 		}
 }
 /*--------------------------------------------------------------------------------*/
+
+//Begin: Jovan added : just use to modify the difference of S8513  between black and white  phone
+static int count_read_ps=0;    //jovan added 
+static int ap3220_read_flag=0;    //jovan added 
+static int ap3220_crosstalk_value=0;
+static int black_shift_high=0;
+static int black_shift_low=0;
+//#define	ap3220_udelay(n)	waiton_timer2(((n)*TICKS_PER_MS)/1000)
+static void ap3220_reset_all_vaule(void)
+{
+ count_read_ps=0;    //jovan added 
+ap3220_read_flag=0;    //jovan added 
+ap3220_crosstalk_value=0;
+black_shift_high=0;
+black_shift_low=0;
+}
+
+static int ap3220_modify_black_white(void)
+{
+
+	long res;
+	u8 databuf[2];
+	long int current_value;
+	long count_average=0;
+
+	//APS_LOG("Enter ap3220_modify_black_white jovan\n");
+	while(count_read_ps!=4)
+	{
+	if(count_read_ps==0)
+		{	
+			res = ap3220_i2c_write_reg(0x00,0x02);    //need 12.5ms 
+			mdelay(60);         		//wait for getting the PS_data as a condition
+			//APS_LOG("35ms later: count_read_ps = %x\n",count_read_ps);
+		}
+	if(count_read_ps!=0)
+		{
+			mdelay(35);			//wait for getting the crosstalk_value of white after modify!
+			//APS_LOG("get the crosstalk_value of white after modify: count_read_ps = %x\n",count_read_ps);
+		}
+	//res = ap3220_i2c_write_reg(0x00,0x03);
+//	APS_FUN(f);
+	res = ap3220_i2c_read_reg(AP3220_REG_SYS_PS_DATA_LOW,&databuf[0]);
+	res = ap3220_i2c_read_reg(AP3220_REG_SYS_PS_DATA_HIGH,&databuf[1]);
+	if(res < 0)
+	{
+		APS_ERR("i2c_master_send function err\n");
+	}
+	
+		//APS_LOG("AP3220_REG_PS_DATA value value_low = %x, value_high = %x\n",databuf[0],databuf[1]);
+	current_value = ((databuf[1] & 0x3f) << 4 |(databuf[0] & 0x0f));
+
+		//APS_LOG("ap3220_read_flag modify  ap3220_read_flag=%d  jovan\n",ap3220_read_flag);	
+		APS_LOG("ap3220_read_flag modify  current_value=%x,ap3220_crosstalk_value=%x jovan\n",current_value,ap3220_crosstalk_value);
+	count_read_ps++;
+	if(ap3220_read_flag==0)									//modify the black and white phone!
+	{
+	//	res = ap3220_i2c_write_reg(0x20,0x81);
+	//	res = ap3220_i2c_write_reg(0x21,0x20);
+	//	mdelay(50);
+		if(current_value>0x100)		//white   
+		{
+
+			ap3220_read_flag=1;	
+			black_shift_high=0;
+			black_shift_low=0;
+				//APS_LOG("ap3220_read_flag modify count_read_ps=%x,black_shift_high=%x,black_shift_low=%x jovan\n",count_read_ps,black_shift_high,black_shift_low);
+		}
+		else												//black
+		{
+			ap3220_read_flag=1;	
+			black_shift_high=0x104;
+			black_shift_low=0xA5;
+				//APS_LOG(" ap3220_read_flag modify count_read_ps=%x,black_shift_high=%x,black_shift_low=%x jovan\n",count_read_ps,black_shift_high,black_shift_low);
+		}
+			//APS_LOG("exit ap3220_read_flag modify  ap3220_read_flag=%d  jovan\n",ap3220_read_flag);
+	}
+	else													//for adding the classtalk 
+	{
+			
+			ap3220_crosstalk_value+=current_value;
+			if(count_read_ps!=2)
+			{
+				for(count_average=0;count_average<5;count_average++)
+				{
+
+					ap3220_crosstalk_value/=2;
+					if (count_average<4)
+					{
+						ap3220_crosstalk_value+=current_value;
+					}
+
+				}
+			}
+		}
+	}
+	
+	if (res < 0)
+	{
+		APS_ERR("ap3220_i2c_write_reg ERROR!!!\n");	    	    
+		return res;
+	}
+	else
+		return 0;
+}
+
+static int ap3220_threshold_high_low_reset(int th_high,int th_low)
+{
+	
+	u16 value_high,value_low;
+	int res = 0;
+
+	value_high=th_high+ap3220_crosstalk_value+black_shift_high;
+	value_low=th_low+ap3220_crosstalk_value+black_shift_low;
+
+	if(value_high>0x3a0)			//It is used to make sure the phone can work normally if  the ps-window has been covered with something when the initinal of P-sensor is going. 
+		{
+			value_high=0x265;
+			value_low=0x240;		
+			ap3220_crosstalk_value=0;
+			black_shift_high=0x149;
+			black_shift_low=0x1BB;
+			APS_LOG("The phone is covered with something when the initinal of P-sensor is going. And the value of threshold_high_low has be reset:ap3220_crosstalk_value=%x,black_shift_high=%x,black_shift_low=%x,th_high=%x,th_low=%x,value_high=%x,value_low=%x! @jovan\n",ap3220_crosstalk_value,black_shift_high,black_shift_low,th_high,th_low,value_high,value_low);
+		}
+	res = ap3220_i2c_write_reg(0x2A,value_low&0x0003);
+	res = ap3220_i2c_write_reg(0x2B,(value_low>>2)&0x00ff);
+	res = ap3220_i2c_write_reg(0x2C,value_high&0x0003);
+	res = ap3220_i2c_write_reg(0x2D,(value_high>>2)&0x00ff);
+
+	APS_LOG("The value of threshold_high_low has be reset:th_high=%x,th_low=%x,value_high=%x,value_low=%x! @jovan\n",th_high,th_low,value_high,value_low);
+	if(res < 0)
+		{
+			APS_ERR("i2c_master_send function err\n");
+			return res;
+		}
+	else 
+		return 0;
+}
+//End Jovan added 
+
 static int ap3220_init_client(struct i2c_client *client)
 {
 	struct ap3220_priv *obj = i2c_get_clientdata(client);
@@ -1502,7 +1491,11 @@ static int ap3220_init_client(struct i2c_client *client)
 	int res = 0;
 	u16 tmp_data;
 //ALS Range, 0 ~ 65536
-//ALS PERSIST	AP3220_ALS_SETTING_RANGE_16383
+//ALS PERSIST	
+	ap3220_read_flag=0;
+
+	APS_LOG("Enter ap3220_init_client jovan\n");
+
 	data = (AP3220_ALS_SETTING_RANGE_16383 << AP3220_ALS_RANGE_SHIFT) & AP3220_ALS_RANGE_MASK;
 	data2 = (AP3220_ALS_SETTING_PERSIST_1 << AP3220_ALS_PERSIST_SHIFT) & AP3220_ALS_PERSIST_MASK;
 	data |= data2;
@@ -1512,13 +1505,9 @@ static int ap3220_init_client(struct i2c_client *client)
 		APS_ERR("i2c_master_send function err\n");
 		goto EXIT_ERR;
 	}
-#ifdef ALS_AUTO_RANGE
-	g_als_range = AP3220_ALS_SETTING_RANGE_16383;
-#endif
-
 //Ivan FIXME tunnable value to be confirmed by HW
 //ALS Calibration 
-	data = 0xFE;				//0x40/64 = 1
+	data = 0x80;				//0x40/64 = 1
 	res = ap3220_i2c_write_reg(AP3220_REG_ALS_CAL,data);
 	if(res < 0)
 	{
@@ -1558,7 +1547,7 @@ static int ap3220_init_client(struct i2c_client *client)
 	}
 //ALS High Threshold H
 	data = tmp_data >> 8;		// Read from cust_alsps.c
-	APS_ERR("Ivan ALS High Threshold H = %x\n",data);
+	APS_ERR("Ivan ALS High Threshold H = %x\n",data);				
 	res = ap3220_i2c_write_reg(AP3220_REG_ALS_THDH_L,data);
 	if(res < 0)
 	{
@@ -1567,9 +1556,10 @@ static int ap3220_init_client(struct i2c_client *client)
 	}
 	
 //PS Configuration 
-	data = (AP3220_PS_SETTING_INTG_TIME_1 << AP3220_PS_INTEGEATED_TIME_SHIFT) & AP3220_PS_INTEGEATED_TIME_MASK;
+//LINE<JIRA_ID><DATE2013117><ps parameter modify>zhuxiankun
+	data = (AP3220_PS_SETTING_INTG_TIME_9 << AP3220_PS_INTEGEATED_TIME_SHIFT) & AP3220_PS_INTEGEATED_TIME_MASK;
 	data2 = (AP3220_PS_SETTING_GAIN_2 << AP3220_PS_GAIN_SHIFT) & AP3220_PS_GAIN_MASK;
-	data3 = (AP3220_PS_SETTING_PERSIST_4 << AP3220_PS_PERSIST_SHIFT) & AP3220_PS_PERSIST_MASK;	
+	data3 = (AP3220_PS_SETTING_PERSIST_2 << AP3220_PS_PERSIST_SHIFT) & AP3220_PS_PERSIST_MASK;	
 	data |= data2;
 	data |= data3;
 	res = ap3220_i2c_write_reg(AP3220_REG_PS_CONF,data);
@@ -1579,8 +1569,8 @@ static int ap3220_init_client(struct i2c_client *client)
 		goto EXIT_ERR;
 	}
 //PS LED Control
-	data = (AP3220_PS_SETTING_LED_PULSE_1 << AP3220_PS_LED_PULSE_SHIFT) & AP3220_PS_LED_PULSE_MASK;
-	data2 = (AP3220_PS_SETTING_LED_RATIO_66 << AP3220_PS_LED_RATIO_SHIFT) & AP3220_PS_LED_RATIO_MASK;
+	data = (AP3220_PS_SETTING_LED_PULSE_2<< AP3220_PS_LED_PULSE_SHIFT) & AP3220_PS_LED_PULSE_MASK;
+	data2 = (AP3220_PS_SETTING_LED_RATIO_16 << AP3220_PS_LED_RATIO_SHIFT) & AP3220_PS_LED_RATIO_MASK;
 	data |= data2;
 	res = ap3220_i2c_write_reg(AP3220_REG_PS_LED,data);
 	if(res < 0)
@@ -1597,7 +1587,8 @@ static int ap3220_init_client(struct i2c_client *client)
 		goto EXIT_ERR;
 	}
 //PS MEAN TIME
-	data = AP3220_PS_SETTING_PS_MEAN_12;
+//LINE<JIRA_ID><DATE2013117><ps parameter modify>zhuxiankun
+	data = AP3220_PS_SETTING_PS_MEAN_50;//AP3220_PS_SETTING_PS_MEAN_12; 
 	res = ap3220_i2c_write_reg(AP3220_REG_PS_MEAN_TIME,data);
 	if(res < 0)
 	{
@@ -1667,6 +1658,26 @@ static int ap3220_init_client(struct i2c_client *client)
 		APS_ERR("i2c_master_send function err\n");
 		goto EXIT_ERR;
 	}	
+
+	count_read_ps=0;    //jovan added 
+	ap3220_read_flag=0;    //jovan added 
+	ap3220_crosstalk_value=0;
+	black_shift_high=0;
+	black_shift_low=0;
+
+	res=ap3220_modify_black_white();     //get the average value.
+	if(res < 0)
+	{
+		APS_ERR("i2c_master_send function err\n");
+		goto EXIT_ERR;
+	}
+	res=ap3220_threshold_high_low_reset(atomic_read(&obj->ps_thd_val_high),atomic_read(&obj->ps_thd_val_low));
+	if(res < 0)
+	{
+		APS_ERR("i2c_master_send function err\n");
+		goto EXIT_ERR;
+	}
+
 //DEVICE POWER DOWN
 	data = 0;
 	res = ap3220_i2c_write_reg(AP3220_REG_SYS_CONF,data);
@@ -1698,7 +1709,8 @@ long ap3220_ps_operate(void* self, uint32_t command, void* buff_in, int size_in,
 		long err = 0;
 		int value;
 		hwm_sensor_data* sensor_data;
-		struct ap3220_priv *obj = (struct ap3220_priv *)self;		
+		struct ap3220_priv *obj = (struct ap3220_priv *)self;
+
 		APS_FUN(f);
 		switch (command)
 		{
@@ -1729,10 +1741,6 @@ long ap3220_ps_operate(void* self, uint32_t command, void* buff_in, int size_in,
 							return -1;
 						}
 						set_bit(CMC_BIT_PS, &obj->enable);
-//Ivan
-#ifdef TINNO_PS_STARTUP_IRQ
-						queue_delayed_work(ps_startup_irq_workqueue, &ps_startup_irq_work,STARTUP_IRQ_DELAY);
-#endif						
 					}
 					else
 					{
@@ -1926,6 +1934,19 @@ static int ap3220_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 	APS_LOG("ap3220_init_client() OK!\n");
 
+	//Begin: added by jovan @20131014
+
+	//recover_threshold_vale((obj->hw->ps_threshold_high)+ap3220_crosstalk_value+black_shift_high,(obj->hw->ps_threshold_low)+ap3220_crosstalk_value+black_shift_low);
+
+	atomic_set(&obj->ps_thd_val_high, (obj->hw->ps_threshold_high)+ap3220_crosstalk_value+black_shift_high);
+	atomic_set(&obj->ps_thd_val_low,  (obj->hw->ps_threshold_low)+ap3220_crosstalk_value+black_shift_low);
+	//atomic_set(&obj->ps_thd_val_high,  (obj->hw->ps_threshold_high)+ap3220_crosstalk_value+black_shift_high);
+	//atomic_set(&obj->ps_thd_val_low,  (obj->hw->ps_threshold_low)+ap3220_crosstalk_value+black_shift_low);
+
+
+	ap3220_reset_all_vaule();
+	
+	//end: added by jovan @20131014
 	if((err = misc_register(&ap3220_device)))
 	{
 		APS_ERR("ap3220_device register failed\n");
@@ -1966,16 +1987,6 @@ static int ap3220_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 	register_early_suspend(&obj->early_drv);
 	#endif
 
-#ifdef TINNO_PS_STARTUP_IRQ
-	ps_startup_irq_workqueue = create_workqueue("ps_startup_irq");
-	
-	INIT_DELAYED_WORK(&ps_startup_irq_work, ps_startup_irq_func);
-	
-//	queue_delayed_work(ps_startup_irq_workqueue, &ps_startup_irq_work,STARTUP_IRQ_DELAY);
-#endif
-#ifdef ALS_RANGE_DEBUG
-	currentBootMode = get_boot_mode();
-#endif	
 	APS_LOG("%s: OK\n", __func__);
 	return 0;
 
@@ -2046,6 +2057,8 @@ static int ap3220_probe(struct platform_device *pdev)
 		APS_ERR("add driver error\n");
 		return -1;
 	} 
+	//<Line> <add p-sensor wake_lock> <20131113> <mickal.ma>
+	wake_lock_init(&psensor_timer_lock, WAKE_LOCK_SUSPEND, "P-Sensor timer wakelock");
 	return 0;
 }
 /*----------------------------------------------------------------------------*/
@@ -2058,10 +2071,6 @@ static int ap3220_remove(struct platform_device *pdev)
 	ap3220_power(hw, 0);//*****************  
 	
 	i2c_del_driver(&ap3220_i2c_driver);
-	
-#ifdef TINNO_PS_STARTUP_IRQ
-	destroy_workqueue(ps_startup_irq_workqueue);
-#endif
 	return 0;
 }
 
@@ -2080,7 +2089,7 @@ static struct platform_driver ap3220_alsps_driver = {
 static int __init ap3220_init(void)
 {
 	APS_FUN();
-	i2c_register_board_info(3, &i2c_ap3220, 1);
+	i2c_register_board_info(2, &i2c_ap3220, 1);
 	if(platform_driver_register(&ap3220_alsps_driver))
 	{
 		APS_ERR("failed to register driver");

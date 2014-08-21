@@ -68,6 +68,7 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 int cust_isNeedAFLamp(int flashMode, int afLampMode, int isBvHigherTriger)
 {
 	if(flashMode==FLASHLIGHT_FORCE_OFF)
@@ -95,10 +96,7 @@ int cust_isNeedAFLamp(int flashMode, int afLampMode, int isBvHigherTriger)
     // AF_LAMP_AUTO,
     // AF_LAMP_FLASH,
 }
-int cust_isNeedDoPrecapAF(int isFocused, int flashMode, int afLampMode, int isBvLowerTriger)
-{	
-	return 0;
-}
+
 
 void copyTuningPara(FLASH_TUNING_PARA* p, NVRAM_FLASH_TUNING_PARA* nv_p)
 {
@@ -120,14 +118,12 @@ void copyTuningPara(FLASH_TUNING_PARA* p, NVRAM_FLASH_TUNING_PARA* nv_p)
 FLASH_PROJECT_PARA& cust_getFlashProjectPara(int aeMode, NVRAM_CAMERA_STROBE_STRUCT* nvrame)
 {
 	static FLASH_PROJECT_PARA para;
-#if defined (SGM3780_FLASHLIGHT /*CUSTOM_FLASHLIGHT_TYPE_sgm3780_flashlight*/)
+
 	para.dutyNum = 2;
-	para.stepNum = 1;	
-#else
-	para.dutyNum = 32;
-	para.stepNum = 8;
+	para.stepNum = 1;
 	//tuning
-#endif
+
+
 
 	if(nvrame!=0)
 	{
@@ -161,105 +157,54 @@ FLASH_PROJECT_PARA& cust_getFlashProjectPara(int aeMode, NVRAM_CAMERA_STROBE_STR
 	//eng level
 	//index mode
 	//torch
-#if defined (SGM3780_FLASHLIGHT)
-	para.engLevel.torchEngMode = ENUM_FLASH_ENG_INDEX_MODE;
-	para.engLevel.torchDuty = 0;		//0
-	para.engLevel.torchStep = 6;		//6
-
-	//af
-	para.engLevel.afEngMode = ENUM_FLASH_ENG_INDEX_MODE;
-	para.engLevel.afDuty = 0;		//0
-	para.engLevel.afStep = 6;		//6
-
-	//pf, mf, normal
-	para.engLevel.pmfEngMode = ENUM_FLASH_ENG_INDEX_MODE;
-	para.engLevel.pfDuty = 0;		//6
-	para.engLevel.mfDutyMax = 1;		//31
-	para.engLevel.mfDutyMin = 0;		//0
-	para.engLevel.pmfStep = 6;		//6
-
-	//low bat
-	para.engLevel.IChangeByVBatEn=0;	//0
-	para.engLevel.vBatL = 3400;	//mv
-	para.engLevel.pfDutyL = 0;		//6
-	para.engLevel.mfDutyMaxL = 1;		//31
-	para.engLevel.mfDutyMinL = 0;		//0
-	para.engLevel.pmfStepL = 6;		//6
-
-	//burst setting
-	para.engLevel.IChangeByBurstEn=1;	//1
-	para.engLevel.pfDutyB = 0;		//6
-	para.engLevel.mfDutyMaxB = 0;		//8
-	para.engLevel.mfDutyMinB = 0;		//0
-	para.engLevel.pmfStepB = 6;		//6
-
-	//--------------------
-	//cooling delay para
-	para.coolTimeOutPara.tabMode = ENUM_FLASH_ENG_INDEX_MODE;
-	para.coolTimeOutPara.tabNum = 4;
-	para.coolTimeOutPara.tabId[0]=0;
-	para.coolTimeOutPara.tabId[1]=8;
-	para.coolTimeOutPara.tabId[2]=16;
-	para.coolTimeOutPara.tabId[3]=32;
-	para.coolTimeOutPara.coolingTM[0]=0;
-	para.coolTimeOutPara.coolingTM[1]=0;
-	para.coolTimeOutPara.coolingTM[2]=3;
-	para.coolTimeOutPara.coolingTM[3]=6;
-
-	para.coolTimeOutPara.timOutMs[0]=ENUM_FLASH_TIME_NO_TIME_OUT;
-	para.coolTimeOutPara.timOutMs[1]=ENUM_FLASH_TIME_NO_TIME_OUT;
-	para.coolTimeOutPara.timOutMs[2]=400;
-	para.coolTimeOutPara.timOutMs[3]=400;
-#else
 	para.engLevel.torchEngMode = ENUM_FLASH_ENG_INDEX_MODE;
 	para.engLevel.torchDuty = 0;
-	para.engLevel.torchStep = 6;
+	para.engLevel.torchStep = 0;
 
 	//af
 	para.engLevel.afEngMode = ENUM_FLASH_ENG_INDEX_MODE;
 	para.engLevel.afDuty = 0;
-	para.engLevel.afStep = 6;
+	para.engLevel.afStep = 0;
 
 	//pf, mf, normal
 	para.engLevel.pmfEngMode = ENUM_FLASH_ENG_INDEX_MODE;
-	para.engLevel.pfDuty = 6;
-	para.engLevel.mfDutyMax = 31;
+	para.engLevel.pfDuty = 0;
+	para.engLevel.mfDutyMax = 1;
 	para.engLevel.mfDutyMin = 0;
-	para.engLevel.pmfStep = 6;
+	para.engLevel.pmfStep = 0;
 
 	//low bat
 	para.engLevel.IChangeByVBatEn=0;
 	para.engLevel.vBatL = 3400;	//mv
-	para.engLevel.pfDutyL = 6;
-	para.engLevel.mfDutyMaxL = 31;
+	para.engLevel.pfDutyL = 0;
+	para.engLevel.mfDutyMaxL = 1;
 	para.engLevel.mfDutyMinL = 0;
-	para.engLevel.pmfStepL = 6;
+	para.engLevel.pmfStepL = 0;
 
 	//burst setting
 	para.engLevel.IChangeByBurstEn=1;
-	para.engLevel.pfDutyB = 6;
-	para.engLevel.mfDutyMaxB = 8;
+	para.engLevel.pfDutyB = 0;
+	para.engLevel.mfDutyMaxB = 0;
 	para.engLevel.mfDutyMinB = 0;
-	para.engLevel.pmfStepB = 6;
+	para.engLevel.pmfStepB = 0;
 
 	//--------------------
 	//cooling delay para
 	para.coolTimeOutPara.tabMode = ENUM_FLASH_ENG_INDEX_MODE;
-	para.coolTimeOutPara.tabNum = 4;
+	para.coolTimeOutPara.tabNum = 2;
 	para.coolTimeOutPara.tabId[0]=0;
-	para.coolTimeOutPara.tabId[1]=8;
-	para.coolTimeOutPara.tabId[2]=16;
-	para.coolTimeOutPara.tabId[3]=32;
+	para.coolTimeOutPara.tabId[1]=1;
+
+
 	para.coolTimeOutPara.coolingTM[0]=0;
-	para.coolTimeOutPara.coolingTM[1]=0;
-	para.coolTimeOutPara.coolingTM[2]=3;
-	para.coolTimeOutPara.coolingTM[3]=6;
+	para.coolTimeOutPara.coolingTM[1]=5;
+
 
 	para.coolTimeOutPara.timOutMs[0]=ENUM_FLASH_TIME_NO_TIME_OUT;
-	para.coolTimeOutPara.timOutMs[1]=ENUM_FLASH_TIME_NO_TIME_OUT;
-	para.coolTimeOutPara.timOutMs[2]=400;
-	para.coolTimeOutPara.timOutMs[3]=400;
-#endif	
+	para.coolTimeOutPara.timOutMs[1]=400;
+
+	para.maxCapExpTimeUs = 100000;
+
 	/*
 	//---------------
 	//current mode, for mtk internal pmic
@@ -305,7 +250,6 @@ FLASH_PROJECT_PARA& cust_getFlashProjectPara(int aeMode, NVRAM_CAMERA_STROBE_STR
 	para.engLevel.toleranceI = 200;
 	para.engLevel.toleranceV = 200;
 	*/
-
 	if(nvrame!=0)
 	{
 		if(nvrame->isTorchEngUpdate)

@@ -374,6 +374,7 @@ static void mt65xx_mon_trace_start(struct trace_array *tr)
         kt = ktime_set(0, mon_period_ns);
         hrtimer_restart(&timer);       
     }    
+    mtk_mon->enable();
 }
 
 static void mt65xx_mon_trace_stop(struct trace_array *tr)

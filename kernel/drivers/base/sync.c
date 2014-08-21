@@ -31,6 +31,12 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sync.h>
 
+// [MTK] {{{
+// disalbe these logs temporarily
+// TODO: redirect these logs to proc_fs
+//#define SYNC_OBJ_DEBUG
+// [MTK] }}}
+
 static void sync_fence_signal_pt(struct sync_pt *pt);
 static int _sync_pt_has_signaled(struct sync_pt *pt);
 static void sync_fence_free(struct kref *kref);
@@ -312,65 +318,39 @@ EXPORT_SYMBOL(sync_fence_create);
 
 static int sync_fence_copy_pts(struct sync_fence *dst, struct sync_fence *src)
 {
-	struct list_head *pos;
+	struct list_head *pos, *test_pos;
 
 	list_for_each(pos, &src->pt_list_head) {
 		struct sync_pt *orig_pt =
 			container_of(pos, struct sync_pt, pt_list);
-		struct sync_pt *new_pt = sync_pt_dup(orig_pt);
+		struct sync_pt *new_pt;
+
+		/* Skip already signaled points */
+		if (1 == orig_pt->status)
+			continue;
+
+		list_for_each(test_pos, &src->pt_list_head) {
+			struct sync_pt *test_pt =
+				container_of(pos, struct sync_pt, pt_list);
+			if (orig_pt->parent == test_pt->parent) {
+				int diff;
+				diff = orig_pt->parent->ops->compare(orig_pt, test_pt);
+				if (diff == -1) {
+					/* Skip orig_pt; another point will
+					 * signal after it */
+					continue;
+				}
+				break;
+			}
+		}
+
+		new_pt = sync_pt_dup(orig_pt);
 
 		if (new_pt == NULL)
 			return -ENOMEM;
 
 		new_pt->fence = dst;
 		list_add(&new_pt->pt_list, &dst->pt_list_head);
-	}
-
-	return 0;
-}
-
-static int sync_fence_merge_pts(struct sync_fence *dst, struct sync_fence *src)
-{
-	struct list_head *src_pos, *dst_pos, *n;
-
-	list_for_each(src_pos, &src->pt_list_head) {
-		struct sync_pt *src_pt =
-			container_of(src_pos, struct sync_pt, pt_list);
-		bool collapsed = false;
-
-		list_for_each_safe(dst_pos, n, &dst->pt_list_head) {
-			struct sync_pt *dst_pt =
-				container_of(dst_pos, struct sync_pt, pt_list);
-			/* collapse two sync_pts on the same timeline
-			 * to a single sync_pt that will signal at
-			 * the later of the two
-			 */
-			if (dst_pt->parent == src_pt->parent) {
-				if (dst_pt->parent->ops->compare(dst_pt, src_pt) == -1) {
-					struct sync_pt *new_pt =
-						sync_pt_dup(src_pt);
-					if (new_pt == NULL)
-						return -ENOMEM;
-
-					new_pt->fence = dst;
-					list_replace(&dst_pt->pt_list,
-						     &new_pt->pt_list);
-					sync_pt_free(dst_pt);
-				}
-				collapsed = true;
-				break;
-			}
-		}
-
-		if (!collapsed) {
-			struct sync_pt *new_pt = sync_pt_dup(src_pt);
-
-			if (new_pt == NULL)
-				return -ENOMEM;
-
-			new_pt->fence = dst;
-			list_add(&new_pt->pt_list, &dst->pt_list_head);
-		}
 	}
 
 	return 0;
@@ -449,8 +429,8 @@ static int sync_fence_get_status(struct sync_fence *fence)
 struct sync_fence *sync_fence_merge(const char *name,
 				    struct sync_fence *a, struct sync_fence *b)
 {
-	struct sync_fence *fence;
 	struct list_head *pos;
+	struct sync_fence *fence;
 	int err;
 
 	fence = sync_fence_alloc(name);
@@ -461,9 +441,18 @@ struct sync_fence *sync_fence_merge(const char *name,
 	if (err < 0)
 		goto err;
 
-	err = sync_fence_merge_pts(fence, b);
+	err = sync_fence_copy_pts(fence, b);
 	if (err < 0)
 		goto err;
+
+	/* Make sure there is at least one point in the fence */
+	if (list_empty(&fence->pt_list_head)) {
+		struct sync_pt *orig_pt = list_first_entry(&a->pt_list_head, struct sync_pt, pt_list);
+		struct sync_pt *new_pt = sync_pt_dup(orig_pt);
+
+		new_pt->fence = fence;
+		list_add(&new_pt->pt_list, &fence->pt_list_head);
+	}
 
 	list_for_each(pos, &fence->pt_list_head) {
 		struct sync_pt *pt =
@@ -616,9 +605,11 @@ int sync_fence_wait(struct sync_fence *fence, long timeout)
 	}
 
 	if (fence->status == 0) {
-		pr_info("fence timeout on [%p] after %dms\n", fence,
-			jiffies_to_msecs(timeout));
-		sync_dump();
+		if (timeout > 0) {
+			pr_info("fence timeout on [%p] after %dms\n", fence,
+				jiffies_to_msecs(timeout));
+			sync_dump();
+		}
 		return -ETIME;
 	}
 
@@ -852,6 +843,12 @@ static const char *sync_status_str(int status)
 static void sync_print_pt(struct seq_file *s, struct sync_pt *pt, bool fence)
 {
 	int status = pt->status;
+
+    // [MTK] {{{
+    // only dump non-signaled fence
+    if (status > 0) return;
+    // [MTK] }}}
+
 	seq_printf(s, "  %s%spt %s",
 		   fence ? pt->parent->name : "",
 		   fence ? "_" : "",
@@ -879,6 +876,8 @@ static void sync_print_pt(struct seq_file *s, struct sync_pt *pt, bool fence)
 	seq_printf(s, "\n");
 }
 
+// [MTK] {{{
+#ifdef SYNC_OBJ_DEBUG
 static void sync_print_obj(struct seq_file *s, struct sync_timeline *obj)
 {
 	struct list_head *pos;
@@ -905,6 +904,8 @@ static void sync_print_obj(struct seq_file *s, struct sync_timeline *obj)
 	}
 	spin_unlock_irqrestore(&obj->child_list_lock, flags);
 }
+#endif
+// [MTK] }}}
 
 static void sync_print_fence(struct seq_file *s, struct sync_fence *fence)
 {
@@ -936,6 +937,8 @@ static int sync_debugfs_show(struct seq_file *s, void *unused)
 	unsigned long flags;
 	struct list_head *pos;
 
+    // [MTK] {{{
+#ifdef SYNC_OBJ_DEBUG
 	seq_printf(s, "objs:\n--------------\n");
 
 	spin_lock_irqsave(&sync_timeline_list_lock, flags);
@@ -948,6 +951,8 @@ static int sync_debugfs_show(struct seq_file *s, void *unused)
 		seq_printf(s, "\n");
 	}
 	spin_unlock_irqrestore(&sync_timeline_list_lock, flags);
+#endif
+    // [MTK] }}}
 
 	seq_printf(s, "fences:\n--------------\n");
 
@@ -955,6 +960,11 @@ static int sync_debugfs_show(struct seq_file *s, void *unused)
 	list_for_each(pos, &sync_fence_list_head) {
 		struct sync_fence *fence =
 			container_of(pos, struct sync_fence, sync_fence_list);
+
+        // [MTK] {{{
+        // only dump non-signaled fence
+        if (fence->status > 0) continue;
+        // [MTK] }}}
 
 		sync_print_fence(s, fence);
 		seq_printf(s, "\n");

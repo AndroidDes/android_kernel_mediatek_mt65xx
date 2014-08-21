@@ -15,6 +15,6 @@
 #define CFG_DISPLAY_HEIGHT      (DISP_GetScreenHeight())
 #define CFG_DISPLAY_BPP         (16)
 
-#define CFG_POWER_CHARGING
+//#define CFG_POWER_CHARGING
 
 #endif

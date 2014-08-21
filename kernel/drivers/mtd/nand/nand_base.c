@@ -164,12 +164,15 @@ static void nand_release_device(struct mtd_info *mtd)
 	/* Release the controller and the chip */
 	spin_lock(&chip->controller->lock);
 	chip->controller->active = NULL;
+#ifdef CONFIG_MTK_MTD_NAND
+      if(chip->state!=FL_READY&&chip->state!= FL_PM_SUSPENDED)
+      {
+        nand_disable_clock();
+      }
+#endif
 	chip->state = FL_READY;
 	wake_up(&chip->controller->wq);
 	spin_unlock(&chip->controller->lock);
-#ifdef CONFIG_MTK_MTD_NAND
-    nand_disable_clock();
-#endif
 }
 
 /**
@@ -840,11 +843,14 @@ retry:
 		chip->controller->active = chip;
 
 	if (chip->controller->active == chip && chip->state == FL_READY) {
+#ifdef CONFIG_MTK_MTD_NAND
+       if(new_state!=FL_READY&&new_state!= FL_PM_SUSPENDED)
+       {
+           nand_enable_clock();
+       }
+#endif
 		chip->state = new_state;
 		spin_unlock(lock);
-#ifdef CONFIG_MTK_MTD_NAND
-            nand_enable_clock();
-#endif
 		return 0;
 	}
 	if (new_state == FL_PM_SUSPENDED) {
@@ -1866,7 +1872,7 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
 
 #ifdef CONFIG_MTK_MTD_NAND
         oob_checksum = 0;
-        for (i = 0; 
+        for (i = 0;
                 i < MTD_MAX_OOBFREE_ENTRIES && chip->ecc.layout->oobfree[i].length;
                 i++)
         {
@@ -2376,7 +2382,7 @@ static int panic_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
 	struct nand_chip *chip = mtd->priv;
 	struct mtd_oob_ops ops;
 	int ret;
-	
+
 #ifdef CONFIG_MTK_MTD_NAND
 	nand_enable_clock();
 #endif

@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "val_types.h"
+#include "val_types_private.h"
 #include "hal_api.h"
 
 typedef VAL_UINT32_T (*fgPrepare32FN)(VAL_HANDLE_T *a_phBitsHandle);

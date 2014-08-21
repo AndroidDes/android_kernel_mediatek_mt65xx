@@ -3925,9 +3925,23 @@ WLAN_STATUS wfdChangeMediaState(
 
 
 
+BOOLEAN
+p2pFuncIsChannelGrant (
+    IN P_ADAPTER_T prAdapter
+    )
+{
+    P_P2P_FSM_INFO_T prP2pFsmInfo = (P_P2P_FSM_INFO_T)NULL;
+
+    if (prAdapter == NULL)
+        return FALSE;
+
+    prP2pFsmInfo = prAdapter->rWifiVar.prP2pFsmInfo;
 
 
+    if (prP2pFsmInfo == NULL) 
+        return FALSE;
 
-
-
+    return (prP2pFsmInfo->eCurrentState == P2P_STATE_CHNL_ON_HAND);
+    
+} /* p2pFuncIsChannelGrant */
 

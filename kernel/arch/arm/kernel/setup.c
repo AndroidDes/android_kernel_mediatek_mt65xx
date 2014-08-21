@@ -543,10 +543,10 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
 
         if (bank->size) {
             MTK_MEMCFG_LOG_AND_PRINTK(KERN_ALERT
-                    "[PHY layout]kernel   :   0x%08lx - 0x%08lx  (0x%08lx)\n",
-                    (unsigned long)bank->start, 
-                    (unsigned long)(bank->start + bank->size - 1), 
-                    (unsigned long)bank->size);
+                    "[PHY layout]kernel   :   0x%llx - 0x%llx  (0x%llx)\n",
+                    (unsigned long long)bank->start, 
+                    (unsigned long long)(bank->start + bank->size - 1), 
+                    (unsigned long long)bank->size);
         }
 
 	/*

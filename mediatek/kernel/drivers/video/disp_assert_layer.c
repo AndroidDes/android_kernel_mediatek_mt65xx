@@ -1,33 +1,28 @@
-#ifdef BUILD_UBOOT
-#include <asm/arch/disp_drv_platform.h>
-#else
+#include <mach/mt_typedefs.h>
+#include <linux/types.h>
 #include "disp_drv.h"
-#include "disp_drv_platform.h"
+#include "ddp_hal.h"
 #include "disp_drv_log.h"
 #include <linux/disp_assert_layer.h>
 #include <linux/semaphore.h>
 #include <linux/mutex.h>
-#include "ddp_ovl.h"
-
-#endif
 
 ///common part
 #define DAL_BPP             (2)
 #define DAL_WIDTH           (DISP_GetScreenWidth())
 #define DAL_HEIGHT          (DISP_GetScreenHeight())
 
-#ifdef CONFIG_MTK_FB_SUPPORT_ASSERTION_LAYER
+#ifdef MTKFB_DISP_ASSERT_LAYER_ENABLE
 
 #include <linux/string.h>
 #include <linux/semaphore.h>
 #include <asm/cacheflush.h>
 #include <linux/module.h>
 
-#include "lcd_drv.h"
 #include "mtkfb_console.h"
 
 // ---------------------------------------------------------------------------
-#define DAL_FORMAT          (OVL_INPUT_FORMAT_RGB565)
+#define DAL_FORMAT          (eRGB565)
 #define DAL_BG_COLOR        (dal_bg_color)
 #define DAL_FG_COLOR        (dal_fg_color)
 
@@ -57,18 +52,6 @@
         MFC_STATUS ret = (expr);                                            \
         if (MFC_STATUS_OK != ret) {                                         \
             DISP_LOG_PRINT(ANDROID_LOG_WARN, "DAL", "Warning: call MFC_XXX function failed "           \
-                   "in %s(), line: %d, ret: %x\n",                          \
-                   __FUNCTION__, __LINE__, ret);                            \
-            return ret;                                                     \
-        }                                                                   \
-    } while (0)
-
-
-#define DAL_CHECK_LCD_RET(expr)                                             \
-    do {                                                                    \
-        LCD_STATUS ret = (expr);                                            \
-        if (LCD_STATUS_OK != ret) {                                         \
-            DISP_LOG_PRINT(ANDROID_LOG_WARN, "DAL", "Warning: call LCD_XXX function failed "           \
                    "in %s(), line: %d, ret: %x\n",                          \
                    __FUNCTION__, __LINE__, ret);                            \
             return ret;                                                     \
@@ -156,14 +139,23 @@ static DAL_STATUS Show_LowMemory(void)
 	MFC_CONTEXT *ctxt = (MFC_CONTEXT *)mfc_handle;
 
 	if(!dal_shown){//only need show lowmemory assert
-			update_width = ctxt->font_width * strlen(low_memory_msg);
-			update_height = ctxt->font_height;
-			DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "update size:%d,%d",update_width, update_height);
-			DAL_CHECK_LCD_RET(LCD_LayerSetOffset(ASSERT_LAYER, DAL_WIDTH - update_width,0));
-			DAL_CHECK_LCD_RET(LCD_LayerSetWindowOffset(ASSERT_LAYER, DAL_WIDTH - update_width,0));
-    		DAL_CHECK_LCD_RET(LCD_LayerSetSize(ASSERT_LAYER,
-                                       update_width,update_height));
-			DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, TRUE));
+		update_width = ctxt->font_width * strlen(low_memory_msg);
+		update_height = ctxt->font_height;
+		DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "update size:%d,%d",update_width, update_height);
+        mutex_lock(&OverlaySettingMutex);
+        cached_layer_config[ASSERT_LAYER].src_x = DAL_WIDTH - update_width;
+        cached_layer_config[ASSERT_LAYER].src_y = 0;
+        cached_layer_config[ASSERT_LAYER].src_w = update_width;
+        cached_layer_config[ASSERT_LAYER].src_h = update_height;
+        cached_layer_config[ASSERT_LAYER].dst_x = DAL_WIDTH - update_width;
+        cached_layer_config[ASSERT_LAYER].dst_y = 0;
+        cached_layer_config[ASSERT_LAYER].dst_w = update_width;
+        cached_layer_config[ASSERT_LAYER].dst_h = update_height;
+        cached_layer_config[ASSERT_LAYER].layer_en= TRUE;
+        cached_layer_config[ASSERT_LAYER].isDirty = true;
+        atomic_set(&OverlaySettingDirtyFlag, 1);
+        atomic_set(&OverlaySettingApplied, 0);
+        mutex_unlock(&OverlaySettingMutex);
 	}
 /*
 	if(!dal_lowMemory_shown)
@@ -202,16 +194,6 @@ DAL_STATUS DAL_Init(UINT32 layerVA, UINT32 layerPA)
 
     //DAL_Clean();
     DAL_SetRedScreen((UINT32 *)dal_fb_addr);
-#if 0
-    DAL_CHECK_LCD_RET(LCD_LayerSetAddress(ASSERT_LAYER, layerPA));
-    DAL_CHECK_LCD_RET(LCD_LayerSetFormat(ASSERT_LAYER, DAL_FORMAT));
-    DAL_CHECK_LCD_RET(LCD_LayerSetAlphaBlending(ASSERT_LAYER, TRUE, 0x80));
-    DAL_CHECK_LCD_RET(LCD_LayerSetOffset(ASSERT_LAYER, 0, 0));
-    DAL_CHECK_LCD_RET(LCD_LayerSetSize(ASSERT_LAYER,
-                                       DAL_WIDTH,
-                                       DAL_HEIGHT));
-    DAL_CHECK_LCD_RET(LCD_LayerSetPitch(ASSERT_LAYER, DAL_WIDTH * DAL_BPP));
-#endif
     return DAL_STATUS_OK;
 }
 
@@ -230,6 +212,47 @@ DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
     return DAL_STATUS_OK;
 }
 
+DAL_STATUS DAL_Dynamic_Change_FB_Layer(unsigned int isAEEEnabled)
+{
+    static int ui_layer_tdshp = 0;
+
+    printk("[DDP] DAL_Dynamic_Change_FB_Layer, isAEEEnabled=%d \n", isAEEEnabled);
+    
+    if(DISP_DEFAULT_UI_LAYER_ID==DISP_CHANGED_UI_LAYER_ID)
+    {
+    	 printk("[DDP] DAL_Dynamic_Change_FB_Layer, no dynamic switch \n");
+    	 return DAL_STATUS_OK;
+    }
+    
+    if(isAEEEnabled==1)
+    {
+        // change ui layer from DISP_DEFAULT_UI_LAYER_ID to DISP_CHANGED_UI_LAYER_ID
+        memcpy((void*)(&cached_layer_config[DISP_CHANGED_UI_LAYER_ID]), 
+               (void*)(&cached_layer_config[DISP_DEFAULT_UI_LAYER_ID]), 
+               sizeof(OVL_CONFIG_STRUCT));
+        ui_layer_tdshp = cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isTdshp;
+        cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isTdshp = 0;
+        disp_path_change_tdshp_status(DISP_DEFAULT_UI_LAYER_ID, 0); // change global variable value, else error-check will find layer 2, 3 enable tdshp together
+        FB_LAYER = DISP_CHANGED_UI_LAYER_ID;
+    }
+    else
+    {
+        memcpy((void*)(&cached_layer_config[DISP_DEFAULT_UI_LAYER_ID]), 
+               (void*)(&cached_layer_config[DISP_CHANGED_UI_LAYER_ID]), 
+               sizeof(OVL_CONFIG_STRUCT));
+        cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isTdshp = ui_layer_tdshp;
+        FB_LAYER = DISP_DEFAULT_UI_LAYER_ID;
+        memset((void*)(&cached_layer_config[DISP_CHANGED_UI_LAYER_ID]), 0, sizeof(OVL_CONFIG_STRUCT));
+    }
+
+    // no matter memcpy or memset, layer ID should not be changed
+    cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].layer = DISP_DEFAULT_UI_LAYER_ID;
+    cached_layer_config[DISP_CHANGED_UI_LAYER_ID].layer = DISP_CHANGED_UI_LAYER_ID;
+    cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isDirty = 1;
+    cached_layer_config[DISP_CHANGED_UI_LAYER_ID].isDirty = 1;
+
+    return DAL_STATUS_OK;
+}
 
 DAL_STATUS DAL_Clean(void)
 {
@@ -265,14 +288,14 @@ DAL_STATUS DAL_Clean(void)
         DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "can't get semaphore in DAL_Clean()\n");
         goto End;
     }
-		//xuecheng, for debug
+    //xuecheng, for debug
 #if 0
-	if(is_early_suspended){
-		up(&sem_early_suspend);
-		DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "dal_clean in power off\n");
-		goto End;
-	}
-	#endif
+    if(is_early_suspended){
+        up(&sem_early_suspend);
+        DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "dal_clean in power off\n");
+        goto End;
+    }
+#endif
     up(&sem_early_suspend);
 
     mutex_lock(&OverlaySettingMutex);
@@ -280,27 +303,28 @@ DAL_STATUS DAL_Clean(void)
     //TODO: if dal_shown=false, and 3D enabled, mtkfb may disable UI layer, please modify 3D driver
     if(isAEEEnabled==1)
     {
-        DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, FALSE));
+        cached_layer_config[ASSERT_LAYER].layer_en= FALSE;
+        cached_layer_config[ASSERT_LAYER].isDirty = true;
         
         // DAL disable, switch UI layer to default layer 3
         printk("[DDP]* isAEEEnabled from 1 to 0, %d \n", dal_clean_cnt++);
         isAEEEnabled = 0;
-        DAL_CHECK_LCD_RET(LCD_Dynamic_Change_FB_Layer(isAEEEnabled));  // restore UI layer to DEFAULT_UI_LAYER
+        DAL_Dynamic_Change_FB_Layer(isAEEEnabled);  // restore UI layer to DEFAULT_UI_LAYER
     }
     
     dal_shown = FALSE;
 #ifdef DAL_LOWMEMORY_ASSERT
    	if (dal_lowMemory_shown) {//only need show lowmemory assert
 		UINT32 LOWMEMORY_FG_COLOR = MAKE_TWO_RGB565_COLOR(DAL_LOWMEMORY_FG_COLOR, DAL_LOWMEMORY_FG_COLOR);
-		UINT32 LOWMEMORY_BG_COLOR = MAKE_TWO_RGB565_COLOR(DAL_LOWMEMORY_BG_COLOR, DAL_LOWMEMORY_BG_COLOR);
-
-		DAL_CHECK_MFC_RET(MFC_LowMemory_Printf(mfc_handle, low_memory_msg, LOWMEMORY_FG_COLOR, LOWMEMORY_BG_COLOR));
-		Show_LowMemory();
-   	}
-	dal_enable_when_resume_lowmemory = FALSE;
-	dal_disable_when_resume_lowmemory = FALSE;
+        UINT32 LOWMEMORY_BG_COLOR = MAKE_TWO_RGB565_COLOR(DAL_LOWMEMORY_BG_COLOR, DAL_LOWMEMORY_BG_COLOR);
+        
+        DAL_CHECK_MFC_RET(MFC_LowMemory_Printf(mfc_handle, low_memory_msg, LOWMEMORY_FG_COLOR, LOWMEMORY_BG_COLOR));
+        Show_LowMemory();
+    }
+    dal_enable_when_resume_lowmemory = FALSE;
+    dal_disable_when_resume_lowmemory = FALSE;
 #endif
-	dal_disable_when_resume = FALSE;
+    dal_disable_when_resume = FALSE;
     atomic_set(&OverlaySettingDirtyFlag, 1);
     atomic_set(&OverlaySettingApplied, 0);
     mutex_unlock(&OverlaySettingMutex);
@@ -310,32 +334,61 @@ DAL_STATUS DAL_Clean(void)
                                          DAL_WIDTH,
                                          DAL_HEIGHT));
                                          
-	
+
 End:
-	DAL_UNLOCK();
+    DAL_UNLOCK();
     return ret;
 }
 
 
 DAL_STATUS DAL_Printf(const char *fmt, ...)
 {
-	va_list args;
-	uint i;
+    va_list args;
+    uint i;
     DAL_STATUS ret = DAL_STATUS_OK;
+
     //printk("[MTKFB_DAL] DAL_Printf mfc_handle=0x%08X, fmt=0x%08X\n", mfc_handle, fmt);
     if (NULL == mfc_handle) 
         return DAL_STATUS_NOT_READY;
-
+    
     if (NULL == fmt)
         return DAL_STATUS_INVALID_ARGUMENT;
-
+    
     DAL_LOCK();
+     if(isAEEEnabled==0)
+    {
+        printk("[DDP] isAEEEnabled from 0 to 1, ASSERT_LAYER=%d, dal_fb_pa %x\n", 
+            ASSERT_LAYER, dal_fb_pa);
+            
+        isAEEEnabled = 1;
+        DAL_Dynamic_Change_FB_Layer(isAEEEnabled); // default_ui_ layer coniig to changed_ui_layer
+        
+        DAL_CHECK_MFC_RET(MFC_Open(&mfc_handle, dal_fb_addr,
+                                   DAL_WIDTH, DAL_HEIGHT, DAL_BPP,
+                                   DAL_FG_COLOR, DAL_BG_COLOR));        
+        //DAL_Clean();  
+              
+        cached_layer_config[ASSERT_LAYER].addr = dal_fb_pa;
+        cached_layer_config[ASSERT_LAYER].alpha = 0x80;
+        cached_layer_config[ASSERT_LAYER].aen = TRUE;
+        cached_layer_config[ASSERT_LAYER].src_pitch = DAL_WIDTH * DAL_BPP;
+		cached_layer_config[ASSERT_LAYER].fmt= DAL_FORMAT;
+		cached_layer_config[ASSERT_LAYER].src_x = 0;
+		cached_layer_config[ASSERT_LAYER].src_y = 0;
+		cached_layer_config[ASSERT_LAYER].src_w = DAL_WIDTH;
+		cached_layer_config[ASSERT_LAYER].src_h = DAL_HEIGHT;
+		cached_layer_config[ASSERT_LAYER].dst_x = 0;
+		cached_layer_config[ASSERT_LAYER].dst_y = 0;
+		cached_layer_config[ASSERT_LAYER].dst_w = DAL_WIDTH;
+		cached_layer_config[ASSERT_LAYER].dst_h = DAL_HEIGHT;
+        cached_layer_config[ASSERT_LAYER].layer_en= TRUE;
+        cached_layer_config[ASSERT_LAYER].isDirty = true;
 
-	va_start (args, fmt);
-	i = vsprintf(dal_print_buffer, fmt, args);
-        BUG_ON(i>=ARRAY_SIZE(dal_print_buffer));
-	va_end (args);
-
+    }
+    va_start (args, fmt);
+    i = vsprintf(dal_print_buffer, fmt, args);
+    BUG_ON(i>=ARRAY_SIZE(dal_print_buffer));
+    va_end (args);
     DAL_CHECK_MFC_RET(MFC_Print(mfc_handle, dal_print_buffer));
 
     flush_cache_all();
@@ -352,11 +405,11 @@ DAL_STATUS DAL_Printf(const char *fmt, ...)
     }
 
 #if 0
-	if(is_early_suspended){
-		up(&sem_early_suspend);
-		DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "DAL_Printf in power off\n");
-		goto End;
-	}
+    if(is_early_suspended){
+        up(&sem_early_suspend);
+        DISP_LOG_PRINT(ANDROID_LOG_INFO, "DAL", "DAL_Printf in power off\n");
+        goto End;
+    }
 #endif
     up(&sem_early_suspend);
 
@@ -367,35 +420,7 @@ DAL_STATUS DAL_Printf(const char *fmt, ...)
     }
 
     //DAL enable, switch ui layer from default 3 to 2
-    if(isAEEEnabled==0)
-    {
-        printk("[DDP] isAEEEnabled from 0 to 1, ASSERT_LAYER=%d, dal_fb_pa %x\n", 
-            ASSERT_LAYER, dal_fb_pa);
-            
-        isAEEEnabled = 1;
-        DAL_CHECK_LCD_RET(LCD_Dynamic_Change_FB_Layer(isAEEEnabled)); // default_ui_ layer coniig to changed_ui_layer
-        
-        DAL_CHECK_MFC_RET(MFC_Open(&mfc_handle, dal_fb_addr,
-                                   DAL_WIDTH, DAL_HEIGHT, DAL_BPP,
-                                   DAL_FG_COLOR, DAL_BG_COLOR));        
-        //DAL_Clean();        
-        DAL_CHECK_LCD_RET(LCD_LayerSetAddress(ASSERT_LAYER, dal_fb_pa));
-        DAL_CHECK_LCD_RET(LCD_LayerSetAlphaBlending(ASSERT_LAYER, TRUE, 0x80));
-        DAL_CHECK_LCD_RET(LCD_LayerSetPitch(ASSERT_LAYER, DAL_WIDTH * DAL_BPP));  
-		cached_layer_config[ASSERT_LAYER].fmt= DAL_FORMAT;
-		cached_layer_config[ASSERT_LAYER].src_x = 0;
-		cached_layer_config[ASSERT_LAYER].src_y = 0;
-		cached_layer_config[ASSERT_LAYER].src_w = DAL_WIDTH;
-		cached_layer_config[ASSERT_LAYER].src_h = DAL_HEIGHT;
-		cached_layer_config[ASSERT_LAYER].dst_x = 0;
-		cached_layer_config[ASSERT_LAYER].dst_y = 0;
-		cached_layer_config[ASSERT_LAYER].dst_w = DAL_WIDTH;
-		cached_layer_config[ASSERT_LAYER].dst_h = DAL_HEIGHT;
-        DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, TRUE));
-
-        printk("after AEE config LCD layer 3: \n");
-        LCD_Dump_Layer_Info();
-    }
+   
     atomic_set(&OverlaySettingDirtyFlag, 1);
     atomic_set(&OverlaySettingApplied, 0);
     mutex_unlock(&OverlaySettingMutex);
@@ -416,16 +441,27 @@ DAL_STATUS DAL_OnDispPowerOn(void)
 
     /* Re-enable assertion layer when display resumes */
     
-    if (LCD_STATE_POWER_OFF != LCD_GetState()){
-		if(dal_enable_when_resume) {
+    if (is_early_suspended)
+    {
+		if(dal_enable_when_resume) 
+		{
         	dal_enable_when_resume = FALSE;
-        	if (!dal_shown) {
-				DAL_CHECK_LCD_RET(LCD_LayerSetWindowOffset(ASSERT_LAYER,0,0));
-				DAL_CHECK_LCD_RET(LCD_LayerSetOffset(ASSERT_LAYER, 0,0));
-   				DAL_CHECK_LCD_RET(LCD_LayerSetSize(ASSERT_LAYER,
-                                       DAL_WIDTH,
-                                       DAL_HEIGHT));
-            	DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, TRUE));
+        	if (!dal_shown) 
+        	{
+                mutex_lock(&OverlaySettingMutex);
+        		cached_layer_config[ASSERT_LAYER].src_x = 0;
+        		cached_layer_config[ASSERT_LAYER].src_y = 0;
+        		cached_layer_config[ASSERT_LAYER].src_w = DAL_WIDTH;
+        		cached_layer_config[ASSERT_LAYER].src_h = DAL_HEIGHT;
+        		cached_layer_config[ASSERT_LAYER].dst_x = 0;
+        		cached_layer_config[ASSERT_LAYER].dst_y = 0;
+        		cached_layer_config[ASSERT_LAYER].dst_w = DAL_WIDTH;
+        		cached_layer_config[ASSERT_LAYER].dst_h = DAL_HEIGHT;
+                cached_layer_config[ASSERT_LAYER].layer_en= TRUE;
+                cached_layer_config[ASSERT_LAYER].isDirty = true;
+                atomic_set(&OverlaySettingDirtyFlag, 1);
+                atomic_set(&OverlaySettingApplied, 0);
+                mutex_unlock(&OverlaySettingMutex);
             	dal_shown = TRUE;
         	}
 #ifdef DAL_LOWMEMORY_ASSERT
@@ -434,12 +470,19 @@ DAL_STATUS DAL_OnDispPowerOn(void)
 #endif
 			goto End;
     	}
-		else if(dal_disable_when_resume){
+		else if(dal_disable_when_resume)
+		{
 			dal_disable_when_resume = FALSE;
-   			DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, FALSE));
+			mutex_lock(&OverlaySettingMutex);
+            cached_layer_config[ASSERT_LAYER].layer_en= FALSE;
+            cached_layer_config[ASSERT_LAYER].isDirty = true;
+            atomic_set(&OverlaySettingDirtyFlag, 1);
+            atomic_set(&OverlaySettingApplied, 0);
+            mutex_unlock(&OverlaySettingMutex);
 			dal_shown = FALSE;
 #ifdef DAL_LOWMEMORY_ASSERT
-        	if (dal_lowMemory_shown) {//only need show lowmemory assert	
+        	if (dal_lowMemory_shown) 
+        	{//only need show lowmemory assert	
 				UINT32 LOWMEMORY_FG_COLOR = MAKE_TWO_RGB565_COLOR(DAL_LOWMEMORY_FG_COLOR, DAL_LOWMEMORY_FG_COLOR);
 				UINT32 LOWMEMORY_BG_COLOR = MAKE_TWO_RGB565_COLOR(DAL_LOWMEMORY_BG_COLOR, DAL_LOWMEMORY_BG_COLOR);
 
@@ -453,20 +496,32 @@ DAL_STATUS DAL_OnDispPowerOn(void)
 
 		}
 #ifdef DAL_LOWMEMORY_ASSERT
-		if(dal_enable_when_resume_lowmemory){
+		if(dal_enable_when_resume_lowmemory)
+		{
 			dal_enable_when_resume_lowmemory = FALSE;
-			if(!dal_shown){//only need show lowmemory assert
+			if(!dal_shown)
+			{//only need show lowmemory assert
 				Show_LowMemory();
 			}
 		}
-		else if(dal_disable_when_resume_lowmemory){
-			if(!dal_shown){// only low memory assert shown on screen
-				DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, FALSE));
-				DAL_CHECK_LCD_RET(LCD_LayerSetOffset(ASSERT_LAYER, 0,0));
-				DAL_CHECK_LCD_RET(LCD_LayerSetWindowOffset(ASSERT_LAYER, 0,0));
-   				DAL_CHECK_LCD_RET(LCD_LayerSetSize(ASSERT_LAYER,
-                                       DAL_WIDTH,
-                                       DAL_HEIGHT));
+		else if(dal_disable_when_resume_lowmemory)
+		{
+			if(!dal_shown)
+			{// only low memory assert shown on screen
+                mutex_lock(&OverlaySettingMutex);
+        		cached_layer_config[ASSERT_LAYER].src_x = 0;
+        		cached_layer_config[ASSERT_LAYER].src_y = 0;
+        		cached_layer_config[ASSERT_LAYER].src_w = DAL_WIDTH;
+        		cached_layer_config[ASSERT_LAYER].src_h = DAL_HEIGHT;
+        		cached_layer_config[ASSERT_LAYER].dst_x = 0;
+        		cached_layer_config[ASSERT_LAYER].dst_y = 0;
+        		cached_layer_config[ASSERT_LAYER].dst_w = DAL_WIDTH;
+        		cached_layer_config[ASSERT_LAYER].dst_h = DAL_HEIGHT;
+                cached_layer_config[ASSERT_LAYER].layer_en= FALSE;
+                cached_layer_config[ASSERT_LAYER].isDirty = true;
+                atomic_set(&OverlaySettingDirtyFlag, 1);
+                atomic_set(&OverlaySettingApplied, 0);
+                mutex_unlock(&OverlaySettingMutex);
 			}
 		}
 		else{}
@@ -488,15 +543,8 @@ DAL_STATUS DAL_LowMemoryOn(void)
 
 	DAL_CHECK_MFC_RET(MFC_LowMemory_Printf(mfc_handle, low_memory_msg, LOWMEMORY_FG_COLOR, LOWMEMORY_BG_COLOR));
 	
-	if (LCD_STATE_POWER_OFF == LCD_GetState()) {
-        dal_enable_when_resume_lowmemory = TRUE;
-		DAL_LOG("LCD is off\n");
-        goto End;
-    }
-
 	Show_LowMemory();
-//	dal_lowMemory_shown = TRUE;
-End:
+
 	dal_lowMemory_shown = TRUE;
 	DAL_LOG("Leave DAL_LowMemoryOn()\n");
 	return DAL_STATUS_OK;
@@ -509,26 +557,24 @@ DAL_STATUS DAL_LowMemoryOff(void)
 
 	DAL_CHECK_MFC_RET(MFC_SetMem(mfc_handle, low_memory_msg, BG_COLOR));
 	
-	if (LCD_STATE_POWER_OFF == LCD_GetState()) {
-        dal_disable_when_resume_lowmemory = TRUE;
-        goto End;
-    }
 //what about LCM_PHYSICAL_ROTATION = 180
-	if(!dal_shown){// only low memory assert shown on screen
-		DAL_CHECK_LCD_RET(LCD_LayerEnable(ASSERT_LAYER, FALSE));
-		DAL_CHECK_LCD_RET(LCD_LayerSetOffset(ASSERT_LAYER, 0,0));
-		DAL_CHECK_LCD_RET(LCD_LayerSetWindowOffset(ASSERT_LAYER, 0,0));
-   		DAL_CHECK_LCD_RET(LCD_LayerSetSize(ASSERT_LAYER,
-                                       DAL_WIDTH,
-                                       DAL_HEIGHT));
-
+	if(!dal_shown)
+	{// only low memory assert shown on screen
+        mutex_lock(&OverlaySettingMutex);
+        cached_layer_config[ASSERT_LAYER].src_x = 0;
+        cached_layer_config[ASSERT_LAYER].src_y = 0;
+        cached_layer_config[ASSERT_LAYER].src_w = DAL_WIDTH;
+        cached_layer_config[ASSERT_LAYER].src_h = DAL_HEIGHT;
+        cached_layer_config[ASSERT_LAYER].dst_x = 0;
+        cached_layer_config[ASSERT_LAYER].dst_y = 0;
+        cached_layer_config[ASSERT_LAYER].dst_w = DAL_WIDTH;
+        cached_layer_config[ASSERT_LAYER].dst_h = DAL_HEIGHT;
+        cached_layer_config[ASSERT_LAYER].layer_en= FALSE;
+        cached_layer_config[ASSERT_LAYER].isDirty = true;
+        atomic_set(&OverlaySettingDirtyFlag, 1);
+        atomic_set(&OverlaySettingApplied, 0);
+        mutex_unlock(&OverlaySettingMutex);
 	}
-/*
-	DAL_CHECK_DISP_RET(DISP_UpdateScreen(0, 0, 
-                                         DAL_WIDTH,
-                                         DAL_HEIGHT));
-*/
-End:			
 	dal_lowMemory_shown = FALSE;
 	DAL_LOG("Leave DAL_LowMemoryOff()\n");
     return DAL_STATUS_OK;
@@ -538,6 +584,7 @@ End:
 //  !CONFIG_MTK_FB_SUPPORT_ASSERTION_LAYER
 // ##########################################################################
 #else
+unsigned int isAEEEnabled = 0;
 
 UINT32 DAL_GetLayerSize(void)
 {

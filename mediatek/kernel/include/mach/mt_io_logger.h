@@ -19,7 +19,7 @@
 
 #ifndef USER_BUILD_KERNEL//engineering mode
 
-#define IO_LOGGER_ENABLE 1
+#define IO_LOGGER_ENABLE 0
 #else 
 #define IO_LOGGER_ENABLE 0
 #endif

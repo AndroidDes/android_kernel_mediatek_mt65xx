@@ -33,7 +33,6 @@
 #include <linux/file.h>
 #include <linux/vmalloc.h>
 
-#define STORAGE_LOGGER_DEFAULT_ON
 
 /*
  *  Constant

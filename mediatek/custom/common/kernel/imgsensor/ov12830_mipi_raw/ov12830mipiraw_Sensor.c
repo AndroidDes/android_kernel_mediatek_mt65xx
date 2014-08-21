@@ -63,15 +63,16 @@ extern int iReadReg(u16 a_u2Addr , u8 * a_puBuff , u16 i2cId);
 extern int iWriteReg(u16 a_u2Addr , u32 a_u4Data , u32 a_u4Bytes , u16 i2cId);
 extern int iMultiWriteReg(u8 *pData, u16 lens, u16 i2cId);
 
-#define OV12830_write_cmos_sensor(addr, para) iWriteReg((u16) addr , (u32) para , 1, ov12830.write_id) //OV12830MIPI_WRITE_ID
+#define OV12830_write_cmos_sensor(addr, para) iWriteReg((u16) addr , (u32) para , 1, OV12830MIPI_WRITE_ID)
 
-#define OV12830_multi_write_cmos_sensor(pData, lens) iMultiWriteReg((u8*) pData, (u16) lens, ov12830.write_id) //OV12830MIPI_WRITE_ID
+#define OV12830_multi_write_cmos_sensor(pData, lens) iMultiWriteReg((u8*) pData, (u16) lens, OV12830MIPI_WRITE_ID)
 
+#define OV12830_ORIENTATION IMAGE_H_MIRROR
 
 kal_uint16 OV12830_read_cmos_sensor(kal_uint32 addr)
 {
 kal_uint16 get_byte=0;
-    iReadReg((u16) addr ,(u8*)&get_byte,ov12830.write_id); //OV12830MIPI_WRITE_ID
+    iReadReg((u16) addr ,(u8*)&get_byte,OV12830MIPI_WRITE_ID);
     return get_byte;
 }
 
@@ -443,7 +444,7 @@ void OV12830PreviewSetting(void)
 	OV12830_write_cmos_sensor(0x3815,0x31);
 	OV12830_write_cmos_sensor(0x3820,0x14);
 	OV12830_write_cmos_sensor(0x3821,0x0f);
-	OV12830_write_cmos_sensor(0x4004,0x02);
+	OV12830_write_cmos_sensor(0x4004,0x08);
 	OV12830_write_cmos_sensor(0x4837,0x0b);
 	OV12830_write_cmos_sensor(0x5002,0x00);
 	mDELAY(2);
@@ -485,7 +486,7 @@ void OV12830VideoSetting(void)
 	OV12830_write_cmos_sensor(0x3815,0x31);
 	OV12830_write_cmos_sensor(0x3820,0x14);
 	OV12830_write_cmos_sensor(0x3821,0x0f);
-	OV12830_write_cmos_sensor(0x4004,0x02);
+	OV12830_write_cmos_sensor(0x4004,0x08);
 	OV12830_write_cmos_sensor(0x4837,0x0b);
 	OV12830_write_cmos_sensor(0x5002,0x00);
 	mDELAY(2);
@@ -506,14 +507,12 @@ void OV12830CaptureSetting(void)
 	// bps/lane 816MHz
 	OV12830_write_cmos_sensor(0x0100,0x00);
 	//mDELAY(2);
+	OV12830_write_cmos_sensor(0x30b3,0x54);
 	OV12830_write_cmos_sensor(0x30b4,0x03);
-	OV12830_write_cmos_sensor(0x30b3,0x66);
-	OV12830_write_cmos_sensor(0x3106,0x02);
 	OV12830_write_cmos_sensor(0x3090,0x02);
 	OV12830_write_cmos_sensor(0x3091,0x11);
-	OV12830_write_cmos_sensor(0x30b3,0x54);
 	OV12830_write_cmos_sensor(0x3106,0x01);
-	OV12830_write_cmos_sensor(0x3708,0xe2);
+	OV12830_write_cmos_sensor(0x3708,0xe3);
 	OV12830_write_cmos_sensor(0x3709,0xc3);
 	OV12830_write_cmos_sensor(0x3801,0x00);
 	OV12830_write_cmos_sensor(0x3802,0x00);
@@ -537,18 +536,15 @@ void OV12830CaptureSetting(void)
 	OV12830_write_cmos_sensor(0x3821,0x0e);
 	OV12830_write_cmos_sensor(0x3503,0x07);
 	OV12830_write_cmos_sensor(0x3500,0x00);
-	OV12830_write_cmos_sensor(0x3501,0x10);
+	OV12830_write_cmos_sensor(0x3501,0xbd);
 	OV12830_write_cmos_sensor(0x3502,0x40);
 	OV12830_write_cmos_sensor(0x350b,0x80);
 	OV12830_write_cmos_sensor(0x4004,0x08);
-	//OV12830_write_cmos_sensor(0x4837,0x09);
-	//OV12830_write_cmos_sensor(0x5002,0x00);
-	//mDELAY(2);
+	OV12830_write_cmos_sensor(0x4837,0x0b);
+	OV12830_write_cmos_sensor(0x5002,0x00);
 	OV12830_write_cmos_sensor(0x0100,0x01);
-	mDELAY(66);
+    mDELAY(66);
 	
-
-
 }
 
 static kal_uint8 ov12830_init[] = {
@@ -585,9 +581,11 @@ static kal_uint8 ov12830_init[] = {
 0x35,0x09,0x08,
 0x35,0x0a,0x00,
 0x35,0x0b,0x80,
-0x36,0x02,0x28,
+0x36,0x02,0x18,
 0x36,0x12,0x80,
-0x36,0x22,0x0f,
+0x36,0x21,0xb5,
+0x36,0x22,0x0b,
+0x36,0x23,0x28,
 0x36,0x31,0xb3,
 0x36,0x34,0x04,
 0x36,0x60,0x80,
@@ -597,19 +595,24 @@ static kal_uint8 ov12830_init[] = {
 0x36,0x6f,0x20,
 0x36,0x80,0xb5,
 0x36,0x82,0x00,
-0x37,0x0b,0xa8,
+0x37,0x01,0x12,
+0x37,0x02,0x88,
+0x37,0x0b,0xa0,
 0x37,0x0d,0x11,
 0x37,0x0e,0x00,
 0x37,0x1c,0x01,
+0x37,0x1f,0x1b,
+0x37,0x24,0x10,
 0x37,0x26,0x00,
 0x37,0x2a,0x09,
-0x37,0x39,0x7c,
-0x37,0x3c,0x44,
+0x37,0x39,0xb0,
+0x37,0x3c,0x40,
 0x37,0x6b,0x44,
 0x37,0x7b,0x44,
 0x37,0x80,0x22,
-0x37,0x81,0x0c,
+0x37,0x81,0xc8,
 0x37,0x83,0x31,
+0x37,0x96,0x84,
 0x37,0x9c,0x0c,
 0x37,0xc5,0x00,
 0x37,0xc6,0x00,
@@ -636,12 +639,16 @@ static kal_uint8 ov12830_init[] = {
 0x40,0x01,0x06,
 0x40,0x02,0x45,
 0x40,0x05,0x18,
+0x40,0x07,0x90,
 0x40,0x08,0x24,
-0x41,0x00,0x50,
-0x41,0x01,0xb2,
-0x41,0x02,0x34,
-0x41,0x04,0xdc,
-0x41,0x09,0x62,
+0x40,0x4e,0x37,
+0x40,0x4f,0x8f,
+0x41,0x00,0x2d,
+0x41,0x01,0x22,
+0x41,0x02,0x04,
+0x41,0x04,0x5c,
+0x41,0x09,0xa3,
+0x41,0x0a,0x03,
 0x43,0x00,0xff,
 0x43,0x03,0x00,
 0x43,0x04,0x08,
@@ -651,14 +658,16 @@ static kal_uint8 ov12830_init[] = {
 0x48,0x16,0x52,
 0x48,0x1f,0x30,
 0x48,0x26,0x2c,
+0x48,0x4b,0x05,  //SEL_MIPI_CTRL_4B  
 0x4a,0x00,0xaa,
 0x4a,0x03,0x01,
 0x4a,0x05,0x08,
-0x4d,0x01,0x71,
+0x4d,0x01,0x19,
 0x4d,0x02,0xfd,
-0x4d,0x03,0xf5,
-0x4d,0x04,0x0c,
-0x4d,0x05,0xcc,
+0x4d,0x03,0xd1,
+0x4d,0x04,0xff,
+0x4d,0x05,0xff,
+//0x4d,0x07,0x04,  //Temperature monitor
 0x50,0x00,0x06,
 0x50,0x01,0x01,
 0x50,0x03,0x21,
@@ -686,12 +695,11 @@ static kal_uint8 ov12830_init[] = {
 0x34,0x04,0x04,
 0x34,0x05,0x00,
 0x34,0x06,0x01,
-0x40,0x05,0x18,
 0x40,0x09,0x10,
 0x35,0x03,0x07,
 0x35,0x00,0x00,
-0x35,0x01,0x10,
-0x35,0x02,0x40,
+0x35,0x01,0x97,
+0x35,0x02,0x00,
 0x35,0x0b,0x80,
 0x48,0x00,0x14,
 0x30,0xb4,0x03,
@@ -721,7 +729,7 @@ static kal_uint8 ov12830_init[] = {
 0x38,0x15,0x31,
 0x38,0x20,0x14,
 0x38,0x21,0x0f,
-0x40,0x04,0x02,
+0x40,0x04,0x08,
 0x48,0x37,0x0b,
 0x50,0x02,0x00,
 0x01,0x00,0x01};
@@ -935,30 +943,15 @@ UINT32 OV12830Open(void)
 	kal_uint16 sensor_id = 0;
 	OV12830DB("OV12830Open enter :\n ");
 	OV12830_write_cmos_sensor(0x0103,0x01);// Reset sensor
-	mDELAY(2);
-
-	const kal_uint16 sccb_writeid[] = {OV12830_SLAVE_WRITE_ID_1, OV12830_SLAVE_WRITE_ID_2 };
+    mDELAY(2);
 
 	for(i=0;i<3;i++)
 	{
-	    for(i = 0; i <(sizeof(sccb_writeid)/sizeof(sccb_writeid[0])); i++)
-	    {
-	        spin_lock(&ov12830mipiraw_drv_lock);
-	        ov12830.write_id = sccb_writeid[i];
-	        ov12830.read_id = (sccb_writeid[i]|0x01);
-	        spin_unlock(&ov12830mipiraw_drv_lock);
-
-	        sensor_id = (OV12830_read_cmos_sensor(0x300A)<<8)|OV12830_read_cmos_sensor(0x300B);
-	        OV12830DB("OOV12830 READ ID :%x",sensor_id);
-	        if(sensor_id == OV12830_SENSOR_ID)
-	        {
-	            OV12830DB("OV12830 slave write id:%x \n",ov12830.write_id);
-	            break;
-	        }
-	    }
-	    if(sensor_id != OV12830_SENSOR_ID)
-	    	return ERROR_SENSOR_CONNECT_FAIL;
-	    else break;
+		sensor_id = (OV12830_read_cmos_sensor(0x300A)<<8)|OV12830_read_cmos_sensor(0x300B);
+		OV12830DB("OOV12830 READ ID :%x",sensor_id);
+		if(sensor_id != OV12830_SENSOR_ID)
+			return ERROR_SENSOR_CONNECT_FAIL;
+		else break;
 	}
 	spin_lock(&ov12830mipiraw_drv_lock);
 	ov12830.sensorMode = SENSOR_MODE_INIT;
@@ -986,30 +979,20 @@ UINT32 OV12830Open(void)
 
 UINT32 OV12830GetSensorID(UINT32 *sensorID)
 {
-    int  retry = 1, i;
+    int  retry = 1;
 
-    OV12830DB("OV12830GetSensorID enter :\n ");
-    OV12830_write_cmos_sensor(0x0103,0x01);// Reset sensor
+	OV12830DB("OV12830GetSensorID enter :\n ");
+	OV12830_write_cmos_sensor(0x0103,0x01);// Reset sensor
     mDELAY(10);
-
-    const kal_uint16 sccb_writeid[] = {OV12830_SLAVE_WRITE_ID_1, OV12830_SLAVE_WRITE_ID_2 };
 
     // check if sensor ID correct
     do {
-	    for(i = 0; i <(sizeof(sccb_writeid)/sizeof(sccb_writeid[0])); i++)
-	    {
-	        spin_lock(&ov12830mipiraw_drv_lock);
-	        ov12830.write_id = sccb_writeid[i];
-	        ov12830.read_id = (sccb_writeid[i]|0x01);
-	        spin_unlock(&ov12830mipiraw_drv_lock);
-
-	        *sensorID = (OV12830_read_cmos_sensor(0x300A)<<8)|OV12830_read_cmos_sensor(0x300B);
-	        if (*sensorID == OV12830_SENSOR_ID)
-	        {
-  	            OV12830DB("Sensor ID = 0x%04x\n", *sensorID);
-  	            break;
-	        }
-	    }
+        *sensorID = (OV12830_read_cmos_sensor(0x300A)<<8)|OV12830_read_cmos_sensor(0x300B);
+        if (*sensorID == OV12830_SENSOR_ID)
+        	{
+        		OV12830DB("Sensor ID = 0x%04x\n", *sensorID);
+            	break;
+        	}
         OV12830DB("Read Sensor ID Fail = 0x%04x\n", *sensorID);
         retry--;
     } while (retry > 0);
@@ -1071,21 +1054,21 @@ void OV12830SetFlipMirror(kal_int32 imgMirror)
 	flip  = OV12830_read_cmos_sensor(0x3821);
     switch (imgMirror)
     {
-        case IMAGE_H_MIRROR://IMAGE_NORMAL:
-            OV12830_write_cmos_sensor(0x3820, (mirror & (0xFD)));//Set normal
+        case IMAGE_NORMAL://IMAGE_NORMAL:
+            OV12830_write_cmos_sensor(0x3820, (mirror & (0xBD)));//Set normal
             OV12830_write_cmos_sensor(0x3821, (flip & (0xF9)));	//Set normal
             break;
-        case IMAGE_NORMAL://IMAGE_V_MIRROR:
-            OV12830_write_cmos_sensor(0x3820, (mirror & (0xFD)));//Set flip
-            OV12830_write_cmos_sensor(0x3821, (flip | (0x06)));	//Set flip
+        case IMAGE_H_MIRROR://IMAGE_H_MIRROR:
+            OV12830_write_cmos_sensor(0x3820, (mirror & (0xBD)));//Set normal
+            OV12830_write_cmos_sensor(0x3821, (flip | (0x06)));	//Set mirror
             break;
-        case IMAGE_HV_MIRROR://IMAGE_H_MIRROR:
-            OV12830_write_cmos_sensor(0x3820, (mirror |(0x02)));	//Set mirror
-            OV12830_write_cmos_sensor(0x3821, (flip & (0xF9)));	//Set mirror
+        case IMAGE_V_MIRROR://IMAGE_V_MIRROR:
+            OV12830_write_cmos_sensor(0x3820, (mirror |(0x42)));	//Set flip
+            OV12830_write_cmos_sensor(0x3821, (flip & (0xF9)));	//Set normal
             break;
-        case IMAGE_V_MIRROR://IMAGE_HV_MIRROR:
-            OV12830_write_cmos_sensor(0x3820, (mirror |(0x02)));	//Set mirror & flip
-            OV12830_write_cmos_sensor(0x3821, (flip |(0x06)));	//Set mirror & flip
+        case IMAGE_HV_MIRROR://IMAGE_HV_MIRROR:
+            OV12830_write_cmos_sensor(0x3820, (mirror |(0x42)));	//Set flip
+            OV12830_write_cmos_sensor(0x3821, (flip |(0x06)));	//Set mirror
             break;
     }
 }
@@ -1123,8 +1106,8 @@ UINT32 OV12830Preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	spin_lock(&ov12830mipiraw_drv_lock);
 	ov12830.imgMirror = sensor_config_data->SensorImageMirror;
 	spin_unlock(&ov12830mipiraw_drv_lock);
-	OV12830SetFlipMirror(sensor_config_data->SensorImageMirror);
-	OV12830DB("OV12830Preview exit:\n");
+	OV12830SetFlipMirror(OV12830_ORIENTATION);
+	OV12830DB("OV12830Preview exit: \n");
     return ERROR_NONE;
 }	/* OV12830Preview() */
 
@@ -1152,7 +1135,7 @@ UINT32 OV12830Video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	spin_lock(&ov12830mipiraw_drv_lock);
 	ov12830.imgMirror = sensor_config_data->SensorImageMirror;
 	spin_unlock(&ov12830mipiraw_drv_lock);
-	OV12830SetFlipMirror(sensor_config_data->SensorImageMirror);
+	OV12830SetFlipMirror(OV12830_ORIENTATION);
 
 	OV12830DBSOFIA("[OV12830Video]frame_len=%x\n", ((OV12830_read_cmos_sensor(0x380e)<<8)+OV12830_read_cmos_sensor(0x380f)));
 
@@ -1195,7 +1178,7 @@ UINT32 OV12830Capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 		spin_unlock(&ov12830mipiraw_drv_lock);
 
 		//OV12830DB("[OV12830Capture] mirror&flip: %d\n",sensor_config_data->SensorImageMirror);
-		OV12830SetFlipMirror(sensor_config_data->SensorImageMirror);
+		OV12830SetFlipMirror(OV12830_ORIENTATION);
 
 	    if(OV12830CurrentScenarioId==MSDK_SCENARIO_ID_CAMERA_ZSD)
 	    {
@@ -1521,6 +1504,7 @@ UINT32 OV12830MIPIGetDefaultFramerateByScenario(MSDK_SCENARIO_ID_ENUM scenarioId
 
 	return ERROR_NONE;
 }
+
 
 UINT32 OV12830FeatureControl(MSDK_SENSOR_FEATURE_ENUM FeatureId,
                                                                 UINT8 *pFeaturePara,UINT32 *pFeatureParaLen)

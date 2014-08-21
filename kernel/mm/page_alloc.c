@@ -58,10 +58,15 @@
 #include <linux/memcontrol.h>
 #include <linux/prefetch.h>
 #include <linux/page-debug-flags.h>
+#include <linux/export.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
 #include "internal.h"
+
+#ifdef CONFIG_ZRAM
+#undef CONFIG_ZRAM
+#endif
 
 #ifdef CONFIG_USE_PERCPU_NUMA_NODE_ID
 DEFINE_PER_CPU(int, numa_node);
@@ -314,6 +319,9 @@ static void bad_page(struct page *page)
 	printk(KERN_ALERT "BUG: Bad page state in process %s  pfn:%05lx\n",
 		current->comm, page_to_pfn(page));
 	dump_page(page);
+        print_hex_dump(KERN_ALERT, "pages ", DUMP_PREFIX_ADDRESS, 32, 4, page - 10,
+            sizeof(struct page) * 20, 0);
+
 
 	print_modules();
 	dump_stack();
@@ -853,9 +861,10 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 	unsigned int current_order;
 	struct free_area * area;
 	struct page *page;
+	unsigned int end_order = MAX_ORDER;
 
 	/* Find a page of the appropriate size in the preferred list */
-	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
+	for (current_order = order; current_order < end_order; ++current_order) {
 		area = &(zone->free_area[current_order]);
 		if (list_empty(&area->free_list[migratetype]))
 			continue;
@@ -972,9 +981,10 @@ __rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
 	int current_order;
 	struct page *page;
 	int migratetype, i;
+	int start_order = MAX_ORDER-1;
 
 	/* Find the largest possible block of pages in the other list */
-	for (current_order = MAX_ORDER-1; current_order >= order;
+	for (current_order = start_order; current_order >= order;
 						--current_order) {
 		for (i = 0; i < MIGRATE_TYPES - 1; i++) {
 			migratetype = fallbacks[start_migratetype][i];
@@ -2100,6 +2110,10 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
 	struct reclaim_state reclaim_state;
 	bool drained = false;
 
+#ifdef CONFIG_MT_ENG_BUILD
+	void add_kmem_status_page_reclaim_counter(void);
+        add_kmem_status_page_reclaim_counter();
+#endif
 	cond_resched();
 
 	/* We now go into synchronous reclaim */
@@ -2434,6 +2448,23 @@ got_pg:
 static int buddy_is_locked = 0;
 #endif
 
+
+#ifdef CONFIG_ZRAM
+#define __LOG_PAGE_ALLOC_ORDER__
+#endif
+
+#ifdef __LOG_PAGE_ALLOC_ORDER__
+static int page_alloc_order_log[11] = {0};
+static int page_alloc_order_log_size = 11;
+static int page_alloc_dump_order_threshold = 999;
+static int page_alloc_log_order_threshold = 999;
+
+module_param_array_named(order_log, page_alloc_order_log, int, &page_alloc_order_log_size,
+                         S_IRUGO);
+module_param_named(dump_order_threshold, page_alloc_dump_order_threshold, int, S_IRUGO | S_IWUSR);
+module_param_named(log_order_threshold, page_alloc_log_order_threshold, int, S_IRUGO | S_IWUSR);
+#endif // __LOG_PAGE_ALLOC_ORDER__
+
 /*
  * This is the 'heart' of the zoned buddy allocator.
  */
@@ -2490,6 +2521,18 @@ retry_cpuset:
 				zonelist, high_zoneidx, nodemask,
 				preferred_zone, migratetype);
 
+#ifdef __LOG_PAGE_ALLOC_ORDER__
+	page_alloc_order_log[order] += 1;
+	// Enable the log in system server when boot completes
+	if (order >= page_alloc_log_order_threshold) {
+		printk("alloc large continuous pages, order: %d\n", order);
+	}
+  
+	if (order >= page_alloc_dump_order_threshold) {
+		dump_stack();
+	}
+	
+#endif // __LOG_PAGE_ALLOC_ORDER__
 	trace_mm_page_alloc(page, order, gfp_mask, migratetype);
 
 out:

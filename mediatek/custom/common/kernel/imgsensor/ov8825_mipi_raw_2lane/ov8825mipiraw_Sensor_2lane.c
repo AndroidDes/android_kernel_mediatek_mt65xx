@@ -19,7 +19,7 @@
 #include "kd_imgsensor_define.h"
 #include "kd_imgsensor_errcode.h"
 
-#include "ov8825mipiraw_Sensor.h"
+#include "ov8825mipiraw_Sensor_2lane.h"
 #include "ov8825mipiraw_Camera_Sensor_para.h"
 #include "ov8825mipiraw_CameraCustomized.h"
 static DEFINE_SPINLOCK(ov8825mipiraw_drv_lock);
@@ -1120,10 +1120,13 @@ static void OV8825_Sensor_Init(void)
 	OV8825_write_cmos_sensor(0x3615,0x00);//; analog control
 	OV8825_write_cmos_sensor(0x3616,0x03);//; analog control
 	OV8825_write_cmos_sensor(0x3617,0xa1);//; analog control
+	
 	OV8825_write_cmos_sensor(0x3618,0x00);//; VCM position & slew rate, slew rate = 0
 	OV8825_write_cmos_sensor(0x3619,0x00);//; VCM position = 0
 	OV8825_write_cmos_sensor(0x361a,0xB0);//; VCM clock divider, VCM clock = 24000000/0x4b0 = 20000
 	OV8825_write_cmos_sensor(0x361b,0x04);//; VCM clock divider
+	OV8825_write_cmos_sensor(0x361c,0x07);//VCM Driver current
+	
 	OV8825_write_cmos_sensor(0x3700,0x20);//
 	OV8825_write_cmos_sensor(0x3701,0x44);//; sensor control
 	OV8825_write_cmos_sensor(0x3702,0x50);//

@@ -491,16 +491,20 @@ static int KXTIK1004_CheckDeviceID(struct i2c_client *client)
 	}
 	
 
-	if(false)
+	if(databuf[0] == KXTIK1004_DEVICE_ID)
+	{
+		printk("KXTIK1004_CheckDeviceID 0x%x pass!\n ", databuf[0]);
+	}
+	else if(databuf[0] == KXCJK1013_DEVICE_ID)
+	{
+		printk("KXCJK1013_CheckDeviceID 0x%x pass!\n ", databuf[0]);/*because KXCJK-1013 use same driver with KXTIK1004*/
+	}
+	else
 	{
 		printk("KXTIK1004_CheckDeviceID 0x%x failt!\n ", databuf[0]);
 		return KXTIK1004_ERR_IDENTIFICATION;
 	}
-	else
-	{
-		printk("KXTIK1004_CheckDeviceID 0x%x pass!\n ", databuf[0]);
-	}
-	
+
 	exit_KXTIK1004_CheckDeviceID:
 	if (res <= 0)
 	{

@@ -159,6 +159,9 @@ MTK_INC += $(MTK_PATH_CUSTOM)/cgen/cfgfileinc \
            $(MTK_PATH_CUSTOM)/hal/inc \
            $(MTK_PATH_CUSTOM)/hal/audioflinger
 MTK_CDEFS := $(call mtk.custom.generate-macros)
+ifeq ($(TARGET_BUILD_VARIANT),user)
+MTK_CDEFS += -DTARGET_BUILD_VARIANT_$(TARGET_BUILD_VARIANT)
+endif
 COMMON_GLOBAL_CFLAGS += $(MTK_CFLAGS) $(MTK_CDEFS)
 COMMON_GLOBAL_CPPFLAGS += $(MTK_CPPFLAGS) $(MTK_CDEFS)
 SRC_HEADERS += $(MTK_INC)
@@ -186,4 +189,7 @@ dump-comp-build-info:
 	@echo Dump componenet level build info.
 
 MTK_INTERNAL_PLATFORM_API_FILE := $(TARGET_OUT_COMMON_INTERMEDIATES)/PACKAGING/mediatek_public_api.txt
+ifeq ($(strip $(BUILD_MTK_API_MONITOR)), yes)
+MTK_INTERNAL_MONITORING_API_FILE := $(TARGET_OUT_COMMON_INTERMEDIATES)/PACKAGING/mediatek_internal_api.txt
+endif
 JPE_TOOL := $(HOST_OUT_JAVA_LIBRARIES)/jpe_tool.jar

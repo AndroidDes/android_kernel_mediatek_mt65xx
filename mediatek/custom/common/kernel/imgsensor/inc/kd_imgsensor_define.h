@@ -1,38 +1,3 @@
-/* Copyright Statement:
- *
- * This software/firmware and related documentation ("MediaTek Software") are
- * protected under relevant copyright laws. The information contained herein
- * is confidential and proprietary to MediaTek Inc. and/or its licensors.
- * Without the prior written permission of MediaTek inc. and/or its licensors,
- * any reproduction, modification, use or disclosure of MediaTek Software,
- * and information contained herein, in whole or in part, shall be strictly prohibited.
- */
-/* MediaTek Inc. (C) 2010. All rights reserved.
- *
- * BY OPENING THIS FILE, RECEIVER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
- * THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
- * RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO RECEIVER ON
- * AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NONINFRINGEMENT.
- * NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH RESPECT TO THE
- * SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY, INCORPORATED IN, OR
- * SUPPLIED WITH THE MEDIATEK SOFTWARE, AND RECEIVER AGREES TO LOOK ONLY TO SUCH
- * THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. RECEIVER EXPRESSLY ACKNOWLEDGES
- * THAT IT IS RECEIVER'S SOLE RESPONSIBILITY TO OBTAIN FROM ANY THIRD PARTY ALL PROPER LICENSES
- * CONTAINED IN MEDIATEK SOFTWARE. MEDIATEK SHALL ALSO NOT BE RESPONSIBLE FOR ANY MEDIATEK
- * SOFTWARE RELEASES MADE TO RECEIVER'S SPECIFICATION OR TO CONFORM TO A PARTICULAR
- * STANDARD OR OPEN FORUM. RECEIVER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND
- * CUMULATIVE LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE,
- * AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE,
- * OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE CHARGE PAID BY RECEIVER TO
- * MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
- *
- * The following software/firmware and/or related documentation ("MediaTek Software")
- * have been modified by MediaTek Inc. All revisions are subject to any receiver's
- * applicable license agreements with MediaTek Inc.
- */
-
 #ifndef _KD_IMGSENSOR_DATA_H
 #define _KD_IMGSENSOR_DATA_H
 
@@ -249,8 +214,14 @@ typedef enum
   SENSOR_FEATURE_SET_MAX_FRAME_RATE_BY_SCENARIO,
   SENSOR_FEATURE_GET_DEFAULT_FRAME_RATE_BY_SCENARIO,
   SENSOR_FEATURE_GET_AE_AWB_LOCK_INFO,
+  SENSOR_FEATURE_GET_TEST_PATTERN_CHECKSUM_VALUE,
+  SENSOR_FEATURE_GET_SENSOR_CURRENT_TEMPERATURE,
   SENSOR_FEATURE_GET_AE_FLASHLIGHT_INFO,
   SENSOR_FEATURE_AUTOTEST_CMD,
+  SENSOR_FEATURE_GET_TRIGGER_FLASHLIGHT_INFO, //Trigger flashlight or not
+  SENSOR_FEATURE_SET_YUV_3A_CMD,
+  SENSOR_FEATURE_SET_ESHUTTER_GAIN,
+
   SENSOR_FEATURE_MAX
 } ACDK_SENSOR_FEATURE_ENUM;
 
@@ -268,6 +239,7 @@ typedef enum
 {
   SENSOR_INTERFACE_TYPE_PARALLEL=0,
   SENSOR_INTERFACE_TYPE_MIPI,
+  SENSOR_INTERFACE_TYPE_SERIAL,  // add for 72 ATV using serial interface
   SENSOR_INTERFACE_TYPE_MAX
 } ACDK_SENSOR_INTERFACE_TYPE_ENUM;
 
@@ -299,6 +271,12 @@ typedef enum
   SENSOR_MIPI_4_LANE
 } ACDK_SENSOR_MIPI_LANE_NUMBER_ENUM;
 
+typedef enum
+{
+    MIPI_OPHY_NCSI2 = 0,
+    MIPI_OPHY_CSI2 = 1,
+}SENSOR_MIPI_TYPE_ENUM;
+
 typedef struct
 {
   MUINT16 SensorPreviewWidth;
@@ -315,6 +293,34 @@ typedef struct
   MUINT16 Sensor3DFullHeight;
   MUINT16 Sensor3DVideoWidth;
   MUINT16 Sensor3DVideoHeight;  
+  MUINT16 SensorEffectivePreviewWidth;
+  MUINT16 SensorEffectivePreviewHeight;
+  MUINT16 SensorEffectiveFullWidth;
+  MUINT16 SensorEffectiveFullHeight;
+  MUINT16 SensorEffectiveVideoWidth;
+  MUINT16 SensorEffectiveVideoHeight;
+  MUINT16 SensorEffectiveHighSpeedVideoWidth;
+  MUINT16 SensorEffectiveHighSpeedVideoHeight;
+  MUINT16 SensorEffective3DPreviewWidth;
+  MUINT16 SensorEffective3DPreviewHeight;
+  MUINT16 SensorEffective3DFullWidth;
+  MUINT16 SensorEffective3DFullHeight;
+  MUINT16 SensorEffective3DVideoWidth;
+  MUINT16 SensorEffective3DVideoHeight; 
+  MUINT16 SensorPreviewWidthOffset;//from effective width to output width
+  MUINT16 SensorPreviewHeightOffset;//from effective height to output height
+  MUINT16 SensorFullWidthOffset;//from effective width to output width
+  MUINT16 SensorFullHeightOffset;//from effective height to output height
+  MUINT16 SensorVideoWidthOffset;//from effective width to output width
+  MUINT16 SensorVideoHeightOffset;//from effective height to output height
+  MUINT16 SensorHighSpeedVideoWidthOffset;//from effective width to output width
+  MUINT16 SensorHighSpeedVideoHeightOffset;//from effective height to output height
+  MUINT16 Sensor3DPreviewWidthOffset;//from effective width to output width
+  MUINT16 Sensor3DPreviewHeightOffset;//from effective height to output height
+  MUINT16 Sensor3DFullWidthOffset;//from effective width to output width
+  MUINT16 Sensor3DFullHeightOffset;//from effective height to output height
+  MUINT16 Sensor3DVideoWidthOffset;//from effective width to output width
+  MUINT16 Sensor3DVideoHeightOffset;//from effective height to output height
 } ACDK_SENSOR_RESOLUTION_INFO_STRUCT, *PACDK_SENSOR_RESOLUTION_INFO_STRUCT;
 
 
@@ -362,6 +368,7 @@ typedef struct
   MUINT8   SensorWidthSampling;
   MUINT8   SensorHightSampling;  
   MUINT8   SensorPacketECCOrder;
+  SENSOR_MIPI_TYPE_ENUM MIPIsensorType;
 } ACDK_SENSOR_INFO_STRUCT, *PACDK_SENSOR_INFO_STRUCT;
 
 
@@ -482,6 +489,17 @@ typedef struct
 	MUINT32  FrameLines;      //valid+dummy lines for minimum shutter
 }	ACDK_SENSOR_CONFIG_STRUCT;
 
+typedef enum
+{
+    MCLK_48MHZ_GROUP = 0x1,
+    MCLK_52MHZ_GROUP = 0x2,
+}ACKD_SENSOR_MCLK_ENUM;
+
+typedef struct
+{
+    MUINT8 on;
+    ACKD_SENSOR_MCLK_ENUM freq;
+}ACDK_SENSOR_MCLK_STRUCT;
 
 /*******************************************************************************
 *
@@ -772,6 +790,18 @@ typedef enum {
     IMGSENSOR_SET_I2C_ID_STATE  = 0x00,
     IMGSENSOR_SET_I2C_ID_FORCE
 } IMGSENSOR_SET_I2C_ID_ENUM;
+
+
+
+typedef enum
+{
+  SENSOR_3A_AE_LOCK=0,
+  SENSOR_3A_AE_UNLOCK,
+  SENSOR_3A_AWB_LOCK,
+  SENSOR_3A_AWB_UNLOCK,
+  //SENSOR_3A_AF_LOCK,
+  //SENSOR_3A_AF_UNLOCK,
+} ACDK_SENSOR_3A_LOCK_ENUM;
 
 #endif //_KD_IMGSENSOR_DATA_H
 

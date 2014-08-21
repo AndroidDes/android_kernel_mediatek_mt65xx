@@ -38,9 +38,8 @@ typedef signed int      MINT32;
 #define KD_PEAK_FLASHLIGHT_ID       2
 #define KD_TORCH_FLASHLIGHT_ID      3
 #define KD_CONSTANT_FLASHLIGHT_ID   4
-#if defined (SGM3780_FLASHLIGHT)
-#define KD_SGM3780_FLASHLIGHT_ID   5
-#endif
+
+
 typedef enum
 {
     e_CAMERA_NONE_SENSOR=0,
@@ -52,6 +51,8 @@ typedef enum
     //DUAL_CAMERA_SUB_2_SENSOR   = 16,
     e_CAMERA_SENSOR_MAX
 } eFlashSensorId;
+
+
 typedef struct
 {
     int (* flashlight_open)(void *pArg);

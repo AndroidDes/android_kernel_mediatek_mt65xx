@@ -51,6 +51,8 @@
 #ifndef _OV8835MIPI_SENSOR_H
 #define _OV8835MIPI_SENSOR_H
 
+// #define USE_24FPS_SETTING // LINE <><2013.10.31><Use 24FPS to test blc> Jiangde
+#define USE_1080P_VIDEO  // LINE <><2013.9.15><use 1080p to cut down video record current> Jiangde
 #define OV8835MIPI_DEBUG
 #define OV8835MIPI_DRIVER_TRACE
 //#define OV8835MIPI_TEST_PATTEM
@@ -121,7 +123,7 @@ typedef enum {
 //#define OV8835MIPI_FULL_PERIOD_PIXEL_NUMS          2700 /* 9 fps */
 
 //#define OV8835MIPI_DEBUG_SETTING
-//#define OV8835_BINNING_SUM//binning: enable  for sum, disable for vertical averag	
+#define OV8835_BINNING_SUM // binning: enable  for sum, disable for vertical averag, need to modify u4Cap2PreRatio from 1024 to 512	
 #define OV8835MIPI_4LANE
 #ifdef OV8835MIPI_4LANE
 //#define OV8835MIPI_4LANE_CAP_30FPS
@@ -150,15 +152,21 @@ typedef enum {
 #define OV8835MIPI_VIDEO_PERIOD_PIXEL_NUMS            3608  //3055 /* 8 fps */
 #define OV8835MIPI_VIDEO_PERIOD_LINE_NUMS             2522//2642//2586 //2484   //1968
 #else
-#define OV8835MIPI_FULL_PERIOD_PIXEL_NUMS          3608  //3055 /* 8 fps */
-#define OV8835MIPI_FULL_PERIOD_LINE_NUMS           2522//2642//2586 //2484   //1968
-#define OV8835MIPI_PV_PERIOD_PIXEL_NUMS            3608 //1630 /* 30 fps */
-#define OV8835MIPI_PV_PERIOD_LINE_NUMS             1922//1260 //984
-#define OV8835MIPI_VIDEO_PERIOD_PIXEL_NUMS            3608  //3055 /* 8 fps */
-#define OV8835MIPI_VIDEO_PERIOD_LINE_NUMS             2370//for 30fps video//2400//2642//2586 //2484   //1968
+#ifdef USE_24FPS_SETTING
+    #define OV8835MIPI_FULL_PERIOD_PIXEL_NUMS          3608 // test for 24fps  
+    #define OV8835MIPI_FULL_PERIOD_LINE_NUMS           2504 // test for 24fps
+#else
+    #define OV8835MIPI_FULL_PERIOD_PIXEL_NUMS          3608  //3055 /* 8 fps */
+    #define OV8835MIPI_FULL_PERIOD_LINE_NUMS           2522//2642//2586 //2484   //1968
+#endif
+    #define OV8835MIPI_PV_PERIOD_PIXEL_NUMS            3608 //1630 /* 30 fps */
+    #define OV8835MIPI_PV_PERIOD_LINE_NUMS             1922 //1260 //984
+    #define OV8835MIPI_VIDEO_PERIOD_PIXEL_NUMS         3608 //3055 /* 8 fps */
+    #define OV8835MIPI_VIDEO_PERIOD_LINE_NUMS          2370 //for 30fps video//2400//2642//2586 //2484   //1968  //Jiangde video 2/3
 #endif
 #endif
-#endif
+#endif // OV8835MIPI_DEBUG_SETTING
+
 /* SENSOR START/END POSITION */
 #define OV8835MIPI_FULL_X_START                    9
 #define OV8835MIPI_FULL_Y_START                    11
@@ -168,6 +176,7 @@ typedef enum {
 #define OV8835MIPI_PV_Y_START                      5
 #define OV8835MIPI_IMAGE_SENSOR_PV_WIDTH           (1600)  //    (1280 - 16) /* 1264 */
 #define OV8835MIPI_IMAGE_SENSOR_PV_HEIGHT          (1200)  //(960 - 12) /* 948 */
+
 #ifndef OV8835MIPI_4LANE
 #define OV8835MIPI_VIDEO_X_START                    9
 #define OV8835MIPI_VIDEO_Y_START                    11
@@ -176,8 +185,15 @@ typedef enum {
 #else
 #define OV8835MIPI_VIDEO_X_START                    9
 #define OV8835MIPI_VIDEO_Y_START                    11
-#define OV8835MIPI_IMAGE_SENSOR_VIDEO_WIDTH         (3264-64)//(3264 - 64) /* 2560 */
-#define OV8835MIPI_IMAGE_SENSOR_VIDEO_HEIGHT        (1836-36)//(2448 - 48) /* 1920 */
+#ifndef USE_1080P_VIDEO
+ #define OV8835MIPI_IMAGE_SENSOR_VIDEO_WIDTH         (3264-64)//(3264 - 64) /* 2560 */
+ #define OV8835MIPI_IMAGE_SENSOR_VIDEO_HEIGHT        (1836-36)//(2448 - 48) /* 1920 */
+#else
+ //#define OV8835MIPI_IMAGE_SENSOR_VIDEO_WIDTH         (1920 - 32) // (3264-64)//(3264 - 64) /* 2560 */ // Jiangde video 2/3
+ //#define OV8835MIPI_IMAGE_SENSOR_VIDEO_HEIGHT        (1080 - 24) // (1836-36)//(2448 - 48) /* 1920 */
+ #define OV8835MIPI_IMAGE_SENSOR_VIDEO_WIDTH         (1280-32)//(3264 - 64) /* 2560 */
+ #define OV8835MIPI_IMAGE_SENSOR_VIDEO_HEIGHT        (720-24)//(2448 - 48) /* 1920 */
+#endif
 #endif
 
 

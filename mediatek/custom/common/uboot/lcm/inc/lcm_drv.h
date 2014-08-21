@@ -1,38 +1,3 @@
-/*****************************************************************************
-*  Copyright Statement:
-*  --------------------
-*  This software is protected by Copyright and the information contained
-*  herein is confidential. The software may not be copied and the information
-*  contained herein may not be used or disclosed except with the written
-*  permission of MediaTek Inc. (C) 2008
-*
-*  BY OPENING THIS FILE, BUYER HEREBY UNEQUIVOCALLY ACKNOWLEDGES AND AGREES
-*  THAT THE SOFTWARE/FIRMWARE AND ITS DOCUMENTATIONS ("MEDIATEK SOFTWARE")
-*  RECEIVED FROM MEDIATEK AND/OR ITS REPRESENTATIVES ARE PROVIDED TO BUYER ON
-*  AN "AS-IS" BASIS ONLY. MEDIATEK EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES,
-*  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF
-*  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NONINFRINGEMENT.
-*  NEITHER DOES MEDIATEK PROVIDE ANY WARRANTY WHATSOEVER WITH RESPECT TO THE
-*  SOFTWARE OF ANY THIRD PARTY WHICH MAY BE USED BY, INCORPORATED IN, OR
-*  SUPPLIED WITH THE MEDIATEK SOFTWARE, AND BUYER AGREES TO LOOK ONLY TO SUCH
-*  THIRD PARTY FOR ANY WARRANTY CLAIM RELATING THERETO. MEDIATEK SHALL ALSO
-*  NOT BE RESPONSIBLE FOR ANY MEDIATEK SOFTWARE RELEASES MADE TO BUYER'S
-*  SPECIFICATION OR TO CONFORM TO A PARTICULAR STANDARD OR OPEN FORUM.
-*
-*  BUYER'S SOLE AND EXCLUSIVE REMEDY AND MEDIATEK'S ENTIRE AND CUMULATIVE
-*  LIABILITY WITH RESPECT TO THE MEDIATEK SOFTWARE RELEASED HEREUNDER WILL BE,
-*  AT MEDIATEK'S OPTION, TO REVISE OR REPLACE THE MEDIATEK SOFTWARE AT ISSUE,
-*  OR REFUND ANY SOFTWARE LICENSE FEES OR SERVICE CHARGE PAID BY BUYER TO
-*  MEDIATEK FOR SUCH MEDIATEK SOFTWARE AT ISSUE.
-*
-*  THE TRANSACTION CONTEMPLATED HEREUNDER SHALL BE CONSTRUED IN ACCORDANCE
-*  WITH THE LAWS OF THE STATE OF CALIFORNIA, USA, EXCLUDING ITS CONFLICT OF
-*  LAWS PRINCIPLES.  ANY DISPUTES, CONTROVERSIES OR CLAIMS ARISING THEREOF AND
-*  RELATED THERETO SHALL BE SETTLED BY ARBITRATION IN SAN FRANCISCO, CA, UNDER
-*  THE RULES OF THE INTERNATIONAL CHAMBER OF COMMERCE (ICC).
-*
-*****************************************************************************/
-
 #ifndef __LCM_DRV_H__
 #define __LCM_DRV_H__
 
@@ -245,61 +210,6 @@ typedef enum
 	LCM_PACKED_PS_18BIT_RGB666=3		
 } LCM_PS_TYPE;
 
-typedef enum
-{
-	LCM_DSI_6589_PLL_CLOCK_NULL	  = 0,
-    LCM_DSI_6589_PLL_CLOCK_201_5  = 1,
-    LCM_DSI_6589_PLL_CLOCK_208	  = 2,
-    LCM_DSI_6589_PLL_CLOCK_214_5  = 3,
-    LCM_DSI_6589_PLL_CLOCK_221	  = 4,
-    LCM_DSI_6589_PLL_CLOCK_227_5  = 5,
-	LCM_DSI_6589_PLL_CLOCK_234	  = 6,
-    LCM_DSI_6589_PLL_CLOCK_240_5  = 7,
-    LCM_DSI_6589_PLL_CLOCK_247	  = 8,
-    LCM_DSI_6589_PLL_CLOCK_253_5  = 9,
-    LCM_DSI_6589_PLL_CLOCK_260	  = 10,
-    LCM_DSI_6589_PLL_CLOCK_266_5  = 11,
-	LCM_DSI_6589_PLL_CLOCK_273	  = 12,
-    LCM_DSI_6589_PLL_CLOCK_279_5  = 13,
-    LCM_DSI_6589_PLL_CLOCK_286	  = 14,
-    LCM_DSI_6589_PLL_CLOCK_292_5  = 15,
-    LCM_DSI_6589_PLL_CLOCK_299	  = 16,
-    LCM_DSI_6589_PLL_CLOCK_305_5  = 17,
-	LCM_DSI_6589_PLL_CLOCK_312	  = 18,
-    LCM_DSI_6589_PLL_CLOCK_318_5  = 19,
-    LCM_DSI_6589_PLL_CLOCK_325	  = 20,
-    LCM_DSI_6589_PLL_CLOCK_331_5  = 21,
-    LCM_DSI_6589_PLL_CLOCK_338	  = 22,
-    LCM_DSI_6589_PLL_CLOCK_344_5  = 23,
-	LCM_DSI_6589_PLL_CLOCK_351	  = 24,
-    LCM_DSI_6589_PLL_CLOCK_357_5  = 25,
-    LCM_DSI_6589_PLL_CLOCK_364	  = 26,
-    LCM_DSI_6589_PLL_CLOCK_370_5  = 27,
-    LCM_DSI_6589_PLL_CLOCK_377	  = 28,
-    LCM_DSI_6589_PLL_CLOCK_383_5  = 29,
-	LCM_DSI_6589_PLL_CLOCK_390	  = 30,
-    LCM_DSI_6589_PLL_CLOCK_396_5  = 31,
-    LCM_DSI_6589_PLL_CLOCK_403	  = 32,
-    LCM_DSI_6589_PLL_CLOCK_409_5  = 33,
-    LCM_DSI_6589_PLL_CLOCK_416	  = 34,
-    LCM_DSI_6589_PLL_CLOCK_422_5  = 35,
-	LCM_DSI_6589_PLL_CLOCK_429	  = 36,
-    LCM_DSI_6589_PLL_CLOCK_435_5  = 37,
-    LCM_DSI_6589_PLL_CLOCK_442	  = 38,
-    LCM_DSI_6589_PLL_CLOCK_448_5  = 39,
-    LCM_DSI_6589_PLL_CLOCK_455	  = 40,
-    LCM_DSI_6589_PLL_CLOCK_461_5  = 41,
-	LCM_DSI_6589_PLL_CLOCK_468	  = 42,
-    LCM_DSI_6589_PLL_CLOCK_474_5  = 43,
-    LCM_DSI_6589_PLL_CLOCK_481	  = 44,
-    LCM_DSI_6589_PLL_CLOCK_487_5  = 45,
-    LCM_DSI_6589_PLL_CLOCK_494	  = 46,
-    LCM_DSI_6589_PLL_CLOCK_500_5  = 47,
-	LCM_DSI_6589_PLL_CLOCK_507	  = 48,
-    LCM_DSI_6589_PLL_CLOCK_513_5  = 49,
-	LCM_DSI_6589_PLL_CLOCK_520	  = 50,
-} LCM_DSI_PLL_CLOCK;
-
 // ---------------------------------------------------------------------------
 
 typedef struct 
@@ -426,6 +336,7 @@ typedef struct
 	unsigned int i2x_en;
 	unsigned int i2x_edge;
 	unsigned int embsync;
+	unsigned int lvds_tx_en;	
     /* intermediate buffers parameters */
     unsigned int intermediat_buffer_num; // 2..3
 
@@ -463,7 +374,9 @@ typedef struct
 	unsigned int		horizontal_sync_active;
 	unsigned int		horizontal_backporch;
 	unsigned int		horizontal_frontporch;
+	unsigned int		horizontal_blanking_pixel;
 	unsigned int		horizontal_active_pixel;
+	unsigned int		horizontal_bllp;
 
 	unsigned int		line_byte;
 	unsigned int		horizontal_sync_active_byte;
@@ -503,12 +416,16 @@ typedef struct
 	unsigned int		rg_bir;
 	unsigned int		rg_bic;
 	unsigned int		rg_bp;
-	LCM_DSI_PLL_CLOCK	PLL_CLOCK;
-	
+	unsigned int		PLL_CLOCK;
+	unsigned int		compatibility_for_nvk;
+	unsigned int		ssc_disable;
+	unsigned int		ssc_range;
+	unsigned int		cont_clock;
 	unsigned int		lcm_int_te_monitor;
 	unsigned int		lcm_int_te_period;
 	
 	unsigned int		lcm_ext_te_monitor;
+    unsigned int		lcm_ext_te_enable;
 	
 	unsigned int		noncont_clock;
 	unsigned int		noncont_clock_period;
@@ -559,14 +476,14 @@ typedef struct
     void (*send_data)(unsigned int data);
     unsigned int (*read_data)(void);
 
-	void (*dsi_set_cmdq_V3)(LCM_setting_table_V3 *para_list, unsigned int size, unsigned char force_update);
-	void (*dsi_set_cmdq_V2)(unsigned cmd, unsigned char count, unsigned char *para_list, unsigned char force_update);
-	void (*dsi_set_cmdq)(unsigned int *pdata, unsigned int queue_size, unsigned char force_update);
-	void (*dsi_write_cmd)(unsigned int cmd);
-	void (*dsi_write_regs)(unsigned int addr, unsigned int *para, unsigned int nums);
-	unsigned int (*dsi_read_reg)(void);
-	unsigned int (*dsi_dcs_read_lcm_reg)(unsigned char cmd);
-	unsigned int (*dsi_dcs_read_lcm_reg_v2)(unsigned char cmd, unsigned char *buffer, unsigned char buffer_size);
+    void (*dsi_set_cmdq_V3)(LCM_setting_table_V3 *para_list, unsigned int size, unsigned char force_update);
+    void (*dsi_set_cmdq_V2)(unsigned cmd, unsigned char count, unsigned char *para_list, unsigned char force_update);
+    void (*dsi_set_cmdq)(unsigned int *pdata, unsigned int queue_size, unsigned char force_update);
+    void (*dsi_write_cmd)(unsigned int cmd);
+    void (*dsi_write_regs)(unsigned int addr, unsigned int *para, unsigned int nums);
+    unsigned int (*dsi_read_reg)(void);
+    unsigned int (*dsi_dcs_read_lcm_reg)(unsigned char cmd);
+    unsigned int (*dsi_dcs_read_lcm_reg_v2)(unsigned char cmd, unsigned char *buffer, unsigned char buffer_size);
     void (*wait_transfer_done)(void);
 
     /** FIXME: GPIO mode should not be configured in lcm driver
@@ -589,9 +506,15 @@ typedef struct
     void (*suspend)(void);
     void (*resume)(void);
 
+    // for power-on sequence refinement    
+    void (*init_power)(void);
+    void (*suspend_power)(void);
+    void (*resume_power)(void);
+
     void (*update)(unsigned int x, unsigned int y,
                    unsigned int width, unsigned int height);
 	unsigned int (*compare_id)(void);
+	unsigned int (*get_lcm_id)(void);
 ///////////////////////////CABC backlight related function
 	void (*set_backlight)(unsigned int level);
 	void (*set_pwm)(unsigned int divider);
@@ -603,9 +526,8 @@ typedef struct
     unsigned int (*esd_check)(void);
     unsigned int  (*esd_recover)(void);
 	unsigned int (*check_status)(void);
+	void (*read_fb)(unsigned char *buffer);
 /////////////////////////////////////////////////
-	//edit by Magnum used for debug LCD 
-	void (*m_debug)(char * buf);
 
 } LCM_DRIVER;
 

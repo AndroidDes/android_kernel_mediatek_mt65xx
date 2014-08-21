@@ -1,8 +1,8 @@
 force: ;
 $(INSTALLED_BUILD_PROP_TARGET): force
-droid: make-platform
-make-platform: droidcore
-	@mediatek/build/android/make-platform.sh $(PRODUCT_OUT) $(TARGET_PRODUCT)
+#droid: make-platform
+#make-platform: droidcore
+#	@mediatek/build/android/make-platform.sh $(PRODUCT_OUT) $(TARGET_PRODUCT)
 #	@mediatek/build/tools/mkimage $(PRODUCT_OUT)/ramdisk.img ROOTFS > $(PRODUCT_OUT)/android_rootfs.bin
 #	@mediatek/build/tools/mkimage $(PRODUCT_OUT)/ramdisk-recovery.img RECOVERY > $(PRODUCT_OUT)/android_rootfs_recovery.bin
 #	@mediatek/build/tools/mkimage $(PRODUCT_OUT)/ramdisk-factory.img ROOTFS > $(PRODUCT_OUT)/factory.bin

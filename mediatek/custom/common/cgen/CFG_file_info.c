@@ -34,7 +34,11 @@ extern "C"
 #include "inc/CFG_module_default.h"
 #include "inc/CFG_file_info.h"
 #include "CFG_file_info_custom.h"
+#include "CFG_Dfo_File.h"
+#include "CFG_Dfo_Default.h"
 #include <stdio.h>
+#include <cutils/properties.h>
+
 #define MAX_FILENAMELEN 128;
 #define RESERVE_PATH	"Reserved"
 #define RESERVE_VER	"000"
@@ -102,10 +106,15 @@ const TCFG_FILE g_akCFG_File[]=
 //Reserved ten item
     { "/data/nvram/APCFG/APRDCL/Audio_AudEnh_Control_Opt",   VER(AP_CFG_RDCL_FILE_AUDIO_AUDENH_CONTROL_OPTION_PAR_LID), CFG_FILE_AUDIO_AUDENH_CONTROL_OPTION_PAR_SIZE,
             CFG_FILE_AUDIO_AUDENH_CONTROL_OPTION_PAR_TOTAL, SIGNLE_DEFUALT_REC  ,    (char *)&AUDENH_Control_Option_Par_default, DataReset , NULL},
-    { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
-    { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
-    { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
-    { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
+    { "/data/nvram/APCFG/APRDEB/Dfo",   VER(AP_CFG_CUSTOM_FILE_DFO_LID), CFG_FILE_DFO_CONFIG_SIZE,
+            CFG_FILE_DFO_CONFIG_TOTAL, SIGNLE_DEFUALT_REC  ,    (char *)&stDfoConfigDefault, DataReset , NULL},
+    { "/data/nvram/APCFG/APRDCL/Audio_VOIP_Param",   VER(AP_CFG_RDCL_FILE_AUDIO_VOIP_PAR_LID), CFG_FILE_AUDIO_VOIP_PAR_SIZE,
+            CFG_FILE_AUDIO_VOIP_PAR_TOTAL, SIGNLE_DEFUALT_REC  ,    (char *)&Audio_VOIP_Par_default, DataReset , NULL},
+    /*yucong add for PS calibration*/
+	{ "/data/nvram/APCFG/APRDCL/HWMON_PS",	VER(AP_CFG_RDCL_HWMON_PS_LID), 	CFG_FILE_HWMON_PS_REC_SIZE,	
+			CFG_FILE_HWMON_PS_REC_TOTAL,		    DEFAULT_ZERO,					    0, DataReset, NULL},
+		{ "/data/nvram/APCFG/APRDCL/MD_Type",   VER(AP_CFG_FILE_MDTYPE_LID), CFG_FILE_MDTYPE_CONFIG_SIZE,
+            CFG_FILE_MDTYPE_CONFIG_TOTAL, SIGNLE_DEFUALT_REC  ,    (char *)&stMDTypeDefault, DataReset , NULL},
     { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
     { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
     { RESERVE_PATH,	RESERVE_VER,	0,	0,	SIGNLE_DEFUALT_REC,	NULL ,	DataReset , NULL},
@@ -142,7 +151,9 @@ FileName aBackupToBinRegion[]=
 	{"FACTORY",AP_CFG_RDCL_FACTORY_LID},
 	{"HWMON_ACC",AP_CFG_RDCL_HWMON_ACC_LID},
 	{"HWMON_GYRO",AP_CFG_RDCL_HWMON_GYRO_LID},
+	{"HWMON_PS",AP_CFG_RDCL_HWMON_PS_LID},//yucong add for ALSPS calibration
 	{"WIFI_CUSTOM",AP_CFG_RDEB_WIFI_CUSTOM_LID},
+	{"GPS",AP_CFG_CUSTOM_FILE_GPS_LID},
 #ifndef MTK_PRODUCT_INFO_SUPPORT
 	{"PRODUCT_INFO",AP_CFG_REEB_PRODUCT_INFO_LID},
 #endif
@@ -152,6 +163,7 @@ FileName aBackupToBinRegion[]=
 #ifdef	MTK_MT8193_SUPPORT
     {"HDCP_KEY", AP_CFG_RDCL_FILE_HDCP_KEY_LID},
 #endif
+    {"Dfo", AP_CFG_CUSTOM_FILE_DFO_LID},
 };
 FileName aPerformance[]=
 {
@@ -185,6 +197,7 @@ pfConvertFunc aNvRamConvertFuncTable[]=
   NULL,//AP_CFG_RDCL_BWCS_LID
   NULL,//AP_CFG_RDCL_HWMON_ACC_LID
   NULL,//AP_CFG_RDCL_HWMON_GYRO_LID
+  NULL,//AP_CFG_RDCL_HWMON_PS_LID
   NULL,//AP_CFG_RDCL_FILE_AUDIO_LID
   NULL,//AP_CFG_RDCL_FILE_AUDIO_COMPFLT_LID
   NULL,//AP_CFG_RDCL_FILE_AUDIO_EFFECT_LID
@@ -196,6 +209,7 @@ pfConvertFunc aNvRamConvertFuncTable[]=
 #ifdef	MTK_SDIORETRY_SUPPORT
   NULL,//AP_CFG_REEB_SDIO_RETRY_LID
 #endif
+  NULL,//AP_CFG_CUSTOM_FILE_DFO_LID
 };
 extern pfConvertFunc aNvRamConvertFuncTable[];
 
@@ -230,6 +244,87 @@ extern const TABLE_FOR_SPECIAL_LID g_new_nvram_lid[];
 extern const unsigned int g_new_nvram_lid_count;
 #endif
 //end new nvram partition feature
+
+#ifdef MTK_COMBO_SUPPORT
+extern int nvram_bt_default_value(unsigned char *ucNvRamData)
+{
+    int  chipId_ready_retry = 0;
+    char chipId_val[PROPERTY_VALUE_MAX];
+    int  chipId;
+    
+    do {
+        property_get("persist.mtk.wcn.combo.chipid", chipId_val, NULL);
+        if(0 == strcmp(chipId_val, "0x6620")){
+            chipId = 0x6620;
+            break;
+        }
+        else if(0 == strcmp(chipId_val, "0x6628")){
+            chipId = 0x6628;
+            break;
+        }
+        else if(0 == strcmp(chipId_val, "0x6572")){
+            chipId = 0x6572;
+            break;
+        }
+        else if(0 == strcmp(chipId_val, "0x6582")){
+            chipId = 0x6582;
+            break;
+        }
+        else {
+            chipId_ready_retry ++;
+            usleep(200000);
+        }
+    } while(chipId_ready_retry < 10);
+    
+    NVRAM_LOG("Get combo chip id retry %d\n", chipId_ready_retry);
+    if (chipId_ready_retry >= 10){
+        NVRAM_LOG("Get combo chip id fails!\n");
+        return -1;
+    }
+    else{
+        NVRAM_LOG("Combo chip id %x\n", chipId);
+        
+        if(chipId == 0x6620){
+            /* NVRAM is MT6620 default */
+            memcpy(ucNvRamData, &stBtDefault_6620, CFG_FILE_BT_ADDR_REC_SIZE);
+        }
+        
+        if(chipId == 0x6628){
+            /* NVRAM is MT6628 default */
+            memcpy(ucNvRamData, &stBtDefault_6628, CFG_FILE_BT_ADDR_REC_SIZE);
+        }
+        
+        if(chipId == 0x6572){
+            /* NVRAM is MT6572 default */
+            memcpy(ucNvRamData, &stBtDefault_6572, CFG_FILE_BT_ADDR_REC_SIZE);
+        }
+        
+        if(chipId == 0x6582){
+            /* NVRAM is MT6582 default */
+            memcpy(ucNvRamData, &stBtDefault_6582, CFG_FILE_BT_ADDR_REC_SIZE);
+        }
+        
+        return 0;
+    }
+}
+#else
+extern int nvram_bt_default_value(unsigned char *ucNvRamData)
+{
+    return 0;
+}
+#endif
+
+#ifdef MTK_EMMC_SUPPORT
+extern bool nvram_emmc_support()
+{
+	return true;
+}
+#else
+extern bool nvram_emmc_support()
+{
+	return false;
+}
+#endif
 /*
 #ifdef __cplusplus
 }
